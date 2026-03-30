@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iRealEstateMxPro — Resultados</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">🏡</span>
+        <span class="logo-text">iRealEstate<span class="logo-accent">MxPro</span></span>
+      </div>
+      <p class="header-tagline">Contenido generado con IA</p>
+    </div>
+  </header>
+
+  <main class="main-container result-layout">
+
+    <!-- Columna izquierda: ficha de la propiedad -->
+    <aside class="property-sidebar">
+
+      {% if foto_portada_url %}
+      <div class="cover-photo-wrapper">
+        <img src="{{ foto_portada_url }}" alt="Foto de portada" class="cover-photo" />
+        <div class="cover-badge">{{ operacion }}</div>
+      </div>
+      {% else %}
+      <div class="cover-photo-placeholder">
+        <span>Sin foto</span>
+      </div>
+      {% endif %}
+
+      {% if fotos_extra_urls %}
+      <div class="extra-photos-grid">
+        {% for url in fotos_extra_urls %}
+        <img src="{{ url }}" alt="Foto adicional" class="extra-photo" />
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      <div class="property-card">
+        <div class="property-type-badge">{{ tipo_propiedad }} en {{ operacion }}</div>
+        <div class="property-price">{{ precio_formateado }}</div>
+        <p class="property-location">📍 {{ direccion }}, {{ ciudad }}, {{ estado }}</p>
+
+        <div class="property-specs">
+          {% if recamaras %}
+          <div class="spec-item">
+            <span class="spec-icon">🛏</span>
+            <span class="spec-value">{{ recamaras }}</span>
+            <span class="spec-label">Recámaras</span>
+          </div>
+          {% endif %}
+          {% if banos %}
+          <div class="spec-item">
+            <span class="spec-icon">🚿</span>
+            <span class="spec-value">{{ banos }}</span>
+            <span class="spec-label">Baños</span>
+          </div>
+          {% endif %}
+          {% if metros_construidos %}
+          <div class="spec-item">
+            <span class="spec-icon">📐</span>
+            <span class="spec-value">{{ metros_construidos }}</span>
+            <span class="spec-label">m² const.</span>
+          </div>
+          {% endif %}
+          {% if metros_terreno %}
+          <div class="spec-item">
+            <span class="spec-icon">🗺️</span>
+            <span class="spec-value">{{ metros_terreno }}</span>
+            <span class="spec-label">m² terreno</span>
+          </div>
+          {% endif %}
+          {% if estacionamientos %}
+          <div class="spec-item">
+            <span class="spec-icon">🚗</span>
+            <span class="spec-value">{{ estacionamientos }}</span>
+            <span class="spec-label">Cajones</span>
+          </div>
+          {% endif %}
+        </div>
+
+        {% if amenidades %}
+        <div class="amenidades-list">
+          <p class="amenidades-title">Amenidades</p>
+          <div class="amenidades-tags">
+            {% for a in amenidades %}
+            <span class="amenidad-tag">{{ a }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="agent-card">
+        <div class="agent-avatar">{{ agente_nombre[0] | upper }}</div>
+        <div class="agent-info">
+          <p class="agent-name">{{ agente_nombre }}</p>
+          <p class="agent-contact">📞 {{ agente_telefono }}</p>
+          <p class="agent-contact">✉️ {{ agente_email }}</p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Columna derecha: contenido generado -->
+    <div class="results-main">
+
+      <div class="results-header">
+        <h1>Contenido generado <span class="success-badge">✓ Listo</span></h1>
+        <a href="/" class="btn-secondary">← Nueva propiedad</a>
+      </div>
+
+      <!-- Descripción profesional -->
+      <div class="result-card">
+        <div class="result-card-header">
+          <div class="result-card-title">
+            <span class="result-icon">📝</span>
+            <h2>Descripción profesional</h2>
+          </div>
+          <button class="btn-copy" onclick="copyToClipboard('desc-profesional', this)" data-copied="false">
+            <span class="copy-icon">📋</span> Copiar
+          </button>
+        </div>
+        <div class="result-content" id="desc-profesional">{{ descripcion_profesional }}</div>
+      </div>
+
+      <!-- Instagram copy -->
+      <div class="result-card result-card-instagram">
+        <div class="result-card-header">
+          <div class="result-card-title">
+            <span class="result-icon">📸</span>
+            <h2>Copy para Instagram</h2>
+          </div>
+          <button class="btn-copy" onclick="copyToClipboard('instagram-copy', this)" data-copied="false">
+            <span class="copy-icon">📋</span> Copiar
+          </button>
+        </div>
+        <div class="result-content instagram-text" id="instagram-copy">{{ instagram_copy }}</div>
+      </div>
+
+      <div class="action-row">
+        <a href="/" class="btn-primary">
+          <span>✨</span> Generar otra propiedad
+        </a>
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <p>iRealEstateMxPro — Herramienta para agentes inmobiliarios en México</p>
+  </footer>
+
+  <script src="/static/js/app.js"></script>
+</body>
+</html>
