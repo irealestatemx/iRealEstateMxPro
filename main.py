@@ -881,11 +881,7 @@ async def publish_instagram(
 
 # ─── Generacion de Video con Remotion ───
 
-def _to_file_url(path_str: str) -> str:
-    """Convierte ruta absoluta a file:// URL para Remotion/Chrome."""
-    p = Path(path_str).resolve()
-    # En Linux: /app/static/... -> file:///app/static/...
-    return p.as_uri()
+INTERNAL_URL = "http://127.0.0.1:8000"
 
 
 async def render_video_task(job_id: str, props: dict, output_path: Path):
@@ -1016,13 +1012,12 @@ async def generate_video(
     for url in all_urls:
         fpath = url_to_filepath(url)
         if fpath.exists():
-            photos_absolute.append(_to_file_url(str(fpath)))
+            # Usar HTTP URL del propio servidor (Chromium puede cargarlas)
+            photos_absolute.append(f"{INTERNAL_URL}{url}")
 
-    # Logos como file:// URLs
-    logo_header_path = BASE_DIR / "static" / "img" / "logo-header.png"
-    logo_full_path = BASE_DIR / "static" / "img" / "logo-full.png"
-    logo_header = _to_file_url(str(logo_header_path)) if logo_header_path.exists() else ""
-    logo_full = _to_file_url(str(logo_full_path)) if logo_full_path.exists() else ""
+    # Logos como HTTP URLs
+    logo_header = f"{INTERNAL_URL}/static/img/logo-header.png"
+    logo_full = f"{INTERNAL_URL}/static/img/logo-full.png"
 
     ubicacion = f"{direccion}, {ciudad}, {estado}"
 
