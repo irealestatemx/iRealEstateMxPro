@@ -37,9 +37,34 @@ services:
     networks:
       - n8n_default
 
+  waha:
+    image: devlikeapro/waha:latest
+    container_name: waha
+    restart: unless-stopped
+    environment:
+      - WHATSAPP_DEFAULT_ENGINE=NOWEB
+      - WAHA_DASHBOARD_ENABLED=true
+      - WAHA_DASHBOARD_USERNAME=${WAHA_DASHBOARD_USER:-admin}
+      - WAHA_DASHBOARD_PASSWORD=${WAHA_DASHBOARD_PASS:-admin}
+      - WHATSAPP_RESTART_ALL_SESSIONS=True
+      - WAHA_LOG_LEVEL=info
+    volumes:
+      - waha_data:/app/.sessions
+    expose:
+      - "3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.waha.rule=Host(`wa.irealestatemx.cloud`)"
+      - "traefik.http.routers.waha.entrypoints=websecure"
+      - "traefik.http.routers.waha.tls.certresolver=mytlschallenge"
+      - "traefik.http.services.waha.loadbalancer.server.port=3000"
+    networks:
+      - n8n_default
+
 volumes:
   uploads_data:
   pgdata:
+  waha_data:
 
 networks:
   n8n_default:
