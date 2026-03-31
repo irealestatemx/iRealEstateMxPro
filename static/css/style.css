@@ -361,6 +361,29 @@ textarea { resize: vertical; min-height: 80px; }
   border-color: var(--success);
 }
 
+.btn-instagram-dl {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045);
+  color: var(--white);
+  border: none;
+  padding: 12px 28px;
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: .95rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: opacity var(--transition), transform var(--transition), box-shadow var(--transition);
+}
+.btn-instagram-dl:hover {
+  opacity: .9;
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.btn-instagram-dl:active { transform: translateY(0); }
+
 .btn-pdf {
   display: inline-flex;
   align-items: center;

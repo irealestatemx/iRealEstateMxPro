@@ -172,7 +172,28 @@
         <input type="hidden" name="descripcion_profesional" value="{{ descripcion_profesional }}" />
       </form>
 
+      <!-- Formulario oculto para generar imagen Instagram -->
+      <form id="imgForm" action="/download-image" method="post">
+        <input type="hidden" name="tipo_propiedad" value="{{ tipo_propiedad }}" />
+        <input type="hidden" name="operacion" value="{{ operacion }}" />
+        <input type="hidden" name="direccion" value="{{ direccion }}" />
+        <input type="hidden" name="ciudad" value="{{ ciudad }}" />
+        <input type="hidden" name="estado" value="{{ estado }}" />
+        <input type="hidden" name="precio_formateado" value="{{ precio_formateado }}" />
+        <input type="hidden" name="recamaras" value="{{ recamaras or '' }}" />
+        <input type="hidden" name="banos" value="{{ banos or '' }}" />
+        <input type="hidden" name="metros_construidos" value="{{ metros_construidos or '' }}" />
+        <input type="hidden" name="metros_terreno" value="{{ metros_terreno or '' }}" />
+        <input type="hidden" name="estacionamientos" value="{{ estacionamientos or '' }}" />
+        {% if foto_portada_url %}
+        <input type="hidden" name="foto_portada_url" value="{{ foto_portada_url }}" />
+        {% endif %}
+      </form>
+
       <div class="action-row">
+        <button type="submit" form="imgForm" class="btn-instagram-dl">
+          <span>📸</span> Descargar Imagen IG
+        </button>
         <button type="submit" form="pdfForm" class="btn-pdf">
           <span>📄</span> Descargar PDF
         </button>

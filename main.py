@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 from openai import OpenAI
 from dotenv import load_dotenv
 from fpdf import FPDF
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 
 load_dotenv()
 
@@ -387,6 +388,184 @@ def generate_property_pdf(data: dict) -> bytes:
     return pdf.output()
 
 
+# ─── Generacion de imagen Instagram ───
+
+def _find_font(bold: bool = False) -> str:
+    """Busca una fuente TrueType disponible en el sistema."""
+    candidates_bold = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+        "C:/Windows/Fonts/arialbd.ttf",
+        "C:/Windows/Fonts/segoeui.ttf",
+    ]
+    candidates_regular = [
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+        "/usr/share/fonts/TTF/DejaVuSans.ttf",
+        "C:/Windows/Fonts/arial.ttf",
+        "C:/Windows/Fonts/segoeui.ttf",
+    ]
+    candidates = candidates_bold if bold else candidates_regular
+    for path in candidates:
+        if Path(path).exists():
+            return path
+    return ""
+
+
+def generate_instagram_image(data: dict) -> bytes:
+    """Genera imagen cuadrada 1080x1080 para Instagram."""
+    SIZE = 1080
+    NAVY = (26, 60, 94)
+    GOLD = (201, 162, 39)
+    WHITE = (255, 255, 255)
+    WHITE_90 = (255, 255, 255, 230)
+    WHITE_60 = (255, 255, 255, 153)
+
+    # ── Cargar fuentes ──
+    font_bold_path = _find_font(bold=True)
+    font_regular_path = _find_font(bold=False)
+
+    def load_font(bold: bool, size: int) -> ImageFont.FreeTypeFont:
+        path = font_bold_path if bold else font_regular_path
+        if path:
+            return ImageFont.truetype(path, size)
+        return ImageFont.load_default()
+
+    font_badge = load_font(True, 32)
+    font_price = load_font(True, 72)
+    font_location = load_font(False, 34)
+    font_specs = load_font(True, 30)
+    font_specs_label = load_font(False, 24)
+    font_brand = load_font(True, 36)
+    font_brand_sub = load_font(False, 20)
+
+    # ── Fondo: foto de portada ──
+    portada_url = data.get("foto_portada_url")
+    if portada_url:
+        portada_path = url_to_filepath(portada_url)
+        if portada_path.exists():
+            bg = Image.open(portada_path).convert("RGBA")
+        else:
+            bg = Image.new("RGBA", (SIZE, SIZE), NAVY)
+    else:
+        bg = Image.new("RGBA", (SIZE, SIZE), NAVY)
+
+    # Recortar a cuadrado (crop centrado)
+    w, h = bg.size
+    side = min(w, h)
+    left = (w - side) // 2
+    top = (h - side) // 2
+    bg = bg.crop((left, top, left + side, top + side))
+    bg = bg.resize((SIZE, SIZE), Image.LANCZOS)
+
+    # ── Gradiente oscuro ──
+    gradient = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+    draw_grad = ImageDraw.Draw(gradient)
+    # Gradiente superior (sutil)
+    for y in range(300):
+        alpha = int(180 * (1 - y / 300))
+        draw_grad.line([(0, y), (SIZE, y)], fill=(0, 0, 0, alpha))
+    # Gradiente inferior (fuerte, para que se lea el texto)
+    for y in range(SIZE):
+        if y > SIZE - 600:
+            progress = (y - (SIZE - 600)) / 600
+            alpha = int(220 * progress)
+            draw_grad.line([(0, y), (SIZE, y)], fill=(0, 0, 0, alpha))
+
+    bg = Image.alpha_composite(bg, gradient)
+
+    # ── Overlay de dibujo ──
+    overlay = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    # ── Linea dorada superior decorativa ──
+    draw.rectangle([0, 0, SIZE, 6], fill=GOLD)
+
+    # ── Badge "EN VENTA" / "EN RENTA" (arriba izquierda) ──
+    operacion = data.get("operacion", "Venta")
+    badge_text = f"  EN {operacion.upper()}  "
+    badge_bbox = font_badge.getbbox(badge_text)
+    badge_w = badge_bbox[2] - badge_bbox[0] + 32
+    badge_h = badge_bbox[3] - badge_bbox[1] + 20
+    badge_x, badge_y = 50, 45
+
+    # Fondo dorado del badge con esquinas
+    draw.rounded_rectangle(
+        [badge_x, badge_y, badge_x + badge_w, badge_y + badge_h],
+        radius=8, fill=GOLD
+    )
+    draw.text((badge_x + 16, badge_y + 8), badge_text, fill=NAVY, font=font_badge)
+
+    # ── Marca "iRealEstateMx" (arriba derecha) ──
+    brand_text = "iRealEstateMx"
+    brand_bbox = font_brand.getbbox(brand_text)
+    brand_w = brand_bbox[2] - brand_bbox[0]
+    draw.text((SIZE - brand_w - 50, 52), brand_text, fill=WHITE_90, font=font_brand)
+
+    # ── Zona inferior: datos de la propiedad ──
+    y_cursor = SIZE - 340
+
+    # Linea dorada decorativa
+    draw.rectangle([50, y_cursor, SIZE - 50, y_cursor + 3], fill=GOLD)
+    y_cursor += 25
+
+    # Precio
+    precio = data.get("precio_formateado", "")
+    draw.text((50, y_cursor), precio, fill=WHITE, font=font_price)
+    y_cursor += 90
+
+    # Ubicacion
+    ubicacion = f"{data.get('direccion', '')}, {data.get('ciudad', '')}, {data.get('estado', '')}"
+    # Truncar si es muy largo
+    if len(ubicacion) > 50:
+        ubicacion = ubicacion[:47] + "..."
+    draw.text((50, y_cursor), ubicacion, fill=WHITE_60, font=font_location)
+    y_cursor += 55
+
+    # ── Specs row con separadores ──
+    specs_parts = []
+    if data.get("recamaras"):
+        specs_parts.append(f"{data['recamaras']} Rec")
+    if data.get("banos"):
+        specs_parts.append(f"{data['banos']} Banos")
+    if data.get("metros_construidos"):
+        specs_parts.append(f"{data['metros_construidos']} m2")
+    if data.get("estacionamientos"):
+        specs_parts.append(f"{data['estacionamientos']} Est")
+
+    if specs_parts:
+        # Dibujar cada spec con separador dorado
+        x_spec = 50
+        for i, part in enumerate(specs_parts):
+            # Valor
+            draw.text((x_spec, y_cursor), part, fill=WHITE, font=font_specs)
+            spec_bbox = font_specs.getbbox(part)
+            spec_w = spec_bbox[2] - spec_bbox[0]
+            x_spec += spec_w + 20
+            # Separador
+            if i < len(specs_parts) - 1:
+                draw.rectangle([x_spec, y_cursor + 4, x_spec + 3, y_cursor + 32], fill=GOLD)
+                x_spec += 23
+
+    y_cursor += 60
+
+    # ── Linea dorada inferior ──
+    draw.rectangle([50, y_cursor, SIZE - 50, y_cursor + 2], fill=GOLD)
+    y_cursor += 15
+
+    # ── Branding inferior ──
+    tagline = "BIENES RAICES  |  EXCLUSIVO"
+    draw.text((50, y_cursor), tagline, fill=(*GOLD, 200), font=font_brand_sub)
+
+    # Componer
+    final = Image.alpha_composite(bg, overlay).convert("RGB")
+
+    # Exportar a bytes
+    buf = io.BytesIO()
+    final.save(buf, format="JPEG", quality=95, optimize=True)
+    buf.seek(0)
+    return buf.getvalue()
+
+
 # ─── Rutas ───
 
 @app.get("/", response_class=HTMLResponse)
@@ -541,6 +720,49 @@ async def download_pdf(
     return StreamingResponse(
         io.BytesIO(pdf_bytes),
         media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.post("/download-image")
+async def download_image(
+    request: Request,
+    tipo_propiedad: str = Form(""),
+    operacion: str = Form(""),
+    direccion: str = Form(""),
+    ciudad: str = Form(""),
+    estado: str = Form(""),
+    precio_formateado: str = Form(""),
+    recamaras: Optional[str] = Form(None),
+    banos: Optional[str] = Form(None),
+    metros_construidos: Optional[str] = Form(None),
+    metros_terreno: Optional[str] = Form(None),
+    estacionamientos: Optional[str] = Form(None),
+    foto_portada_url: Optional[str] = Form(None),
+):
+    data = {
+        "tipo_propiedad": tipo_propiedad,
+        "operacion": operacion,
+        "direccion": direccion,
+        "ciudad": ciudad,
+        "estado": estado,
+        "precio_formateado": precio_formateado,
+        "recamaras": recamaras,
+        "banos": banos,
+        "metros_construidos": metros_construidos,
+        "metros_terreno": metros_terreno,
+        "estacionamientos": estacionamientos,
+        "foto_portada_url": foto_portada_url,
+    }
+
+    img_bytes = generate_instagram_image(data)
+
+    tipo_clean = tipo_propiedad.lower().replace(" ", "_")
+    filename = f"instagram_{tipo_clean}_{ciudad.lower().replace(' ', '_')}.jpg"
+
+    return StreamingResponse(
+        io.BytesIO(img_bytes),
+        media_type="image/jpeg",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
