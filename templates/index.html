@@ -57,7 +57,11 @@
         <div class="form-grid form-grid-2">
           <div class="field-group">
             <label for="ciudad">Ciudad <span class="required">*</span></label>
-            <input type="text" id="ciudad" name="ciudad" value="León" required />
+            <select id="ciudad" name="ciudad" required>
+              <option value="León" selected>León</option>
+              <option value="Guanajuato">Guanajuato</option>
+              <option value="Irapuato">Irapuato</option>
+            </select>
           </div>
           <div class="field-group">
             <label for="estado">Estado <span class="required">*</span></label>
@@ -157,6 +161,31 @@
             <input type="checkbox" name="amenidades" value="Salón de eventos" />
             <span class="checkbox-icon">🎉</span>
             <span>Salón de eventos</span>
+          </label>
+          <label class="checkbox-card">
+            <input type="checkbox" name="amenidades" value="Área deportiva" />
+            <span class="checkbox-icon">⚽</span>
+            <span>Área deportiva</span>
+          </label>
+          <label class="checkbox-card">
+            <input type="checkbox" name="amenidades" value="Pet Friendly" />
+            <span class="checkbox-icon">🐾</span>
+            <span>Pet Friendly</span>
+          </label>
+          <label class="checkbox-card">
+            <input type="checkbox" name="amenidades" value="Bar" />
+            <span class="checkbox-icon">🍸</span>
+            <span>Bar</span>
+          </label>
+          <label class="checkbox-card">
+            <input type="checkbox" name="amenidades" value="Cisterna" />
+            <span class="checkbox-icon">💧</span>
+            <span>Cisterna</span>
+          </label>
+          <label class="checkbox-card">
+            <input type="checkbox" name="amenidades" value="Parking invitados" />
+            <span class="checkbox-icon">🅿️</span>
+            <span>Parking invitados</span>
           </label>
           <label class="checkbox-card">
             <input type="checkbox" name="amenidades" value="Vista panorámica" />

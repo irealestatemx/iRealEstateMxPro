@@ -191,9 +191,13 @@ def url_to_filepath(url: str) -> Path:
 def generate_property_pdf(data: dict) -> bytes:
     pdf = PropertyPDF(orientation="P", unit="mm", format="A4")
     pdf.set_auto_page_break(auto=True, margin=20)
-    pdf.add_page()
 
     s = pdf._safe  # shortcut
+
+    # ══════════════════════════════════════
+    # PAGINA 1 — Portada + datos principales
+    # ══════════════════════════════════════
+    pdf.add_page()
 
     # ── Badge tipo + operacion ──
     badge_text = s(f"  {data['tipo_propiedad']} en {data['operacion']}  ")
@@ -222,20 +226,19 @@ def generate_property_pdf(data: dict) -> bytes:
         portada_path = url_to_filepath(portada_url)
         if portada_path.exists():
             try:
-                img_w = 190
-                pdf.image(str(portada_path), x=10, w=img_w)
+                pdf.image(str(portada_path), x=10, w=190)
                 pdf.ln(4)
             except Exception:
                 pass
 
-    # ── Fotos extras (en fila) ──
+    # ── Fotos extras (miniaturas en fila) ──
     fotos_extra = data.get("fotos_extra_urls", [])
     if fotos_extra:
         x_start = 10
         thumb_w = 35
         gap = 3
         x = x_start
-        for url in fotos_extra[:4]:  # max 4 extras en la fila
+        for url in fotos_extra[:4]:
             fpath = url_to_filepath(url)
             if fpath.exists():
                 try:
@@ -246,8 +249,6 @@ def generate_property_pdf(data: dict) -> bytes:
         pdf.ln(thumb_w * 0.75 + 4)
 
     # ── Caracteristicas (grid visual) ──
-    pdf.section_title("Caracteristicas")
-
     specs = []
     if data.get("recamaras"):
         specs.append(("Recamaras", str(data["recamaras"])))
@@ -261,22 +262,23 @@ def generate_property_pdf(data: dict) -> bytes:
         specs.append(("Estacionam.", str(data["estacionamientos"])))
 
     if specs:
+        # Verificar si hay espacio suficiente, si no, nueva pagina
+        if pdf.get_y() > 245:
+            pdf.add_page()
+
+        pdf.section_title("Caracteristicas")
         col_w = 190 / min(len(specs), 5)
-        # Fondo gris para la fila
         pdf.set_fill_color(*PropertyPDF.GRAY_LIGHT)
         row_y = pdf.get_y()
         pdf.rect(10, row_y, 190, 18, "F")
 
         for label, value in specs:
-            x_pos = pdf.get_x()
-            # Valor grande
             pdf.set_font("Helvetica", "B", 14)
             pdf.set_text_color(*PropertyPDF.NAVY)
             pdf.cell(col_w, 10, s(value), align="C")
         pdf.ln()
         pdf.set_x(10)
         for label, value in specs:
-            # Label chico
             pdf.set_font("Helvetica", "", 7)
             pdf.set_text_color(*PropertyPDF.GRAY_TEXT)
             pdf.cell(col_w, 6, s(label), align="C")
@@ -285,11 +287,13 @@ def generate_property_pdf(data: dict) -> bytes:
     # ── Amenidades ──
     amenidades = data.get("amenidades", [])
     if amenidades:
+        if pdf.get_y() > 255:
+            pdf.add_page()
+
         pdf.section_title("Amenidades")
         pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(*PropertyPDF.DARK)
 
-        # Dibujar como tags en linea
         x = 10
         y = pdf.get_y()
         for a in amenidades:
@@ -306,9 +310,14 @@ def generate_property_pdf(data: dict) -> bytes:
             x += tag_w + 3
         pdf.ln(12)
 
-    # ── Descripcion profesional ──
+    # ══════════════════════════════════════
+    # PAGINA 2 — Descripcion + Agente
+    # ══════════════════════════════════════
     descripcion = data.get("descripcion_profesional", "")
     if descripcion:
+        if pdf.get_y() > 200:
+            pdf.add_page()
+
         pdf.section_title("Descripcion de la propiedad")
         pdf.set_font("Helvetica", "", 9)
         pdf.set_text_color(*PropertyPDF.DARK)
@@ -316,13 +325,15 @@ def generate_property_pdf(data: dict) -> bytes:
         pdf.ln(6)
 
     # ── Datos de contacto del agente ──
+    if pdf.get_y() > 245:
+        pdf.add_page()
+
     pdf.section_title("Agente de contacto")
     pdf.set_fill_color(*PropertyPDF.GRAY_LIGHT)
     box_y = pdf.get_y()
     pdf.rect(10, box_y, 190, 22, "F")
 
-    pdf.set_xy(14, box_y + 2)
-    # Avatar circular (simulada con rectangulo de color)
+    # Avatar
     pdf.set_fill_color(*PropertyPDF.NAVY)
     pdf.rect(14, box_y + 3, 16, 16, "F")
     nombre = data.get("agente_nombre", "")
@@ -332,7 +343,6 @@ def generate_property_pdf(data: dict) -> bytes:
     pdf.set_xy(14, box_y + 7)
     pdf.cell(16, 8, initial, align="C")
 
-    # Info del agente
     pdf.set_xy(34, box_y + 3)
     pdf.set_font("Helvetica", "B", 10)
     pdf.set_text_color(*PropertyPDF.NAVY)
@@ -348,7 +358,32 @@ def generate_property_pdf(data: dict) -> bytes:
 
     pdf.ln(28)
 
-    # Generar bytes
+    # ══════════════════════════════════════
+    # PAGINAS EXTRA — Cada foto en grande
+    # ══════════════════════════════════════
+    all_photo_urls = []
+    if portada_url:
+        all_photo_urls.append(portada_url)
+    all_photo_urls.extend(fotos_extra)
+
+    if len(all_photo_urls) > 1:
+        for i, url in enumerate(all_photo_urls):
+            fpath = url_to_filepath(url)
+            if not fpath.exists():
+                continue
+            try:
+                pdf.add_page()
+                label = "Foto de portada" if i == 0 else f"Foto {i + 1} de {len(all_photo_urls)}"
+                pdf.section_title(label)
+
+                # Calcular tamano maximo que cabe en la pagina
+                # Espacio disponible: ancho 190mm, alto ~220mm (despues de header + titulo)
+                avail_w = 190
+                avail_h = 220
+                pdf.image(str(fpath), x=10, y=pdf.get_y(), w=avail_w, h=0)
+            except Exception:
+                pass
+
     return pdf.output()
 
 
