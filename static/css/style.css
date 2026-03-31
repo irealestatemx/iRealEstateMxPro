@@ -58,8 +58,7 @@ body {
   letter-spacing: -.5px;
   white-space: nowrap;
 }
-.logo-icon { font-size: 1.6rem; }
-.logo-accent { color: var(--gold); }
+.logo-img { height: 38px; width: auto; display: block; }
 .header-tagline {
   font-size: .85rem;
   color: rgba(255,255,255,.65);
@@ -360,6 +359,35 @@ textarea { resize: vertical; min-height: 80px; }
   color: var(--white);
   border-color: var(--success);
 }
+
+.btn-publish-ig {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--navy);
+  color: var(--gold);
+  border: 2px solid var(--gold);
+  padding: 12px 28px;
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: .95rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all var(--transition);
+}
+.btn-publish-ig:hover {
+  background: var(--gold);
+  color: var(--navy);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+.btn-publish-ig:disabled {
+  opacity: .7;
+  cursor: not-allowed;
+  transform: none;
+}
+.btn-publish-ig:active { transform: translateY(0); }
 
 .btn-instagram-dl {
   display: inline-flex;
@@ -662,12 +690,6 @@ textarea { resize: vertical; min-height: 80px; }
 .result-card-instagram .btn-copy:hover { background: rgba(255,255,255,.35); }
 .result-card-instagram .btn-copy.copied { background: rgba(255,255,255,.9); color: var(--success); border-color: transparent; }
 
-.action-row {
-  display: flex;
-  gap: 12px;
-  padding-bottom: 8px;
-}
-
 /* ── FOOTER ── */
 .site-footer {
   background: var(--navy-dark);
@@ -676,4 +698,49 @@ textarea { resize: vertical; min-height: 80px; }
   padding: 14px;
   font-size: .78rem;
   margin-top: auto;
+}
+
+/* ── TOAST NOTIFICATIONS ── */
+.toast {
+  position: fixed;
+  bottom: 30px;
+  right: 30px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 24px;
+  border-radius: var(--radius);
+  font-family: inherit;
+  font-size: .9rem;
+  font-weight: 600;
+  box-shadow: var(--shadow-md);
+  z-index: 1000;
+  transform: translateY(120px);
+  opacity: 0;
+  transition: transform .3s ease, opacity .3s ease;
+  max-width: 420px;
+}
+.toast-visible {
+  transform: translateY(0);
+  opacity: 1;
+}
+.toast-success {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+.toast-error {
+  background: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+.toast-icon { font-size: 1.2rem; }
+.toast-msg { flex: 1; }
+
+/* ── ACTION ROW responsive ── */
+.action-row {
+  display: flex;
+  gap: 12px;
+  padding-bottom: 8px;
+  flex-wrap: wrap;
 }

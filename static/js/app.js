@@ -145,3 +145,60 @@ function copyToClipboard(elementId, btn) {
     }, 2500);
   });
 }
+
+/* ── Toast notification ── */
+function showToast(message, isSuccess) {
+  const toast = document.getElementById('toast');
+  const toastIcon = document.getElementById('toastIcon');
+  const toastMsg = document.getElementById('toastMsg');
+  if (!toast) return;
+
+  toastIcon.textContent = isSuccess ? '✅' : '❌';
+  toastMsg.textContent = message;
+  toast.className = 'toast ' + (isSuccess ? 'toast-success' : 'toast-error') + ' toast-visible';
+
+  setTimeout(() => { toast.classList.remove('toast-visible'); }, 5000);
+}
+
+/* ── Publish to Instagram via Upload Post API ── */
+async function publishToInstagram() {
+  const btn = document.getElementById('publishIgBtn');
+  if (!btn) return;
+
+  // Deshabilitar boton
+  btn.disabled = true;
+  btn.innerHTML = '<span>⏳</span> Publicando...';
+
+  // Recoger datos del form oculto de imagen
+  const imgForm = document.getElementById('imgForm');
+  const formData = new FormData(imgForm);
+
+  // Agregar el instagram_copy desde el contenido de la pagina
+  const igCopyEl = document.getElementById('instagram-copy');
+  if (igCopyEl) {
+    formData.append('instagram_copy', igCopyEl.innerText || igCopyEl.textContent);
+  }
+
+  try {
+    const response = await fetch('/publish-instagram', {
+      method: 'POST',
+      body: formData,
+    });
+    const result = await response.json();
+
+    if (result.success) {
+      let msg = result.message;
+      if (result.post_url) msg += ' — ' + result.post_url;
+      showToast(msg, true);
+      btn.innerHTML = '<span>✅</span> Publicado';
+    } else {
+      showToast('Error: ' + (result.error || 'Error desconocido'), false);
+      btn.disabled = false;
+      btn.innerHTML = '<span>🚀</span> Publicar en Instagram';
+    }
+  } catch (err) {
+    showToast('Error de conexion: ' + err.message, false);
+    btn.disabled = false;
+    btn.innerHTML = '<span>🚀</span> Publicar en Instagram';
+  }
+}

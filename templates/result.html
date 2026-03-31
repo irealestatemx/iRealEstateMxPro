@@ -12,8 +12,7 @@
   <header class="site-header">
     <div class="header-inner">
       <div class="logo">
-        <span class="logo-icon">🏡</span>
-        <span class="logo-text">iRealEstate<span class="logo-accent">MxPro</span></span>
+        <img src="/static/img/logo-header.png" alt="iRealEstateMx" class="logo-img" />
       </div>
       <p class="header-tagline">Contenido generado con IA</p>
     </div>
@@ -191,6 +190,9 @@
       </form>
 
       <div class="action-row">
+        <button type="button" class="btn-publish-ig" id="publishIgBtn" onclick="publishToInstagram()">
+          <span>🚀</span> Publicar en Instagram
+        </button>
         <button type="submit" form="imgForm" class="btn-instagram-dl">
           <span>📸</span> Descargar Imagen IG
         </button>
@@ -200,6 +202,12 @@
         <a href="/" class="btn-primary">
           <span>✨</span> Generar otra propiedad
         </a>
+      </div>
+
+      <!-- Toast de notificacion -->
+      <div class="toast" id="toast">
+        <span class="toast-icon" id="toastIcon"></span>
+        <span class="toast-msg" id="toastMsg"></span>
       </div>
 
     </div>

@@ -13,6 +13,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from fpdf import FPDF
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
+import httpx
 
 load_dotenv()
 
@@ -495,11 +496,18 @@ def generate_instagram_image(data: dict) -> bytes:
     )
     draw.text((badge_x + 16, badge_y + 8), badge_text, fill=NAVY, font=font_badge)
 
-    # ── Marca "iRealEstateMx" (arriba derecha) ──
-    brand_text = "iRealEstateMx"
-    brand_bbox = font_brand.getbbox(brand_text)
-    brand_w = brand_bbox[2] - brand_bbox[0]
-    draw.text((SIZE - brand_w - 50, 52), brand_text, fill=WHITE_90, font=font_brand)
+    # ── Logo iRealEstateMx (arriba derecha) ──
+    logo_path = BASE_DIR / "static" / "img" / "logo-header.png"
+    if logo_path.exists():
+        logo_img = Image.open(logo_path).convert("RGBA")
+        # Escalar logo a altura ~50px manteniendo proporciones
+        logo_h = 50
+        logo_ratio = logo_img.width / logo_img.height
+        logo_w = int(logo_h * logo_ratio)
+        logo_img = logo_img.resize((logo_w, logo_h), Image.LANCZOS)
+        logo_x = SIZE - logo_w - 50
+        logo_y = 40
+        overlay.paste(logo_img, (logo_x, logo_y), logo_img)
 
     # ── Zona inferior: datos de la propiedad ──
     y_cursor = SIZE - 340
@@ -552,9 +560,19 @@ def generate_instagram_image(data: dict) -> bytes:
     draw.rectangle([50, y_cursor, SIZE - 50, y_cursor + 2], fill=GOLD)
     y_cursor += 15
 
-    # ── Branding inferior ──
-    tagline = "BIENES RAICES  |  EXCLUSIVO"
-    draw.text((50, y_cursor), tagline, fill=(*GOLD, 200), font=font_brand_sub)
+    # ── Logo completo inferior ──
+    logo_full_path = BASE_DIR / "static" / "img" / "logo-full.png"
+    if logo_full_path.exists():
+        logo_full = Image.open(logo_full_path).convert("RGBA")
+        # Escalar a altura ~60px
+        lf_h = 60
+        lf_ratio = logo_full.width / logo_full.height
+        lf_w = int(lf_h * lf_ratio)
+        logo_full = logo_full.resize((lf_w, lf_h), Image.LANCZOS)
+        overlay.paste(logo_full, (50, y_cursor - 5), logo_full)
+    else:
+        tagline = "BIENES RAICES  |  EXCLUSIVO"
+        draw.text((50, y_cursor), tagline, fill=(*GOLD, 200), font=font_brand_sub)
 
     # Componer
     final = Image.alpha_composite(bg, overlay).convert("RGB")
@@ -765,6 +783,91 @@ async def download_image(
         media_type="image/jpeg",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@app.post("/publish-instagram")
+async def publish_instagram(
+    request: Request,
+    tipo_propiedad: str = Form(""),
+    operacion: str = Form(""),
+    direccion: str = Form(""),
+    ciudad: str = Form(""),
+    estado: str = Form(""),
+    precio_formateado: str = Form(""),
+    recamaras: Optional[str] = Form(None),
+    banos: Optional[str] = Form(None),
+    metros_construidos: Optional[str] = Form(None),
+    metros_terreno: Optional[str] = Form(None),
+    estacionamientos: Optional[str] = Form(None),
+    foto_portada_url: Optional[str] = Form(None),
+    instagram_copy: str = Form(""),
+):
+    """Genera la imagen IG y la publica via Upload Post API."""
+    api_key = os.getenv("UPLOADPOST_API_KEY", "")
+    user = os.getenv("UPLOADPOST_USER", "")
+
+    if not api_key or not user:
+        return {"success": False, "error": "Faltan las variables UPLOADPOST_API_KEY o UPLOADPOST_USER en el .env"}
+
+    # Generar la imagen
+    data = {
+        "tipo_propiedad": tipo_propiedad,
+        "operacion": operacion,
+        "direccion": direccion,
+        "ciudad": ciudad,
+        "estado": estado,
+        "precio_formateado": precio_formateado,
+        "recamaras": recamaras,
+        "banos": banos,
+        "metros_construidos": metros_construidos,
+        "metros_terreno": metros_terreno,
+        "estacionamientos": estacionamientos,
+        "foto_portada_url": foto_portada_url,
+    }
+    img_bytes = generate_instagram_image(data)
+
+    # Llamar a Upload Post API
+    try:
+        async with httpx.AsyncClient(timeout=120.0) as client_http:
+            response = await client_http.post(
+                "https://api.upload-post.com/api/upload_photos",
+                headers={
+                    "Authorization": f"Apikey {api_key}",
+                },
+                data={
+                    "user": user,
+                    "platform[]": "instagram",
+                    "title": instagram_copy,
+                },
+                files={
+                    "photos[]": ("instagram_post.jpg", img_bytes, "image/jpeg"),
+                },
+            )
+
+        result = response.json()
+
+        if response.status_code == 200 and result.get("success"):
+            ig_result = result.get("results", {}).get("instagram", {})
+            post_url = ig_result.get("url", "")
+            return {
+                "success": True,
+                "message": "Publicado exitosamente en Instagram",
+                "post_url": post_url,
+            }
+        elif response.status_code == 202:
+            return {
+                "success": True,
+                "message": "Publicacion programada exitosamente",
+                "job_id": result.get("job_id", ""),
+            }
+        else:
+            error_msg = result.get("error") or result.get("message") or f"Error HTTP {response.status_code}"
+            return {"success": False, "error": error_msg}
+
+    except httpx.TimeoutException:
+        return {"success": False, "error": "Timeout: la publicacion esta siendo procesada en segundo plano"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
 
 
 if __name__ == "__main__":
