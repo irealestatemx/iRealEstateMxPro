@@ -108,7 +108,7 @@ Instagram copy:"""
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("index.html", context={"request": request}, request=request)
 
 
 @app.post("/generate", response_class=HTMLResponse)
@@ -181,7 +181,7 @@ async def generate(
 
     precio_formateado = format_price(float(precio.replace(",", "").replace("$", "").strip()))
 
-    return templates.TemplateResponse("result.html", {
+    context = {
         "request": request,
         "tipo_propiedad": tipo_propiedad,
         "operacion": operacion,
@@ -202,7 +202,8 @@ async def generate(
         "fotos_extra_urls": fotos_extra_urls,
         "descripcion_profesional": descripcion_profesional,
         "instagram_copy": instagram_copy,
-    })
+    }
+    return templates.TemplateResponse("result.html", context=context, request=request)
 
 
 if __name__ == "__main__":
