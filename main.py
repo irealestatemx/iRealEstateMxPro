@@ -1,15 +1,17 @@
 import os
+import io
 import uuid
 import shutil
 from pathlib import Path
 from typing import List, Optional
 
 from fastapi import FastAPI, Request, Form, File, UploadFile
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from openai import OpenAI
 from dotenv import load_dotenv
+from fpdf import FPDF
 
 load_dotenv()
 
@@ -25,6 +27,8 @@ templates = Jinja2Templates(directory=BASE_DIR / "templates")
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
+# ─── Utilidades ───
+
 def format_price(price: float) -> str:
     return f"${price:,.0f} MXN"
 
@@ -35,37 +39,39 @@ def build_property_summary(data: dict) -> str:
 
     caracteristicas = []
     if data.get("recamaras"):
-        caracteristicas.append(f"{data['recamaras']} recámaras")
+        caracteristicas.append(f"{data['recamaras']} recamaras")
     if data.get("banos"):
-        caracteristicas.append(f"{data['banos']} baños")
+        caracteristicas.append(f"{data['banos']} banos")
     if data.get("metros_construidos"):
-        caracteristicas.append(f"{data['metros_construidos']} m² construidos")
+        caracteristicas.append(f"{data['metros_construidos']} m2 construidos")
     if data.get("metros_terreno"):
-        caracteristicas.append(f"{data['metros_terreno']} m² de terreno")
+        caracteristicas.append(f"{data['metros_terreno']} m2 de terreno")
     if data.get("estacionamientos"):
-        caracteristicas.append(f"{data['estacionamientos']} cajón(es) de estacionamiento")
+        caracteristicas.append(f"{data['estacionamientos']} cajon(es) de estacionamiento")
 
     return f"""
 Tipo de propiedad: {data['tipo_propiedad']}
-Operación: {data['operacion']}
-Ubicación: {data['direccion']}, {data['ciudad']}, {data['estado']}
+Operacion: {data['operacion']}
+Ubicacion: {data['direccion']}, {data['ciudad']}, {data['estado']}
 Precio: {format_price(float(data['precio']))}
-Características: {', '.join(caracteristicas) if caracteristicas else 'No especificadas'}
+Caracteristicas: {', '.join(caracteristicas) if caracteristicas else 'No especificadas'}
 Amenidades: {amenidades_str}
 Notas del agente: {data.get('descripcion_agente', '')}
 """.strip()
 
 
+# ─── Generacion con IA ───
+
 def generate_professional_description(summary: str) -> str:
-    prompt = f"""Eres un experto en marketing inmobiliario de México, especializado en el mercado de Guanajuato y León.
-Con base en los siguientes datos de la propiedad, redacta una descripción profesional, atractiva y persuasiva de 150 a 200 palabras.
+    prompt = f"""Eres un experto en marketing inmobiliario de Mexico, especializado en el mercado de Guanajuato y Leon.
+Con base en los siguientes datos de la propiedad, redacta una descripcion profesional, atractiva y persuasiva de 150 a 200 palabras.
 El tono debe ser formal-moderno, resaltar los puntos fuertes de la propiedad y motivar al comprador/arrendatario potencial a contactar al agente.
-Escribe directamente la descripción, sin títulos ni encabezados.
+Escribe directamente la descripcion, sin titulos ni encabezados.
 
 Datos de la propiedad:
 {summary}
 
-Descripción profesional:"""
+Descripcion profesional:"""
 
     response = client.chat.completions.create(
         model="gpt-4o-mini",
@@ -81,16 +87,16 @@ def generate_instagram_copy(summary: str, tipo: str, operacion: str, ciudad: str
     operacion_tag = "EnVenta" if operacion == "Venta" else "EnRenta"
     tipo_tag = tipo.replace(" ", "")
 
-    prompt = f"""Eres un experto en redes sociales para el sector inmobiliario en México.
+    prompt = f"""Eres un experto en redes sociales para el sector inmobiliario en Mexico.
 Con base en los siguientes datos de propiedad, crea un copy atractivo para Instagram.
 
 Estructura requerida:
-1. Texto principal: 2-3 oraciones impactantes, máximo 280 caracteres, con emoji(s) al inicio, llamada a la acción al final (ej: "¡Agenda tu visita hoy! 📲")
-2. Salto de línea
-3. Bloque de hashtags: exactamente 20 hashtags relevantes al mercado inmobiliario mexicano, la ciudad ({ciudad}) y el tipo de operación.
+1. Texto principal: 2-3 oraciones impactantes, maximo 280 caracteres, con emoji(s) al inicio, llamada a la accion al final (ej: "Agenda tu visita hoy!")
+2. Salto de linea
+3. Bloque de hashtags: exactamente 20 hashtags relevantes al mercado inmobiliario mexicano, la ciudad ({ciudad}) y el tipo de operacion.
 
-Hashtags sugeridos a incluir (puedes agregar más relevantes):
-#BienesRaicesMexico #Inmobiliaria #InmobiliariaLeón #InmobiliariaGuanajuato #{ciudad_lower} #Guanajuato #{tipo_tag}{operacion_tag} #PropiedadesLeón #Mexico #CasasMexico #InversionInmobiliaria #PropiedadesMexico #RealtorMexico #AgentInmobiliario #ViveLeón
+Hashtags sugeridos a incluir (puedes agregar mas relevantes):
+#BienesRaicesMexico #Inmobiliaria #InmobiliariaLeon #InmobiliariaGuanajuato #{ciudad_lower} #Guanajuato #{tipo_tag}{operacion_tag} #PropiedadesLeon #Mexico #CasasMexico #InversionInmobiliaria #PropiedadesMexico #RealtorMexico #AgentInmobiliario #ViveLeon
 
 Datos de la propiedad:
 {summary}
@@ -105,6 +111,248 @@ Instagram copy:"""
     )
     return response.choices[0].message.content.strip()
 
+
+# ─── Generacion de PDF ───
+
+class PropertyPDF(FPDF):
+    """PDF personalizado para fichas de propiedades inmobiliarias."""
+
+    NAVY = (26, 60, 94)
+    GOLD = (201, 162, 39)
+    WHITE = (255, 255, 255)
+    GRAY_LIGHT = (241, 243, 245)
+    GRAY_TEXT = (108, 117, 125)
+    DARK = (52, 58, 64)
+
+    def header(self):
+        # Barra superior azul marino
+        self.set_fill_color(*self.NAVY)
+        self.rect(0, 0, 210, 28, "F")
+        # Logo / nombre
+        self.set_font("Helvetica", "B", 16)
+        self.set_text_color(*self.WHITE)
+        self.set_xy(12, 6)
+        self.cell(0, 8, "iRealEstateMxPro", ln=False)
+        # Subtitulo
+        self.set_font("Helvetica", "", 9)
+        self.set_text_color(180, 200, 220)
+        self.set_xy(12, 15)
+        self.cell(0, 8, "Ficha de propiedad", ln=False)
+        # Linea dorada decorativa
+        self.set_fill_color(*self.GOLD)
+        self.rect(0, 28, 210, 2, "F")
+        self.set_y(35)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font("Helvetica", "I", 7)
+        self.set_text_color(*self.GRAY_TEXT)
+        self.cell(0, 10, f"iRealEstateMxPro  |  Pagina {self.page_no()}", align="C")
+
+    def _safe(self, text: str) -> str:
+        """Limpia caracteres que latin-1 no soporta."""
+        if not text:
+            return ""
+        replacements = {
+            "\u2013": "-", "\u2014": "-", "\u2018": "'", "\u2019": "'",
+            "\u201c": '"', "\u201d": '"', "\u2026": "...", "\u00b2": "2",
+            "\u2022": "-", "\u00b7": "-",
+        }
+        for old, new in replacements.items():
+            text = text.replace(old, new)
+        return text.encode("latin-1", errors="replace").decode("latin-1")
+
+    def section_title(self, title: str):
+        self.set_font("Helvetica", "B", 11)
+        self.set_text_color(*self.NAVY)
+        self.cell(0, 8, self._safe(title), ln=True)
+        self.set_fill_color(*self.GOLD)
+        self.rect(self.get_x(), self.get_y(), 40, 0.8, "F")
+        self.ln(3)
+
+    def gray_box_start(self):
+        self._box_y = self.get_y()
+
+    def gray_box_end(self):
+        h = self.get_y() - self._box_y
+        self.set_fill_color(*self.GRAY_LIGHT)
+        # Dibuja el fondo detras (truco: lo dibujamos y luego avanzamos)
+        page = self.page
+        self.page = page
+        self.rect(10, self._box_y - 2, 190, h + 4, "F")
+
+
+def url_to_filepath(url: str) -> Path:
+    """Convierte una URL como /static/uploads/uuid/file.jpg a una ruta de archivo."""
+    relative = url.lstrip("/")
+    return BASE_DIR / relative
+
+
+def generate_property_pdf(data: dict) -> bytes:
+    pdf = PropertyPDF(orientation="P", unit="mm", format="A4")
+    pdf.set_auto_page_break(auto=True, margin=20)
+    pdf.add_page()
+
+    s = pdf._safe  # shortcut
+
+    # ── Badge tipo + operacion ──
+    badge_text = s(f"  {data['tipo_propiedad']} en {data['operacion']}  ")
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_fill_color(*PropertyPDF.NAVY)
+    pdf.set_text_color(*PropertyPDF.WHITE)
+    badge_w = pdf.get_string_width(badge_text) + 8
+    pdf.cell(badge_w, 7, badge_text, ln=False, fill=True)
+    pdf.ln(10)
+
+    # ── Precio ──
+    pdf.set_font("Helvetica", "B", 22)
+    pdf.set_text_color(*PropertyPDF.NAVY)
+    pdf.cell(0, 12, s(data.get("precio_formateado", "")), ln=True)
+
+    # ── Ubicacion ──
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(*PropertyPDF.GRAY_TEXT)
+    ubicacion = f"{data.get('direccion', '')}, {data.get('ciudad', '')}, {data.get('estado', '')}"
+    pdf.cell(0, 6, s(ubicacion), ln=True)
+    pdf.ln(4)
+
+    # ── Foto de portada ──
+    portada_url = data.get("foto_portada_url")
+    if portada_url:
+        portada_path = url_to_filepath(portada_url)
+        if portada_path.exists():
+            try:
+                img_w = 190
+                pdf.image(str(portada_path), x=10, w=img_w)
+                pdf.ln(4)
+            except Exception:
+                pass
+
+    # ── Fotos extras (en fila) ──
+    fotos_extra = data.get("fotos_extra_urls", [])
+    if fotos_extra:
+        x_start = 10
+        thumb_w = 35
+        gap = 3
+        x = x_start
+        for url in fotos_extra[:4]:  # max 4 extras en la fila
+            fpath = url_to_filepath(url)
+            if fpath.exists():
+                try:
+                    pdf.image(str(fpath), x=x, y=pdf.get_y(), w=thumb_w, h=thumb_w * 0.75)
+                    x += thumb_w + gap
+                except Exception:
+                    pass
+        pdf.ln(thumb_w * 0.75 + 4)
+
+    # ── Caracteristicas (grid visual) ──
+    pdf.section_title("Caracteristicas")
+
+    specs = []
+    if data.get("recamaras"):
+        specs.append(("Recamaras", str(data["recamaras"])))
+    if data.get("banos"):
+        specs.append(("Banos", str(data["banos"])))
+    if data.get("metros_construidos"):
+        specs.append(("m2 Construidos", str(data["metros_construidos"])))
+    if data.get("metros_terreno"):
+        specs.append(("m2 Terreno", str(data["metros_terreno"])))
+    if data.get("estacionamientos"):
+        specs.append(("Estacionam.", str(data["estacionamientos"])))
+
+    if specs:
+        col_w = 190 / min(len(specs), 5)
+        # Fondo gris para la fila
+        pdf.set_fill_color(*PropertyPDF.GRAY_LIGHT)
+        row_y = pdf.get_y()
+        pdf.rect(10, row_y, 190, 18, "F")
+
+        for label, value in specs:
+            x_pos = pdf.get_x()
+            # Valor grande
+            pdf.set_font("Helvetica", "B", 14)
+            pdf.set_text_color(*PropertyPDF.NAVY)
+            pdf.cell(col_w, 10, s(value), align="C")
+        pdf.ln()
+        pdf.set_x(10)
+        for label, value in specs:
+            # Label chico
+            pdf.set_font("Helvetica", "", 7)
+            pdf.set_text_color(*PropertyPDF.GRAY_TEXT)
+            pdf.cell(col_w, 6, s(label), align="C")
+        pdf.ln(10)
+
+    # ── Amenidades ──
+    amenidades = data.get("amenidades", [])
+    if amenidades:
+        pdf.section_title("Amenidades")
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(*PropertyPDF.DARK)
+
+        # Dibujar como tags en linea
+        x = 10
+        y = pdf.get_y()
+        for a in amenidades:
+            tag_text = s(f"  {a}  ")
+            tag_w = pdf.get_string_width(tag_text) + 4
+            if x + tag_w > 200:
+                x = 10
+                y += 8
+                pdf.set_y(y)
+            pdf.set_xy(x, y)
+            pdf.set_fill_color(*PropertyPDF.GRAY_LIGHT)
+            pdf.set_draw_color(200, 200, 200)
+            pdf.cell(tag_w, 6.5, tag_text, border=1, fill=True, align="C")
+            x += tag_w + 3
+        pdf.ln(12)
+
+    # ── Descripcion profesional ──
+    descripcion = data.get("descripcion_profesional", "")
+    if descripcion:
+        pdf.section_title("Descripcion de la propiedad")
+        pdf.set_font("Helvetica", "", 9)
+        pdf.set_text_color(*PropertyPDF.DARK)
+        pdf.multi_cell(190, 5, s(descripcion))
+        pdf.ln(6)
+
+    # ── Datos de contacto del agente ──
+    pdf.section_title("Agente de contacto")
+    pdf.set_fill_color(*PropertyPDF.GRAY_LIGHT)
+    box_y = pdf.get_y()
+    pdf.rect(10, box_y, 190, 22, "F")
+
+    pdf.set_xy(14, box_y + 2)
+    # Avatar circular (simulada con rectangulo de color)
+    pdf.set_fill_color(*PropertyPDF.NAVY)
+    pdf.rect(14, box_y + 3, 16, 16, "F")
+    nombre = data.get("agente_nombre", "")
+    initial = s(nombre[0].upper()) if nombre else "A"
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(*PropertyPDF.WHITE)
+    pdf.set_xy(14, box_y + 7)
+    pdf.cell(16, 8, initial, align="C")
+
+    # Info del agente
+    pdf.set_xy(34, box_y + 3)
+    pdf.set_font("Helvetica", "B", 10)
+    pdf.set_text_color(*PropertyPDF.NAVY)
+    pdf.cell(80, 6, s(nombre))
+
+    pdf.set_xy(34, box_y + 9)
+    pdf.set_font("Helvetica", "", 8)
+    pdf.set_text_color(*PropertyPDF.GRAY_TEXT)
+    pdf.cell(80, 5, s(f"Tel: {data.get('agente_telefono', '')}"))
+
+    pdf.set_xy(34, box_y + 14)
+    pdf.cell(80, 5, s(f"Email: {data.get('agente_email', '')}"))
+
+    pdf.ln(28)
+
+    # Generar bytes
+    return pdf.output()
+
+
+# ─── Rutas ───
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -203,6 +451,63 @@ async def generate(
         "instagram_copy": instagram_copy,
     }
     return templates.TemplateResponse(request=request, name="result.html", context=context)
+
+
+@app.post("/download-pdf")
+async def download_pdf(
+    request: Request,
+    tipo_propiedad: str = Form(""),
+    operacion: str = Form(""),
+    direccion: str = Form(""),
+    ciudad: str = Form(""),
+    estado: str = Form(""),
+    precio_formateado: str = Form(""),
+    recamaras: Optional[str] = Form(None),
+    banos: Optional[str] = Form(None),
+    metros_construidos: Optional[str] = Form(None),
+    metros_terreno: Optional[str] = Form(None),
+    estacionamientos: Optional[str] = Form(None),
+    agente_nombre: str = Form(""),
+    agente_telefono: str = Form(""),
+    agente_email: str = Form(""),
+    foto_portada_url: Optional[str] = Form(None),
+    descripcion_profesional: str = Form(""),
+):
+    form_data = await request.form()
+    amenidades = form_data.getlist("amenidades")
+    fotos_extra_urls = form_data.getlist("fotos_extra_urls")
+
+    data = {
+        "tipo_propiedad": tipo_propiedad,
+        "operacion": operacion,
+        "direccion": direccion,
+        "ciudad": ciudad,
+        "estado": estado,
+        "precio_formateado": precio_formateado,
+        "recamaras": recamaras,
+        "banos": banos,
+        "metros_construidos": metros_construidos,
+        "metros_terreno": metros_terreno,
+        "estacionamientos": estacionamientos,
+        "amenidades": amenidades,
+        "agente_nombre": agente_nombre,
+        "agente_telefono": agente_telefono,
+        "agente_email": agente_email,
+        "foto_portada_url": foto_portada_url,
+        "fotos_extra_urls": fotos_extra_urls,
+        "descripcion_profesional": descripcion_profesional,
+    }
+
+    pdf_bytes = generate_property_pdf(data)
+
+    tipo_clean = tipo_propiedad.lower().replace(" ", "_")
+    filename = f"ficha_{tipo_clean}_{ciudad.lower().replace(' ', '_')}.pdf"
+
+    return StreamingResponse(
+        io.BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 if __name__ == "__main__":

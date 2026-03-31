@@ -144,7 +144,38 @@
         <div class="result-content instagram-text" id="instagram-copy">{{ instagram_copy }}</div>
       </div>
 
+      <!-- Formulario oculto para generar PDF -->
+      <form id="pdfForm" action="/download-pdf" method="post">
+        <input type="hidden" name="tipo_propiedad" value="{{ tipo_propiedad }}" />
+        <input type="hidden" name="operacion" value="{{ operacion }}" />
+        <input type="hidden" name="direccion" value="{{ direccion }}" />
+        <input type="hidden" name="ciudad" value="{{ ciudad }}" />
+        <input type="hidden" name="estado" value="{{ estado }}" />
+        <input type="hidden" name="precio_formateado" value="{{ precio_formateado }}" />
+        <input type="hidden" name="recamaras" value="{{ recamaras or '' }}" />
+        <input type="hidden" name="banos" value="{{ banos or '' }}" />
+        <input type="hidden" name="metros_construidos" value="{{ metros_construidos or '' }}" />
+        <input type="hidden" name="metros_terreno" value="{{ metros_terreno or '' }}" />
+        <input type="hidden" name="estacionamientos" value="{{ estacionamientos or '' }}" />
+        <input type="hidden" name="agente_nombre" value="{{ agente_nombre }}" />
+        <input type="hidden" name="agente_telefono" value="{{ agente_telefono }}" />
+        <input type="hidden" name="agente_email" value="{{ agente_email }}" />
+        {% if foto_portada_url %}
+        <input type="hidden" name="foto_portada_url" value="{{ foto_portada_url }}" />
+        {% endif %}
+        {% for url in fotos_extra_urls %}
+        <input type="hidden" name="fotos_extra_urls" value="{{ url }}" />
+        {% endfor %}
+        {% for a in amenidades %}
+        <input type="hidden" name="amenidades" value="{{ a }}" />
+        {% endfor %}
+        <input type="hidden" name="descripcion_profesional" value="{{ descripcion_profesional }}" />
+      </form>
+
       <div class="action-row">
+        <button type="submit" form="pdfForm" class="btn-pdf">
+          <span>📄</span> Descargar PDF
+        </button>
         <a href="/" class="btn-primary">
           <span>✨</span> Generar otra propiedad
         </a>
