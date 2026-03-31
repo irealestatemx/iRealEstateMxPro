@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+  irealestate:
+    build: .
+    container_name: irealestate
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - uploads_data:/app/static/uploads
+    expose:
+      - "8000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.fastapi.rule=Host(`api.irealestatemx.cloud`)"
+      - "traefik.http.routers.fastapi.entrypoints=websecure"
+      - "traefik.http.routers.fastapi.tls.certresolver=mytlschallenge"
+      - "traefik.http.services.fastapi.loadbalancer.server.port=8000"
+    networks:
+      - n8n_default
+
+volumes:
+  uploads_data:
+
+networks:
+  n8n_default:
+    external: true
