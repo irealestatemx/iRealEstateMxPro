@@ -43,6 +43,7 @@ services:
     restart: unless-stopped
     environment:
       - WHATSAPP_DEFAULT_ENGINE=NOWEB
+      - WHATSAPP_API_KEY=${WAHA_API_KEY:-your_secret_api_key}
       - WAHA_DASHBOARD_ENABLED=true
       - WAHA_DASHBOARD_USERNAME=${WAHA_DASHBOARD_USER:-admin}
       - WAHA_DASHBOARD_PASSWORD=${WAHA_DASHBOARD_PASS:-admin}
