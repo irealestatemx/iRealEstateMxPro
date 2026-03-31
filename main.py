@@ -1133,7 +1133,7 @@ def _build_scene_contact(data: dict) -> Image.Image:
 
 def render_video_sync(data: dict, output_path: Path, job_id: str):
     """Renderiza el reel MP4 con MoviePy + Pillow (puro Python)."""
-    from moviepy.editor import ImageClip, concatenate_videoclips, CompositeVideoClip
+    from moviepy import ImageClip, concatenate_videoclips, CompositeVideoClip
     import numpy as np
 
     photos = data.get("photos", [])
