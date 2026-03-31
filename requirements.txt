@@ -8,3 +8,4 @@ aiofiles
 fpdf2
 Pillow
 httpx
+moviepy

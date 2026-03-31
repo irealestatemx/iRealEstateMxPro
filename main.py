@@ -879,90 +879,340 @@ async def publish_instagram(
         return {"success": False, "error": str(e)}
 
 
-# ─── Generacion de Video con Remotion ───
+# ─── Generacion de Video con MoviePy + Pillow ───
 
-INTERNAL_URL = "http://127.0.0.1:8000"
+W_VID, H_VID = 1080, 1920
+FPS_VID = 30
+SCENE_SECS = 4
+COVER_SECS = 5
+CONTACT_SECS = 5
+
+NAVY_RGB = (26, 60, 94)
+GOLD_RGB = (201, 162, 39)
+WHITE_RGB = (255, 255, 255)
 
 
-async def render_video_task(job_id: str, props: dict, output_path: Path):
-    """Renderiza el video con Remotion en background."""
+def _pil_to_frame(img: Image.Image):
+    """Convierte Pillow RGBA/RGB a array numpy para MoviePy."""
+    import numpy as np
+    return np.array(img.convert("RGB"))
+
+
+def _load_and_crop_vertical(path: str) -> Image.Image:
+    """Carga imagen y la recorta a 1080x1920 (9:16 centrado)."""
+    img = Image.open(path).convert("RGB")
+    w, h = img.size
+    target_ratio = W_VID / H_VID  # 0.5625
+    current_ratio = w / h
+    if current_ratio > target_ratio:
+        new_w = int(h * target_ratio)
+        left = (w - new_w) // 2
+        img = img.crop((left, 0, left + new_w, h))
+    else:
+        new_h = int(w / target_ratio)
+        top = (h - new_h) // 2
+        img = img.crop((0, top, w, top + new_h))
+    return img.resize((W_VID, H_VID), Image.LANCZOS)
+
+
+def _draw_gradient(draw: ImageDraw.Draw, w: int, h: int, top_alpha=150, bottom_alpha=220):
+    """Gradiente oscuro arriba y abajo."""
+    for y in range(min(400, h)):
+        a = int(top_alpha * (1 - y / 400))
+        draw.line([(0, y), (w, y)], fill=(0, 0, 0, a))
+    start = h - 650
+    for y in range(start, h):
+        progress = (y - start) / 650
+        a = int(bottom_alpha * progress)
+        draw.line([(0, y), (w, y)], fill=(0, 0, 0, a))
+
+
+def _apply_ken_burns(base_img: Image.Image, t: float, duration: float, direction: str = "in") -> Image.Image:
+    """Aplica efecto Ken Burns (zoom lento) al frame."""
+    progress = t / duration if duration > 0 else 0
+    if direction == "in":
+        scale = 1.0 + 0.08 * progress
+        dx = -10 * progress
+    else:
+        scale = 1.08 - 0.08 * progress
+        dx = -10 * (1 - progress)
+    new_w = int(W_VID * scale)
+    new_h = int(H_VID * scale)
+    zoomed = base_img.resize((new_w, new_h), Image.LANCZOS)
+    cx = (new_w - W_VID) // 2 + int(dx)
+    cy = (new_h - H_VID) // 2
+    cx = max(0, min(cx, new_w - W_VID))
+    cy = max(0, min(cy, new_h - H_VID))
+    return zoomed.crop((cx, cy, cx + W_VID, cy + H_VID))
+
+
+def _build_scene_cover(photo_path: str, data: dict) -> Image.Image:
+    """Escena 1: portada con badge + precio + ubicacion."""
+    base = _load_and_crop_vertical(photo_path)
+    overlay = Image.new("RGBA", (W_VID, H_VID), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    _draw_gradient(draw, W_VID, H_VID, 150, 230)
+
+    fb = _find_font(True)
+    fr = _find_font(False)
+    font_badge = ImageFont.truetype(fb, 36) if fb else ImageFont.load_default()
+    font_price = ImageFont.truetype(fb, 78) if fb else ImageFont.load_default()
+    font_loc = ImageFont.truetype(fr, 34) if fr else ImageFont.load_default()
+
+    # Gold top line
+    draw.rectangle([0, 0, W_VID, 6], fill=GOLD_RGB)
+
+    # Badge
+    badge = f"  EN {data.get('operacion', 'VENTA').upper()}  "
+    bb = font_badge.getbbox(badge)
+    bw = bb[2] - bb[0] + 36
+    bh = bb[3] - bb[1] + 22
+    draw.rounded_rectangle([60, 60, 60 + bw, 60 + bh], radius=8, fill=(*GOLD_RGB, 255))
+    draw.text((60 + 18, 60 + 9), badge, fill=(*NAVY_RGB, 255), font=font_badge)
+
+    # Logo header top-right
+    logo_path = BASE_DIR / "static" / "img" / "logo-header.png"
+    if logo_path.exists():
+        logo = Image.open(logo_path).convert("RGBA")
+        lh = 55
+        lr = logo.width / logo.height
+        logo = logo.resize((int(lh * lr), lh), Image.LANCZOS)
+        overlay.paste(logo, (W_VID - logo.width - 60, 55), logo)
+
+    # Gold line + price + location (bottom)
+    y = H_VID - 380
+    draw.rectangle([60, y, W_VID - 60, y + 3], fill=(*GOLD_RGB, 255))
+    y += 30
+    draw.text((60, y), data.get("precio_formateado", ""), fill=(*WHITE_RGB, 255), font=font_price)
+    y += 100
+    ubic = f"{data.get('direccion', '')}, {data.get('ciudad', '')}"
+    if len(ubic) > 45:
+        ubic = ubic[:42] + "..."
+    draw.text((60, y), ubic, fill=(255, 255, 255, 180), font=font_loc)
+
+    result = Image.alpha_composite(base.convert("RGBA"), overlay)
+    return result.convert("RGB")
+
+
+def _build_scene_specs(photo_path: str, data: dict) -> Image.Image:
+    """Escena 2: foto con datos principales."""
+    base = _load_and_crop_vertical(photo_path)
+    overlay = Image.new("RGBA", (W_VID, H_VID), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    _draw_gradient(draw, W_VID, H_VID, 120, 210)
+
+    fb = _find_font(True)
+    fr = _find_font(False)
+    font_val = ImageFont.truetype(fb, 64) if fb else ImageFont.load_default()
+    font_lbl = ImageFont.truetype(fr, 24) if fr else ImageFont.load_default()
+    font_badge = ImageFont.truetype(fb, 30) if fb else ImageFont.load_default()
+
+    # Top badge
+    tipo = data.get("tipoPropiedad", "").upper()
+    bb = font_badge.getbbox(tipo)
+    bw = bb[2] - bb[0] + 48
+    bh = bb[3] - bb[1] + 22
+    draw.rounded_rectangle([60, 80, 60 + bw, 80 + bh], radius=6,
+                           fill=(26, 60, 94, 200), outline=(*GOLD_RGB, 255), width=2)
+    draw.text((60 + 24, 80 + 9), tipo, fill=(*GOLD_RGB, 255), font=font_badge)
+
+    # Specs at bottom
+    specs = []
+    if data.get("recamaras"): specs.append(("Rec", data["recamaras"]))
+    if data.get("banos"): specs.append(("Banos", data["banos"]))
+    if data.get("metros_construidos"): specs.append(("m2", data["metros_construidos"]))
+    if data.get("estacionamientos"): specs.append(("Est", data["estacionamientos"]))
+
+    if specs:
+        y = H_VID - 300
+        draw.rectangle([60, y, W_VID - 60, y + 3], fill=(*GOLD_RGB, 255))
+        y += 30
+        col_w = (W_VID - 120) // len(specs)
+        for i, (lbl, val) in enumerate(specs):
+            x = 60 + i * col_w + col_w // 2
+            vbb = font_val.getbbox(str(val))
+            vw = vbb[2] - vbb[0]
+            draw.text((x - vw // 2, y), str(val), fill=(*WHITE_RGB, 255), font=font_val)
+            lbb = font_lbl.getbbox(lbl.upper())
+            lw = lbb[2] - lbb[0]
+            draw.text((x - lw // 2, y + 72), lbl.upper(), fill=(*GOLD_RGB, 255), font=font_lbl)
+        draw.rectangle([60, y + 115, W_VID - 60, y + 118], fill=(*GOLD_RGB, 255))
+
+    result = Image.alpha_composite(base.convert("RGBA"), overlay)
+    return result.convert("RGB")
+
+
+def _build_scene_detail(photo_path: str, data: dict) -> Image.Image:
+    """Escena intermedia: foto con precio y ubicacion."""
+    base = _load_and_crop_vertical(photo_path)
+    overlay = Image.new("RGBA", (W_VID, H_VID), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    _draw_gradient(draw, W_VID, H_VID, 80, 200)
+
+    fb = _find_font(True)
+    fr = _find_font(False)
+    font_price = ImageFont.truetype(fb, 60) if fb else ImageFont.load_default()
+    font_loc = ImageFont.truetype(fr, 30) if fr else ImageFont.load_default()
+
+    y = H_VID - 260
+    draw.text((60, y), data.get("precio_formateado", ""), fill=(*WHITE_RGB, 255), font=font_price)
+    draw.rectangle([60, y + 75, 260, y + 78], fill=(*GOLD_RGB, 255))
+    draw.text((60, y + 90), f"{data.get('direccion', '')}, {data.get('ciudad', '')}",
+              fill=(255, 255, 255, 170), font=font_loc)
+
+    result = Image.alpha_composite(base.convert("RGBA"), overlay)
+    return result.convert("RGB")
+
+
+def _build_scene_contact(data: dict) -> Image.Image:
+    """Escena final: fondo navy + logo + datos de contacto."""
+    base = Image.new("RGB", (W_VID, H_VID), NAVY_RGB)
+    overlay = Image.new("RGBA", (W_VID, H_VID), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    fb = _find_font(True)
+    fr = _find_font(False)
+    font_name = ImageFont.truetype(fb, 48) if fb else ImageFont.load_default()
+    font_phone = ImageFont.truetype(fb, 38) if fb else ImageFont.load_default()
+    font_email = ImageFont.truetype(fr, 30) if fr else ImageFont.load_default()
+    font_cta = ImageFont.truetype(fb, 34) if fb else ImageFont.load_default()
+
+    # Gold lines top/bottom
+    draw.rectangle([0, 0, W_VID, 6], fill=(*GOLD_RGB, 255))
+    draw.rectangle([0, H_VID - 6, W_VID, H_VID], fill=(*GOLD_RGB, 255))
+
+    # Logo full centered
+    logo_path = BASE_DIR / "static" / "img" / "logo-full.png"
+    y_cursor = 500
+    if logo_path.exists():
+        logo = Image.open(logo_path).convert("RGBA")
+        lh = 220
+        lr = logo.width / logo.height
+        logo = logo.resize((int(lh * lr), lh), Image.LANCZOS)
+        lx = (W_VID - logo.width) // 2
+        overlay.paste(logo, (lx, y_cursor), logo)
+        y_cursor += lh + 40
+
+    # Gold divider
+    draw.rectangle([(W_VID - 300) // 2, y_cursor, (W_VID + 300) // 2, y_cursor + 3], fill=(*GOLD_RGB, 255))
+    y_cursor += 50
+
+    # Agent name
+    name = data.get("agente_nombre", "")
+    nbb = font_name.getbbox(name)
+    nw = nbb[2] - nbb[0]
+    draw.text(((W_VID - nw) // 2, y_cursor), name, fill=(*WHITE_RGB, 255), font=font_name)
+    y_cursor += 70
+
+    # Phone
+    phone = f"Tel: {data.get('agente_telefono', '')}"
+    pbb = font_phone.getbbox(phone)
+    pw = pbb[2] - pbb[0]
+    draw.text(((W_VID - pw) // 2, y_cursor), phone, fill=(*GOLD_RGB, 255), font=font_phone)
+    y_cursor += 60
+
+    # Email
+    email = data.get("agente_email", "")
+    ebb = font_email.getbbox(email)
+    ew = ebb[2] - ebb[0]
+    draw.text(((W_VID - ew) // 2, y_cursor), email, fill=(255, 255, 255, 150), font=font_email)
+    y_cursor += 100
+
+    # CTA button
+    cta = "AGENDA TU VISITA HOY"
+    cbb = font_cta.getbbox(cta)
+    cw = cbb[2] - cbb[0] + 80
+    ch = cbb[3] - cbb[1] + 36
+    cx = (W_VID - cw) // 2
+    draw.rounded_rectangle([cx, y_cursor, cx + cw, y_cursor + ch], radius=12, fill=(*GOLD_RGB, 255))
+    draw.text((cx + 40, y_cursor + 16), cta, fill=(*NAVY_RGB, 255), font=font_cta)
+
+    result = Image.alpha_composite(base.convert("RGBA"), overlay)
+    return result.convert("RGB")
+
+
+def render_video_sync(data: dict, output_path: Path, job_id: str):
+    """Renderiza el reel MP4 con MoviePy + Pillow (puro Python)."""
+    from moviepy.editor import ImageClip, concatenate_videoclips, CompositeVideoClip
+    import numpy as np
+
+    photos = data.get("photos", [])
+    scenes = []
+
+    # Escena 1: Cover
+    if photos:
+        cover_img = _build_scene_cover(photos[0], data)
+        base_cover = _load_and_crop_vertical(photos[0])
+
+        def make_cover_frame(t):
+            kb = _apply_ken_burns(base_cover, t, COVER_SECS, "in")
+            # Componer overlay encima del ken burns
+            ov = Image.new("RGBA", (W_VID, H_VID), (0, 0, 0, 0))
+            draw = ImageDraw.Draw(ov)
+            _draw_gradient(draw, W_VID, H_VID, 150, 230)
+            # Reusar el overlay de cover_img (truco: blend)
+            combined = Image.alpha_composite(kb.convert("RGBA"), ov)
+            return _pil_to_frame(combined)
+
+        # Usar cover_img estatico (mas rapido, el ken burns es sutil)
+        clip = ImageClip(_pil_to_frame(cover_img)).set_duration(COVER_SECS)
+        scenes.append(clip)
+        video_jobs[job_id]["progress"] = 20
+
+    # Escena 2: Specs
+    if len(photos) > 1:
+        specs_img = _build_scene_specs(photos[1], data)
+        clip = ImageClip(_pil_to_frame(specs_img)).set_duration(SCENE_SECS)
+        scenes.append(clip)
+        video_jobs[job_id]["progress"] = 35
+
+    # Escenas intermedias: detail
+    detail_start = 2
+    for i in range(min(len(photos) - detail_start, 3)):
+        idx = detail_start + i
+        if idx < len(photos):
+            detail_img = _build_scene_detail(photos[idx], data)
+            clip = ImageClip(_pil_to_frame(detail_img)).set_duration(SCENE_SECS)
+            scenes.append(clip)
+        video_jobs[job_id]["progress"] = 35 + (i + 1) * 10
+
+    # Escena final: contacto
+    contact_img = _build_scene_contact(data)
+    clip = ImageClip(_pil_to_frame(contact_img)).set_duration(CONTACT_SECS)
+    scenes.append(clip)
+    video_jobs[job_id]["progress"] = 70
+
+    # Concatenar y exportar
+    final = concatenate_videoclips(scenes, method="compose")
+    video_jobs[job_id]["progress"] = 80
+
+    final.write_videofile(
+        str(output_path),
+        fps=FPS_VID,
+        codec="libx264",
+        audio=False,
+        preset="fast",
+        threads=2,
+        logger=None,
+    )
+    video_jobs[job_id]["progress"] = 100
+
+
+async def render_video_task(job_id: str, data: dict, output_path: Path):
+    """Lanza el render en un thread separado para no bloquear asyncio."""
     try:
         video_jobs[job_id]["status"] = "rendering"
         video_jobs[job_id]["progress"] = 5
 
-        # Escribir props a archivo temporal (evita problemas con JSON en CLI)
-        props_file = output_path.parent / f"{job_id}_props.json"
-        with open(props_file, "w", encoding="utf-8") as f:
-            json.dump(props, f, ensure_ascii=False)
+        loop = asyncio.get_event_loop()
+        await loop.run_in_executor(None, render_video_sync, data, output_path, job_id)
 
-        cmd = [
-            "npx", "remotion", "render",
-            "src/index.ts",
-            "PropertyReel",
-            str(output_path),
-            "--props", str(props_file),
-            "--gl", "swangle",
-            "--concurrency", "1",
-            "--disable-web-security",
-            "--chromium-executable", os.getenv("REMOTION_CHROME_EXECUTABLE", "/usr/bin/chromium"),
-        ]
-
-        video_jobs[job_id]["progress"] = 10
-        all_stderr_lines: list[str] = []
-
-        process = await asyncio.create_subprocess_exec(
-            *cmd,
-            cwd=str(VIDEO_PROJECT_DIR),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.PIPE,
-            env={**os.environ, "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/chromium"},
-        )
-
-        # Leer stdout y stderr en paralelo
-        async def read_stream(stream, is_stderr=False):
-            while True:
-                line = await stream.readline()
-                if not line:
-                    break
-                text = line.decode("utf-8", errors="replace").strip()
-                if not text:
-                    continue
-
-                if is_stderr:
-                    all_stderr_lines.append(text)
-
-                # Remotion imprime progreso en ambos streams
-                if "%" in text:
-                    try:
-                        pct_str = text.split("(")[-1].split("%")[0].strip()
-                        pct = float(pct_str)
-                        video_jobs[job_id]["progress"] = int(10 + pct * 0.85)
-                    except (ValueError, IndexError):
-                        pass
-                elif "Rendering" in text or "rendered" in text.lower():
-                    video_jobs[job_id]["progress"] = max(
-                        video_jobs[job_id]["progress"], 15
-                    )
-
-        await asyncio.gather(
-            read_stream(process.stdout, is_stderr=False),
-            read_stream(process.stderr, is_stderr=True),
-        )
-        await process.wait()
-
-        # Limpiar archivo de props temporal
-        if props_file.exists():
-            props_file.unlink()
-
-        if process.returncode == 0 and output_path.exists():
+        if output_path.exists():
             video_jobs[job_id]["status"] = "done"
-            video_jobs[job_id]["progress"] = 100
             video_jobs[job_id]["file"] = str(output_path)
         else:
-            # Capturar las ultimas lineas de error para diagnostico
-            error_detail = "\n".join(all_stderr_lines[-10:]) if all_stderr_lines else "Sin detalle"
             video_jobs[job_id]["status"] = "error"
-            video_jobs[job_id]["error"] = f"Exit code {process.returncode}: {error_detail}"
+            video_jobs[job_id]["error"] = "No se genero el archivo MP4"
 
     except Exception as e:
         video_jobs[job_id]["status"] = "error"
@@ -991,9 +1241,8 @@ async def generate_video(
     form_data = await request.form()
     fotos_extra_urls = form_data.getlist("fotos_extra_urls")
 
-    # Construir lista de URLs absolutas de fotos para Remotion
-    # Remotion necesita rutas de archivo absolutas o URLs http
-    photos_absolute = []
+    # Recoger rutas de fotos locales
+    photo_paths = []
     all_urls = []
     if foto_portada_url:
         all_urls.append(foto_portada_url)
@@ -1002,31 +1251,23 @@ async def generate_video(
     for url in all_urls:
         fpath = url_to_filepath(url)
         if fpath.exists():
-            # Usar HTTP URL del propio servidor (Chromium puede cargarlas)
-            photos_absolute.append(f"{INTERNAL_URL}{url}")
+            photo_paths.append(str(fpath.resolve()))
 
-    # Logos como HTTP URLs
-    logo_header = f"{INTERNAL_URL}/static/img/logo-header.png"
-    logo_full = f"{INTERNAL_URL}/static/img/logo-full.png"
-
-    ubicacion = f"{direccion}, {ciudad}, {estado}"
-
-    props = {
-        "photos": photos_absolute,
+    data = {
+        "photos": photo_paths,
         "operacion": operacion,
-        "precio": precio_formateado,
-        "ubicacion": ubicacion,
+        "precio_formateado": precio_formateado,
+        "direccion": direccion,
+        "ciudad": ciudad,
+        "estado": estado,
         "recamaras": recamaras or "",
         "banos": banos or "",
-        "metrosConstruidos": metros_construidos or "",
-        "metrosTerreno": metros_terreno or "",
+        "metros_construidos": metros_construidos or "",
         "estacionamientos": estacionamientos or "",
         "tipoPropiedad": tipo_propiedad,
-        "agenteNombre": agente_nombre,
-        "agenteTelefono": agente_telefono,
-        "agenteEmail": agente_email,
-        "logoHeaderUrl": logo_header,
-        "logoFullUrl": logo_full,
+        "agente_nombre": agente_nombre,
+        "agente_telefono": agente_telefono,
+        "agente_email": agente_email,
     }
 
     job_id = str(uuid.uuid4())[:8]
@@ -1042,15 +1283,13 @@ async def generate_video(
         "filename": output_filename,
     }
 
-    # Lanzar render en background
-    asyncio.create_task(render_video_task(job_id, props, output_path))
+    asyncio.create_task(render_video_task(job_id, data, output_path))
 
     return JSONResponse({"success": True, "job_id": job_id})
 
 
 @app.get("/video-status/{job_id}")
 async def video_status(job_id: str):
-    """Endpoint de polling para consultar progreso del video."""
     job = video_jobs.get(job_id)
     if not job:
         return JSONResponse({"success": False, "error": "Job no encontrado"}, status_code=404)
@@ -1066,7 +1305,6 @@ async def video_status(job_id: str):
 
 @app.get("/download-video/{job_id}")
 async def download_video(job_id: str):
-    """Descarga directa del video renderizado."""
     job = video_jobs.get(job_id)
     if not job or job["status"] != "done" or not job.get("file"):
         return JSONResponse({"success": False, "error": "Video no disponible"}, status_code=404)

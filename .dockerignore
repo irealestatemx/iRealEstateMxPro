@@ -9,5 +9,4 @@ static/uploads/*
 !static/uploads/.gitkeep
 static/videos/*
 !static/videos/.gitkeep
-video/node_modules
-video/dist
+video/
