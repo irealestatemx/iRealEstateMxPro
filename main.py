@@ -1155,14 +1155,14 @@ def render_video_sync(data: dict, output_path: Path, job_id: str):
             return _pil_to_frame(combined)
 
         # Usar cover_img estatico (mas rapido, el ken burns es sutil)
-        clip = ImageClip(_pil_to_frame(cover_img)).set_duration(COVER_SECS)
+        clip = ImageClip(_pil_to_frame(cover_img), duration=COVER_SECS)
         scenes.append(clip)
         video_jobs[job_id]["progress"] = 20
 
     # Escena 2: Specs
     if len(photos) > 1:
         specs_img = _build_scene_specs(photos[1], data)
-        clip = ImageClip(_pil_to_frame(specs_img)).set_duration(SCENE_SECS)
+        clip = ImageClip(_pil_to_frame(specs_img), duration=SCENE_SECS)
         scenes.append(clip)
         video_jobs[job_id]["progress"] = 35
 
@@ -1172,13 +1172,13 @@ def render_video_sync(data: dict, output_path: Path, job_id: str):
         idx = detail_start + i
         if idx < len(photos):
             detail_img = _build_scene_detail(photos[idx], data)
-            clip = ImageClip(_pil_to_frame(detail_img)).set_duration(SCENE_SECS)
+            clip = ImageClip(_pil_to_frame(detail_img), duration=SCENE_SECS)
             scenes.append(clip)
         video_jobs[job_id]["progress"] = 35 + (i + 1) * 10
 
     # Escena final: contacto
     contact_img = _build_scene_contact(data)
-    clip = ImageClip(_pil_to_frame(contact_img)).set_duration(CONTACT_SECS)
+    clip = ImageClip(_pil_to_frame(contact_img), duration=CONTACT_SECS)
     scenes.append(clip)
     video_jobs[job_id]["progress"] = 70
 
