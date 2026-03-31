@@ -3,6 +3,10 @@ __pycache__/
 *.pyc
 static/uploads/*
 !static/uploads/.gitkeep
+static/videos/*
+!static/videos/.gitkeep
 .venv/
 venv/
 *.egg-info/
+video/node_modules/
+video/dist/

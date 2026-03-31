@@ -1,12 +1,15 @@
 import os
 import io
+import json
 import uuid
 import shutil
+import asyncio
+import subprocess
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Dict
 
 from fastapi import FastAPI, Request, Form, File, UploadFile
-from fastapi.responses import HTMLResponse, StreamingResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from openai import OpenAI
@@ -22,6 +25,12 @@ app = FastAPI(title="iRealEstateMxPro")
 BASE_DIR = Path(__file__).parent
 UPLOAD_DIR = BASE_DIR / "static" / "uploads"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+VIDEO_DIR = BASE_DIR / "static" / "videos"
+VIDEO_DIR.mkdir(parents=True, exist_ok=True)
+VIDEO_PROJECT_DIR = BASE_DIR / "video"
+
+# Tracking de renderizados de video en progreso
+video_jobs: Dict[str, dict] = {}
 
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
@@ -868,6 +877,188 @@ async def publish_instagram(
         return {"success": False, "error": "Timeout: la publicacion esta siendo procesada en segundo plano"}
     except Exception as e:
         return {"success": False, "error": str(e)}
+
+
+# ─── Generacion de Video con Remotion ───
+
+async def render_video_task(job_id: str, props: dict, output_path: Path):
+    """Renderiza el video con Remotion en background."""
+    try:
+        video_jobs[job_id]["status"] = "rendering"
+        video_jobs[job_id]["progress"] = 5
+
+        # Construir props JSON para Remotion
+        props_json = json.dumps(props)
+
+        # Calcular duracion basada en numero de fotos
+        num_photos = len(props.get("photos", []))
+        cover_frames = 150  # 5s
+        spec_frames = 120 if num_photos > 0 else 0  # 4s
+        detail_scenes = min(max(num_photos - 2, 0), 3)
+        detail_frames = detail_scenes * 120  # 4s each
+        contact_frames = 180  # 6s
+        total_frames = cover_frames + spec_frames + detail_frames + contact_frames
+
+        cmd = [
+            "npx", "remotion", "render",
+            "src/index.ts",
+            "PropertyReel",
+            str(output_path),
+            "--props", props_json,
+            "--frames", f"0-{total_frames - 1}",
+            "--gl", "angle",
+            "--concurrency", "1",
+        ]
+
+        video_jobs[job_id]["progress"] = 10
+
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            cwd=str(VIDEO_PROJECT_DIR),
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        # Leer stderr para progreso (Remotion imprime progreso ahi)
+        async def read_progress():
+            while True:
+                line = await process.stderr.readline()
+                if not line:
+                    break
+                text = line.decode("utf-8", errors="replace").strip()
+                # Remotion imprime lineas como "Rendered frame 50/750 (6.7%)"
+                if "%" in text:
+                    try:
+                        pct_str = text.split("(")[-1].split("%")[0].strip()
+                        pct = float(pct_str)
+                        # Mapear del 0-100 de Remotion a 10-95 nuestro
+                        video_jobs[job_id]["progress"] = int(10 + pct * 0.85)
+                    except (ValueError, IndexError):
+                        pass
+
+        await read_progress()
+        await process.wait()
+
+        if process.returncode == 0 and output_path.exists():
+            video_jobs[job_id]["status"] = "done"
+            video_jobs[job_id]["progress"] = 100
+            video_jobs[job_id]["file"] = str(output_path)
+        else:
+            stdout = await process.stdout.read() if process.stdout else b""
+            video_jobs[job_id]["status"] = "error"
+            video_jobs[job_id]["error"] = f"Remotion exit code {process.returncode}"
+
+    except Exception as e:
+        video_jobs[job_id]["status"] = "error"
+        video_jobs[job_id]["error"] = str(e)
+
+
+@app.post("/generate-video")
+async def generate_video(
+    request: Request,
+    tipo_propiedad: str = Form(""),
+    operacion: str = Form(""),
+    direccion: str = Form(""),
+    ciudad: str = Form(""),
+    estado: str = Form(""),
+    precio_formateado: str = Form(""),
+    recamaras: Optional[str] = Form(None),
+    banos: Optional[str] = Form(None),
+    metros_construidos: Optional[str] = Form(None),
+    metros_terreno: Optional[str] = Form(None),
+    estacionamientos: Optional[str] = Form(None),
+    agente_nombre: str = Form(""),
+    agente_telefono: str = Form(""),
+    agente_email: str = Form(""),
+    foto_portada_url: Optional[str] = Form(None),
+):
+    form_data = await request.form()
+    fotos_extra_urls = form_data.getlist("fotos_extra_urls")
+
+    # Construir lista de URLs absolutas de fotos para Remotion
+    # Remotion necesita rutas de archivo absolutas o URLs http
+    photos_absolute = []
+    all_urls = []
+    if foto_portada_url:
+        all_urls.append(foto_portada_url)
+    all_urls.extend(fotos_extra_urls)
+
+    for url in all_urls:
+        fpath = url_to_filepath(url)
+        if fpath.exists():
+            photos_absolute.append(str(fpath.resolve()))
+
+    # Logos absolutos
+    logo_header = str((BASE_DIR / "static" / "img" / "logo-header.png").resolve())
+    logo_full = str((BASE_DIR / "static" / "img" / "logo-full.png").resolve())
+
+    ubicacion = f"{direccion}, {ciudad}, {estado}"
+
+    props = {
+        "photos": photos_absolute,
+        "operacion": operacion,
+        "precio": precio_formateado,
+        "ubicacion": ubicacion,
+        "recamaras": recamaras or "",
+        "banos": banos or "",
+        "metrosConstruidos": metros_construidos or "",
+        "metrosTerreno": metros_terreno or "",
+        "estacionamientos": estacionamientos or "",
+        "tipoPropiedad": tipo_propiedad,
+        "agenteNombre": agente_nombre,
+        "agenteTelefono": agente_telefono,
+        "agenteEmail": agente_email,
+        "logoHeaderUrl": logo_header,
+        "logoFullUrl": logo_full,
+    }
+
+    job_id = str(uuid.uuid4())[:8]
+    tipo_clean = tipo_propiedad.lower().replace(" ", "_")
+    output_filename = f"reel_{tipo_clean}_{job_id}.mp4"
+    output_path = VIDEO_DIR / output_filename
+
+    video_jobs[job_id] = {
+        "status": "queued",
+        "progress": 0,
+        "file": None,
+        "error": None,
+        "filename": output_filename,
+    }
+
+    # Lanzar render en background
+    asyncio.create_task(render_video_task(job_id, props, output_path))
+
+    return JSONResponse({"success": True, "job_id": job_id})
+
+
+@app.get("/video-status/{job_id}")
+async def video_status(job_id: str):
+    """Endpoint de polling para consultar progreso del video."""
+    job = video_jobs.get(job_id)
+    if not job:
+        return JSONResponse({"success": False, "error": "Job no encontrado"}, status_code=404)
+
+    return JSONResponse({
+        "success": True,
+        "status": job["status"],
+        "progress": job["progress"],
+        "error": job.get("error"),
+        "download_url": f"/static/videos/{job['filename']}" if job["status"] == "done" else None,
+    })
+
+
+@app.get("/download-video/{job_id}")
+async def download_video(job_id: str):
+    """Descarga directa del video renderizado."""
+    job = video_jobs.get(job_id)
+    if not job or job["status"] != "done" or not job.get("file"):
+        return JSONResponse({"success": False, "error": "Video no disponible"}, status_code=404)
+
+    return FileResponse(
+        job["file"],
+        media_type="video/mp4",
+        filename=job["filename"],
+    )
 
 
 if __name__ == "__main__":

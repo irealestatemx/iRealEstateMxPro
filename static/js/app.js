@@ -202,3 +202,88 @@ async function publishToInstagram() {
     btn.innerHTML = '<span>🚀</span> Publicar en Instagram';
   }
 }
+
+/* ── Generate Video Reel ── */
+async function generateVideo() {
+  const btn = document.getElementById('generateVideoBtn');
+  const progressDiv = document.getElementById('videoProgress');
+  const progressBar = document.getElementById('videoProgressBar');
+  const progressText = document.getElementById('videoProgressText');
+  const resultDiv = document.getElementById('videoResult');
+  const videoPreview = document.getElementById('videoPreview');
+  const downloadLink = document.getElementById('videoDownloadLink');
+
+  if (!btn) return;
+
+  // Deshabilitar boton y mostrar progreso
+  btn.disabled = true;
+  btn.innerHTML = '<span>⏳</span> Renderizando...';
+  progressDiv.style.display = 'block';
+  resultDiv.style.display = 'none';
+  progressBar.style.width = '0%';
+  progressText.textContent = 'Iniciando renderizado...';
+
+  // Enviar datos al backend
+  const videoForm = document.getElementById('videoForm');
+  const formData = new FormData(videoForm);
+
+  try {
+    const response = await fetch('/generate-video', {
+      method: 'POST',
+      body: formData,
+    });
+    const result = await response.json();
+
+    if (!result.success) {
+      showToast('Error: ' + (result.error || 'No se pudo iniciar'), false);
+      btn.disabled = false;
+      btn.innerHTML = '<span>🎬</span> Generar Video';
+      progressDiv.style.display = 'none';
+      return;
+    }
+
+    const jobId = result.job_id;
+    progressText.textContent = 'Renderizando video...';
+
+    // Polling de progreso cada 2 segundos
+    const pollInterval = setInterval(async () => {
+      try {
+        const statusResp = await fetch(`/video-status/${jobId}`);
+        const statusData = await statusResp.json();
+
+        if (statusData.status === 'rendering' || statusData.status === 'queued') {
+          const pct = statusData.progress || 0;
+          progressBar.style.width = pct + '%';
+          progressText.textContent = `Renderizando... ${pct}%`;
+        } else if (statusData.status === 'done') {
+          clearInterval(pollInterval);
+          progressBar.style.width = '100%';
+          progressText.textContent = 'Video listo';
+
+          // Mostrar preview y descarga
+          resultDiv.style.display = 'flex';
+          videoPreview.src = statusData.download_url;
+          downloadLink.href = `/download-video/${jobId}`;
+
+          btn.innerHTML = '<span>✅</span> Video generado';
+          showToast('Video generado exitosamente', true);
+        } else if (statusData.status === 'error') {
+          clearInterval(pollInterval);
+          progressText.textContent = 'Error: ' + (statusData.error || 'desconocido');
+          progressBar.style.width = '0%';
+          btn.disabled = false;
+          btn.innerHTML = '<span>🎬</span> Reintentar';
+          showToast('Error al generar video: ' + (statusData.error || ''), false);
+        }
+      } catch (pollErr) {
+        // Ignorar errores de polling individuales
+      }
+    }, 2000);
+
+  } catch (err) {
+    showToast('Error de conexion: ' + err.message, false);
+    btn.disabled = false;
+    btn.innerHTML = '<span>🎬</span> Generar Video';
+    progressDiv.style.display = 'none';
+  }
+}
