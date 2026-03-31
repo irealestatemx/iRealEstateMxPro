@@ -881,72 +881,102 @@ async def publish_instagram(
 
 # ─── Generacion de Video con Remotion ───
 
+def _to_file_url(path_str: str) -> str:
+    """Convierte ruta absoluta a file:// URL para Remotion/Chrome."""
+    p = Path(path_str).resolve()
+    # En Linux: /app/static/... -> file:///app/static/...
+    return p.as_uri()
+
+
 async def render_video_task(job_id: str, props: dict, output_path: Path):
     """Renderiza el video con Remotion en background."""
     try:
         video_jobs[job_id]["status"] = "rendering"
         video_jobs[job_id]["progress"] = 5
 
-        # Construir props JSON para Remotion
-        props_json = json.dumps(props)
-
         # Calcular duracion basada en numero de fotos
         num_photos = len(props.get("photos", []))
-        cover_frames = 150  # 5s
+        cover_frames = 150   # 5s
         spec_frames = 120 if num_photos > 0 else 0  # 4s
         detail_scenes = min(max(num_photos - 2, 0), 3)
         detail_frames = detail_scenes * 120  # 4s each
         contact_frames = 180  # 6s
         total_frames = cover_frames + spec_frames + detail_frames + contact_frames
 
+        # Escribir props a archivo temporal (evita problemas con JSON en CLI)
+        props_file = output_path.parent / f"{job_id}_props.json"
+        with open(props_file, "w", encoding="utf-8") as f:
+            json.dump(props, f, ensure_ascii=False)
+
         cmd = [
             "npx", "remotion", "render",
             "src/index.ts",
             "PropertyReel",
             str(output_path),
-            "--props", props_json,
+            "--props", str(props_file),
             "--frames", f"0-{total_frames - 1}",
-            "--gl", "angle",
+            "--gl", "swangle",
             "--concurrency", "1",
+            "--disable-web-security",
+            "--chromium-executable", os.getenv("REMOTION_CHROME_EXECUTABLE", "/usr/bin/chromium"),
         ]
 
         video_jobs[job_id]["progress"] = 10
+        all_stderr_lines: list[str] = []
 
         process = await asyncio.create_subprocess_exec(
             *cmd,
             cwd=str(VIDEO_PROJECT_DIR),
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
+            env={**os.environ, "PUPPETEER_EXECUTABLE_PATH": "/usr/bin/chromium"},
         )
 
-        # Leer stderr para progreso (Remotion imprime progreso ahi)
-        async def read_progress():
+        # Leer stdout y stderr en paralelo
+        async def read_stream(stream, is_stderr=False):
             while True:
-                line = await process.stderr.readline()
+                line = await stream.readline()
                 if not line:
                     break
                 text = line.decode("utf-8", errors="replace").strip()
-                # Remotion imprime lineas como "Rendered frame 50/750 (6.7%)"
+                if not text:
+                    continue
+
+                if is_stderr:
+                    all_stderr_lines.append(text)
+
+                # Remotion imprime progreso en ambos streams
                 if "%" in text:
                     try:
                         pct_str = text.split("(")[-1].split("%")[0].strip()
                         pct = float(pct_str)
-                        # Mapear del 0-100 de Remotion a 10-95 nuestro
                         video_jobs[job_id]["progress"] = int(10 + pct * 0.85)
                     except (ValueError, IndexError):
                         pass
+                elif "Rendering" in text or "rendered" in text.lower():
+                    video_jobs[job_id]["progress"] = max(
+                        video_jobs[job_id]["progress"], 15
+                    )
 
-        await read_progress()
+        await asyncio.gather(
+            read_stream(process.stdout, is_stderr=False),
+            read_stream(process.stderr, is_stderr=True),
+        )
         await process.wait()
+
+        # Limpiar archivo de props temporal
+        if props_file.exists():
+            props_file.unlink()
 
         if process.returncode == 0 and output_path.exists():
             video_jobs[job_id]["status"] = "done"
             video_jobs[job_id]["progress"] = 100
             video_jobs[job_id]["file"] = str(output_path)
         else:
-            stdout = await process.stdout.read() if process.stdout else b""
+            # Capturar las ultimas lineas de error para diagnostico
+            error_detail = "\n".join(all_stderr_lines[-10:]) if all_stderr_lines else "Sin detalle"
             video_jobs[job_id]["status"] = "error"
-            video_jobs[job_id]["error"] = f"Remotion exit code {process.returncode}"
+            video_jobs[job_id]["error"] = f"Exit code {process.returncode}: {error_detail}"
 
     except Exception as e:
         video_jobs[job_id]["status"] = "error"
@@ -986,11 +1016,13 @@ async def generate_video(
     for url in all_urls:
         fpath = url_to_filepath(url)
         if fpath.exists():
-            photos_absolute.append(str(fpath.resolve()))
+            photos_absolute.append(_to_file_url(str(fpath)))
 
-    # Logos absolutos
-    logo_header = str((BASE_DIR / "static" / "img" / "logo-header.png").resolve())
-    logo_full = str((BASE_DIR / "static" / "img" / "logo-full.png").resolve())
+    # Logos como file:// URLs
+    logo_header_path = BASE_DIR / "static" / "img" / "logo-header.png"
+    logo_full_path = BASE_DIR / "static" / "img" / "logo-full.png"
+    logo_header = _to_file_url(str(logo_header_path)) if logo_header_path.exists() else ""
+    logo_full = _to_file_url(str(logo_full_path)) if logo_full_path.exists() else ""
 
     ubicacion = f"{direccion}, {ciudad}, {estado}"
 
