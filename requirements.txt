@@ -9,3 +9,5 @@ fpdf2
 Pillow
 httpx
 moviepy
+asyncpg
+databases[postgresql]

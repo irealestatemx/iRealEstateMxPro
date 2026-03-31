@@ -20,7 +20,19 @@ import httpx
 
 load_dotenv()
 
+from database import database, init_db, close_db, save_property, get_all_properties, get_property_by_id, search_properties, update_property, toggle_property, count_properties
+
 app = FastAPI(title="iRealEstateMxPro")
+
+
+@app.on_event("startup")
+async def startup():
+    await init_db()
+
+
+@app.on_event("shutdown")
+async def shutdown():
+    await close_db()
 
 BASE_DIR = Path(__file__).parent
 UPLOAD_DIR = BASE_DIR / "static" / "uploads"
@@ -600,6 +612,104 @@ async def index(request: Request):
     return templates.TemplateResponse(request=request, name="index.html")
 
 
+# ─── API REST de Propiedades (para web, chatbot, n8n) ───
+
+@app.get("/api/propiedades")
+async def api_list_properties(
+    ciudad: Optional[str] = None,
+    operacion: Optional[str] = None,
+    tipo: Optional[str] = None,
+    precio_min: Optional[float] = None,
+    precio_max: Optional[float] = None,
+    limit: int = 20,
+    offset: int = 0,
+    activas: bool = True,
+):
+    """Lista propiedades con filtros. Usado por web, chatbot y n8n."""
+    if any([ciudad, operacion, tipo, precio_min, precio_max]):
+        props = await search_properties(
+            ciudad=ciudad, operacion=operacion, tipo=tipo,
+            precio_min=precio_min, precio_max=precio_max, limit=limit
+        )
+    else:
+        props = await get_all_properties(active_only=activas, limit=limit, offset=offset)
+
+    total = await count_properties(active_only=activas)
+
+    # Serializar datetimes y Decimals para JSON
+    for p in props:
+        for k, v in p.items():
+            if hasattr(v, 'isoformat'):
+                p[k] = v.isoformat()
+            elif isinstance(v, (int, float, str, bool, list, dict)) or v is None:
+                pass
+            else:
+                p[k] = str(v)
+
+    return JSONResponse({"total": total, "propiedades": props})
+
+
+@app.get("/api/propiedades/stats/resumen")
+async def api_stats():
+    """Estadisticas rapidas para dashboard."""
+    total = await count_properties(active_only=False)
+    activas = await count_properties(active_only=True)
+    return JSONResponse({
+        "total": total,
+        "activas": activas,
+        "inactivas": total - activas,
+    })
+
+
+@app.get("/api/propiedades/{prop_id}")
+async def api_get_property(prop_id: int):
+    """Detalle de una propiedad por ID."""
+    prop = await get_property_by_id(prop_id)
+    if not prop:
+        return JSONResponse({"error": "Propiedad no encontrada"}, status_code=404)
+
+    for k, v in prop.items():
+        if hasattr(v, 'isoformat'):
+            prop[k] = v.isoformat()
+        elif isinstance(v, (int, float, str, bool, list, dict)) or v is None:
+            pass
+        else:
+            prop[k] = str(v)
+
+    return JSONResponse({"propiedad": prop})
+
+
+@app.patch("/api/propiedades/{prop_id}")
+async def api_update_property(prop_id: int, request: Request):
+    """Actualiza campos de una propiedad (ej: marcar publicada, desactivar)."""
+    body = await request.json()
+    existing = await get_property_by_id(prop_id)
+    if not existing:
+        return JSONResponse({"error": "Propiedad no encontrada"}, status_code=404)
+    ok = await update_property(prop_id, body)
+    return JSONResponse({"ok": ok, "id": prop_id})
+
+
+@app.delete("/api/propiedades/{prop_id}")
+async def api_deactivate_property(prop_id: int):
+    """Desactiva una propiedad (soft delete)."""
+    existing = await get_property_by_id(prop_id)
+    if not existing:
+        return JSONResponse({"error": "Propiedad no encontrada"}, status_code=404)
+    await toggle_property(prop_id, active=False)
+    return JSONResponse({"ok": True, "id": prop_id, "activa": False})
+
+
+@app.post("/api/propiedades/{prop_id}/reactivar")
+async def api_reactivate_property(prop_id: int):
+    """Reactiva una propiedad desactivada."""
+    existing = await get_property_by_id(prop_id)
+    if not existing:
+        return JSONResponse({"error": "Propiedad no encontrada"}, status_code=404)
+    await toggle_property(prop_id, active=True)
+    return JSONResponse({"ok": True, "id": prop_id, "activa": True})
+
+
 @app.post("/generate", response_class=HTMLResponse)
 async def generate(
     request: Request,
@@ -691,6 +801,20 @@ async def generate(
         "descripcion_profesional": descripcion_profesional,
         "instagram_copy": instagram_copy,
     }
+
+    # ─── Guardar propiedad en base de datos ───
+    try:
+        db_data = {
+            **context,
+            "session_id": session_id,
+            "precio": precio,
+        }
+        prop_id = await save_property(db_data)
+        context["property_id"] = prop_id
+    except Exception as e:
+        print(f"[DB] Error guardando propiedad: {e}")
+        context["property_id"] = None
+
     return templates.TemplateResponse(request=request, name="result.html", context=context)
 
 
@@ -858,6 +982,17 @@ async def publish_instagram(
         if response.status_code == 200 and result.get("success"):
             ig_result = result.get("results", {}).get("instagram", {})
             post_url = ig_result.get("url", "")
+            # Marcar como publicada en DB si tenemos el session_id
+            try:
+                form = await request.form()
+                sid = form.get("session_id", "")
+                if sid:
+                    from database import get_property_by_session
+                    prop = await get_property_by_session(sid)
+                    if prop:
+                        await update_property(prop["id"], {"publicada_instagram": True})
+            except Exception:
+                pass
             return {
                 "success": True,
                 "message": "Publicado exitosamente en Instagram",
