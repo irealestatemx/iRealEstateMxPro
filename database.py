@@ -52,11 +52,39 @@ CREATE TABLE IF NOT EXISTS propiedades (
 
 """
 
+CREATE_DESARROLLOS = """
+CREATE TABLE IF NOT EXISTS desarrollos (
+    id              SERIAL PRIMARY KEY,
+    nombre          VARCHAR(300) NOT NULL,
+    descripcion     TEXT,
+    ubicacion       VARCHAR(500),
+    ciudad          VARCHAR(200),
+    estado          VARCHAR(200),
+    precio_desde    NUMERIC(14, 2),
+    precio_hasta    NUMERIC(14, 2),
+    tipo_propiedad  VARCHAR(100),
+    amenidades      JSONB DEFAULT '[]',
+    caracteristicas TEXT,
+    agente_nombre   VARCHAR(300),
+    agente_telefono VARCHAR(50),
+    agente_email    VARCHAR(300),
+    foto_portada_url VARCHAR(500),
+    fotos_urls      JSONB DEFAULT '[]',
+    pdf_url         VARCHAR(500),
+    activo          BOOLEAN DEFAULT TRUE,
+    created_at      TIMESTAMP DEFAULT NOW(),
+    updated_at      TIMESTAMP DEFAULT NOW()
+);
+"""
+
 CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_propiedades_ciudad ON propiedades(ciudad);",
     "CREATE INDEX IF NOT EXISTS idx_propiedades_operacion ON propiedades(operacion);",
     "CREATE INDEX IF NOT EXISTS idx_propiedades_activa ON propiedades(activa);",
     "CREATE INDEX IF NOT EXISTS idx_propiedades_created ON propiedades(created_at DESC);",
+    "CREATE INDEX IF NOT EXISTS idx_desarrollos_ciudad ON desarrollos(ciudad);",
+    "CREATE INDEX IF NOT EXISTS idx_desarrollos_activo ON desarrollos(activo);",
+    "CREATE INDEX IF NOT EXISTS idx_desarrollos_nombre ON desarrollos(nombre);",
 ]
 
 
@@ -64,6 +92,7 @@ async def init_db():
     """Conecta y crea las tablas si no existen."""
     await database.connect()
     await database.execute(CREATE_TABLES)
+    await database.execute(CREATE_DESARROLLOS)
     for idx in CREATE_INDEXES:
         await database.execute(idx)
 
@@ -218,3 +247,94 @@ async def count_properties(active_only: bool = True) -> int:
     query = f"SELECT COUNT(*) as total FROM propiedades {where}"
     row = await database.fetch_one(query=query)
     return row._mapping["total"] if row else 0
+
+
+# ─── Desarrollos ───
+
+async def save_desarrollo(data: dict) -> int:
+    """Guarda un desarrollo y devuelve su ID."""
+    query = """
+    INSERT INTO desarrollos (
+        nombre, descripcion, ubicacion, ciudad, estado,
+        precio_desde, precio_hasta, tipo_propiedad, amenidades,
+        caracteristicas, agente_nombre, agente_telefono, agente_email,
+        foto_portada_url, fotos_urls, pdf_url
+    ) VALUES (
+        :nombre, :descripcion, :ubicacion, :ciudad, :estado,
+        :precio_desde, :precio_hasta, :tipo_propiedad, :amenidades::jsonb,
+        :caracteristicas, :agente_nombre, :agente_telefono, :agente_email,
+        :foto_portada_url, :fotos_urls::jsonb, :pdf_url
+    ) RETURNING id
+    """
+    values = {
+        "nombre": data.get("nombre", ""),
+        "descripcion": data.get("descripcion"),
+        "ubicacion": data.get("ubicacion", ""),
+        "ciudad": data.get("ciudad", ""),
+        "estado": data.get("estado", ""),
+        "precio_desde": data.get("precio_desde"),
+        "precio_hasta": data.get("precio_hasta"),
+        "tipo_propiedad": data.get("tipo_propiedad", ""),
+        "amenidades": json.dumps(data.get("amenidades", [])),
+        "caracteristicas": data.get("caracteristicas"),
+        "agente_nombre": data.get("agente_nombre", ""),
+        "agente_telefono": data.get("agente_telefono", ""),
+        "agente_email": data.get("agente_email", ""),
+        "foto_portada_url": data.get("foto_portada_url"),
+        "fotos_urls": json.dumps(data.get("fotos_urls", [])),
+        "pdf_url": data.get("pdf_url"),
+    }
+    return await database.execute(query=query, values=values)
+
+
+async def get_all_desarrollos(active_only: bool = True):
+    """Lista todos los desarrollos."""
+    where = "WHERE activo = TRUE" if active_only else ""
+    query = f"SELECT * FROM desarrollos {where} ORDER BY created_at DESC"
+    rows = await database.fetch_all(query=query)
+    return [dict(r._mapping) for r in rows]
+
+
+async def get_desarrollo_by_id(dev_id: int):
+    """Obtiene un desarrollo por ID."""
+    query = "SELECT * FROM desarrollos WHERE id = :id"
+    row = await database.fetch_one(query=query, values={"id": dev_id})
+    return dict(row._mapping) if row else None
+
+
+async def search_desarrollos(texto: str = None, ciudad: str = None, limit: int = 10):
+    """Busca desarrollos por nombre o ciudad."""
+    conditions = ["activo = TRUE"]
+    values = {"limit": limit}
+    if texto:
+        conditions.append("(LOWER(nombre) LIKE :texto OR LOWER(descripcion) LIKE :texto)")
+        values["texto"] = f"%{texto.lower()}%"
+    if ciudad:
+        conditions.append("LOWER(ciudad) LIKE :ciudad")
+        values["ciudad"] = f"%{ciudad.lower()}%"
+    where = "WHERE " + " AND ".join(conditions)
+    query = f"SELECT * FROM desarrollos {where} ORDER BY created_at DESC LIMIT :limit"
+    rows = await database.fetch_all(query=query, values=values)
+    return [dict(r._mapping) for r in rows]
+
+
+async def update_desarrollo(dev_id: int, updates: dict):
+    """Actualiza un desarrollo."""
+    allowed = {
+        "nombre", "descripcion", "ubicacion", "ciudad", "estado",
+        "precio_desde", "precio_hasta", "tipo_propiedad", "amenidades",
+        "caracteristicas", "agente_nombre", "agente_telefono", "agente_email",
+        "foto_portada_url", "fotos_urls", "pdf_url", "activo"
+    }
+    fields = {k: v for k, v in updates.items() if k in allowed}
+    if not fields:
+        return False
+    for jf in ("amenidades", "fotos_urls"):
+        if jf in fields and isinstance(fields[jf], (list, dict)):
+            fields[jf] = json.dumps(fields[jf])
+    fields["updated_at"] = datetime.utcnow()
+    set_clause = ", ".join(f"{k} = :{k}" for k in fields)
+    fields["id"] = dev_id
+    query = f"UPDATE desarrollos SET {set_clause} WHERE id = :id"
+    await database.execute(query=query, values=fields)
+    return True

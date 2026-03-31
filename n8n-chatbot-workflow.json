@@ -1,0 +1,311 @@
+{
+  "name": "WhatsApp Chatbot - iRealEstateMx",
+  "nodes": [
+    {
+      "parameters": {
+        "events": ["message"],
+        "additionalFields": {}
+      },
+      "id": "waha-trigger",
+      "name": "WhatsApp Trigger",
+      "type": "@devlikeapro/n8n-nodes-waha.wahatrigger",
+      "typeVersion": 1,
+      "position": [200, 300],
+      "webhookId": "waha-chatbot-trigger"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "filter-from-me",
+              "leftValue": "={{ $json.payload.from_me }}",
+              "rightValue": "false",
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "filter-has-body",
+              "leftValue": "={{ $json.payload.body }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "filter-messages",
+      "name": "Solo mensajes entrantes",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [420, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "phone",
+              "name": "phone",
+              "value": "={{ $json.payload.from.split('@')[0] }}",
+              "type": "string"
+            },
+            {
+              "id": "message",
+              "name": "message",
+              "value": "={{ $json.payload.body }}",
+              "type": "string"
+            },
+            {
+              "id": "chatId",
+              "name": "chatId",
+              "value": "={{ $json.payload.from }}",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "extract-data",
+      "name": "Extraer datos",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [640, 300]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.message }}",
+        "options": {
+          "systemMessage": "Eres el asistente virtual de iRealEstateMx, una inmobiliaria profesional en Guanajuato, México.\n\nTu rol:\n- Atender clientes interesados en comprar, rentar o invertir en propiedades\n- Dar información sobre propiedades individuales y desarrollos residenciales disponibles\n- Ser amable, profesional y persuasivo pero sin ser agresivo\n- Responder SIEMPRE en español\n- Usar formato simple (sin markdown, sin asteriscos, sin HTML) porque esto va por WhatsApp\n- Mantener respuestas concisas (máximo 3-4 párrafos)\n\nCuando el cliente pregunte por propiedades o desarrollos:\n1. Usa la herramienta 'buscar_propiedades' para consultar la base de datos\n2. Presenta los resultados de forma natural y atractiva\n3. Si hay un desarrollo que coincida (como Carcamos Residencial), destácalo\n4. Menciona que puedes enviarles la ficha técnica en PDF si les interesa\n5. Siempre incluye el nombre y teléfono del agente para contacto directo\n\nSi el cliente pide una ficha técnica o PDF:\n- Indica que el agente se la enviará directamente\n- O si hay pdf_url disponible, menciona que se la enviarás\n\nSi no encuentras propiedades que coincidan:\n- Pide más detalles sobre lo que buscan\n- Sugiere que amplíen su búsqueda (otra zona, otro rango de precio)\n- Ofrece que un agente los contacte personalmente\n\nDatos de contacto de la inmobiliaria:\n- Teléfono: (se obtiene de los datos de la propiedad/desarrollo)\n- Web: https://api.irealestatemx.cloud\n\nNUNCA inventes propiedades ni precios. Solo comparte información que venga de la herramienta de búsqueda."
+        }
+      },
+      "id": "ai-agent",
+      "name": "AI Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [860, 300]
+    },
+    {
+      "parameters": {
+        "model": "gpt-4o-mini",
+        "options": {
+          "temperature": 0.7
+        }
+      },
+      "id": "openai-model",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [860, 520],
+      "credentials": {
+        "openAiApi": {
+          "id": "CONFIGURAR",
+          "name": "OpenAI API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Extraer datos').item.json.phone }}"
+      },
+      "id": "memory",
+      "name": "Window Buffer Memory",
+      "type": "@n8n/n8n-nodes-langchain.memoryBufferWindow",
+      "typeVersion": 1.3,
+      "position": [1060, 520]
+    },
+    {
+      "parameters": {
+        "name": "buscar_propiedades",
+        "description": "Busca propiedades y desarrollos inmobiliarios disponibles. Usa este tool cuando el cliente pregunte por casas, departamentos, terrenos, desarrollos, o cualquier propiedad en venta o renta. Puedes filtrar por ciudad, tipo de operacion (venta/renta), texto libre, o rango de precio.",
+        "method": "GET",
+        "url": "http://irealestate:8000/api/chatbot/buscar",
+        "sendQuery": true,
+        "specifyQuery": "keypair",
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "q",
+              "value": "{q}"
+            },
+            {
+              "name": "ciudad",
+              "value": "{ciudad}"
+            },
+            {
+              "name": "operacion",
+              "value": "{operacion}"
+            },
+            {
+              "name": "tipo",
+              "value": "{tipo}"
+            },
+            {
+              "name": "precio_min",
+              "value": "{precio_min}"
+            },
+            {
+              "name": "precio_max",
+              "value": "{precio_max}"
+            }
+          ]
+        },
+        "placeholderDefinitions": {
+          "values": [
+            {
+              "name": "q",
+              "description": "Texto libre para buscar (ej: carcamos, residencial, nombre del desarrollo)",
+              "type": "string"
+            },
+            {
+              "name": "ciudad",
+              "description": "Ciudad donde buscar (ej: León, Guanajuato, Irapuato). Dejar vacío si no se especifica",
+              "type": "string"
+            },
+            {
+              "name": "operacion",
+              "description": "Tipo de operación: venta o renta. Dejar vacío si no se especifica",
+              "type": "string"
+            },
+            {
+              "name": "tipo",
+              "description": "Tipo de propiedad: casa, departamento, terreno, etc. Dejar vacío si no se especifica",
+              "type": "string"
+            },
+            {
+              "name": "precio_min",
+              "description": "Precio mínimo en MXN (solo número). Dejar vacío si no se especifica",
+              "type": "string"
+            },
+            {
+              "name": "precio_max",
+              "description": "Precio máximo en MXN (solo número). Dejar vacío si no se especifica",
+              "type": "string"
+            }
+          ]
+        }
+      },
+      "id": "tool-search",
+      "name": "Buscar Propiedades",
+      "type": "@n8n/n8n-nodes-langchain.toolHttpRequest",
+      "typeVersion": 1.1,
+      "position": [1260, 520]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://waha:3000/api/sendText",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Api-Key",
+              "value": "waha_ireal_2026_xyz"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"session\": \"default\",\n  \"chatId\": \"{{ $('Extraer datos').item.json.chatId }}\",\n  \"text\": {{ JSON.stringify($json.output) }}\n}"
+      },
+      "id": "send-whatsapp",
+      "name": "Enviar WhatsApp",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1120, 300]
+    }
+  ],
+  "connections": {
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "Solo mensajes entrantes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Solo mensajes entrantes": {
+      "main": [
+        [
+          {
+            "node": "Extraer datos",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extraer datos": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Enviar WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Window Buffer Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar Propiedades": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

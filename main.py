@@ -20,7 +20,13 @@ import httpx
 
 load_dotenv()
 
-from database import database, init_db, close_db, save_property, get_all_properties, get_property_by_id, search_properties, update_property, toggle_property, count_properties
+from database import (
+    database, init_db, close_db,
+    save_property, get_all_properties, get_property_by_id, search_properties,
+    update_property, toggle_property, count_properties,
+    save_desarrollo, get_all_desarrollos, get_desarrollo_by_id,
+    search_desarrollos, update_desarrollo,
+)
 
 app = FastAPI(title="iRealEstateMxPro")
 
@@ -708,6 +714,123 @@ async def api_reactivate_property(prop_id: int):
         return JSONResponse({"error": "Propiedad no encontrada"}, status_code=404)
     await toggle_property(prop_id, active=True)
     return JSONResponse({"ok": True, "id": prop_id, "activa": True})
+
+
+# ─── API REST de Desarrollos (para chatbot, web, n8n) ───
+
+@app.get("/api/desarrollos")
+async def api_list_desarrollos(
+    texto: Optional[str] = None,
+    ciudad: Optional[str] = None,
+):
+    """Lista desarrollos con busqueda opcional."""
+    if texto or ciudad:
+        devs = await search_desarrollos(texto=texto, ciudad=ciudad)
+    else:
+        devs = await get_all_desarrollos()
+    for d in devs:
+        for k, v in d.items():
+            if hasattr(v, 'isoformat'):
+                d[k] = v.isoformat()
+            elif not isinstance(v, (int, float, str, bool, list, dict, type(None))):
+                d[k] = str(v)
+    return JSONResponse({"desarrollos": devs})
+
+
+@app.get("/api/desarrollos/{dev_id}")
+async def api_get_desarrollo(dev_id: int):
+    """Detalle de un desarrollo por ID."""
+    dev = await get_desarrollo_by_id(dev_id)
+    if not dev:
+        return JSONResponse({"error": "Desarrollo no encontrado"}, status_code=404)
+    for k, v in dev.items():
+        if hasattr(v, 'isoformat'):
+            dev[k] = v.isoformat()
+        elif not isinstance(v, (int, float, str, bool, list, dict, type(None))):
+            dev[k] = str(v)
+    return JSONResponse({"desarrollo": dev})
+
+
+@app.post("/api/desarrollos")
+async def api_create_desarrollo(request: Request):
+    """Crea un nuevo desarrollo."""
+    body = await request.json()
+    dev_id = await save_desarrollo(body)
+    return JSONResponse({"ok": True, "id": dev_id})
+
+
+@app.patch("/api/desarrollos/{dev_id}")
+async def api_update_desarrollo(dev_id: int, request: Request):
+    """Actualiza un desarrollo."""
+    body = await request.json()
+    existing = await get_desarrollo_by_id(dev_id)
+    if not existing:
+        return JSONResponse({"error": "Desarrollo no encontrado"}, status_code=404)
+    ok = await update_desarrollo(dev_id, body)
+    return JSONResponse({"ok": ok, "id": dev_id})
+
+
+# ─── Endpoint especial para el chatbot (busca en propiedades + desarrollos) ───
+
+@app.get("/api/chatbot/buscar")
+async def api_chatbot_search(
+    q: Optional[str] = None,
+    ciudad: Optional[str] = None,
+    operacion: Optional[str] = None,
+    tipo: Optional[str] = None,
+    precio_min: Optional[float] = None,
+    precio_max: Optional[float] = None,
+):
+    """Busca en propiedades Y desarrollos. Pensado para el chatbot de WhatsApp."""
+    props = await search_properties(
+        ciudad=ciudad, operacion=operacion, tipo=tipo,
+        precio_min=precio_min, precio_max=precio_max, limit=10
+    )
+    devs = await search_desarrollos(texto=q, ciudad=ciudad)
+
+    # Formatear propiedades para respuesta del chatbot
+    props_resumen = []
+    for p in props:
+        props_resumen.append({
+            "id": p["id"],
+            "tipo": "propiedad",
+            "nombre": f"{p.get('tipo_propiedad', '')} en {p.get('direccion', '')}",
+            "operacion": p.get("operacion", ""),
+            "precio": str(p.get("precio_formateado", "")),
+            "ciudad": p.get("ciudad", ""),
+            "recamaras": p.get("recamaras"),
+            "banos": p.get("banos"),
+            "metros": p.get("metros_construidos"),
+            "descripcion": (p.get("descripcion_profesional", "") or "")[:300],
+            "foto": p.get("foto_portada_url"),
+            "agente_nombre": p.get("agente_nombre"),
+            "agente_telefono": p.get("agente_telefono"),
+        })
+
+    devs_resumen = []
+    for d in devs:
+        devs_resumen.append({
+            "id": d["id"],
+            "tipo": "desarrollo",
+            "nombre": d.get("nombre", ""),
+            "ubicacion": d.get("ubicacion", ""),
+            "ciudad": d.get("ciudad", ""),
+            "precio_desde": str(d.get("precio_desde", "")),
+            "precio_hasta": str(d.get("precio_hasta", "")),
+            "descripcion": (d.get("descripcion", "") or "")[:300],
+            "caracteristicas": d.get("caracteristicas"),
+            "amenidades": d.get("amenidades", []),
+            "pdf_url": d.get("pdf_url"),
+            "foto": d.get("foto_portada_url"),
+            "agente_nombre": d.get("agente_nombre"),
+            "agente_telefono": d.get("agente_telefono"),
+        })
+
+    return JSONResponse({
+        "propiedades": props_resumen,
+        "desarrollos": devs_resumen,
+        "total": len(props_resumen) + len(devs_resumen),
+    })
 
 
 @app.post("/generate", response_class=HTMLResponse)
