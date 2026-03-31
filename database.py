@@ -50,17 +50,22 @@ CREATE TABLE IF NOT EXISTS propiedades (
     updated_at      TIMESTAMP DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_propiedades_ciudad ON propiedades(ciudad);
-CREATE INDEX IF NOT EXISTS idx_propiedades_operacion ON propiedades(operacion);
-CREATE INDEX IF NOT EXISTS idx_propiedades_activa ON propiedades(activa);
-CREATE INDEX IF NOT EXISTS idx_propiedades_created ON propiedades(created_at DESC);
 """
+
+CREATE_INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_propiedades_ciudad ON propiedades(ciudad);",
+    "CREATE INDEX IF NOT EXISTS idx_propiedades_operacion ON propiedades(operacion);",
+    "CREATE INDEX IF NOT EXISTS idx_propiedades_activa ON propiedades(activa);",
+    "CREATE INDEX IF NOT EXISTS idx_propiedades_created ON propiedades(created_at DESC);",
+]
 
 
 async def init_db():
     """Conecta y crea las tablas si no existen."""
     await database.connect()
     await database.execute(CREATE_TABLES)
+    for idx in CREATE_INDEXES:
+        await database.execute(idx)
 
 
 async def close_db():
