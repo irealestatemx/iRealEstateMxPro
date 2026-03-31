@@ -1131,52 +1131,157 @@ def _build_scene_contact(data: dict) -> Image.Image:
     return result.convert("RGB")
 
 
+def _build_overlay_cover(data: dict) -> Image.Image:
+    """Construye SOLO el overlay transparente de la escena cover (sin foto de fondo)."""
+    overlay = Image.new("RGBA", (W_VID, H_VID), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    _draw_gradient(draw, W_VID, H_VID, 150, 230)
+
+    fb = _find_font(True)
+    fr = _find_font(False)
+    font_badge = ImageFont.truetype(fb, 36) if fb else ImageFont.load_default()
+    font_price = ImageFont.truetype(fb, 78) if fb else ImageFont.load_default()
+    font_loc = ImageFont.truetype(fr, 34) if fr else ImageFont.load_default()
+
+    draw.rectangle([0, 0, W_VID, 6], fill=GOLD_RGB)
+    badge = f"  EN {data.get('operacion', 'VENTA').upper()}  "
+    bb = font_badge.getbbox(badge)
+    bw = bb[2] - bb[0] + 36
+    bh = bb[3] - bb[1] + 22
+    draw.rounded_rectangle([60, 60, 60 + bw, 60 + bh], radius=8, fill=(*GOLD_RGB, 255))
+    draw.text((60 + 18, 60 + 9), badge, fill=(*NAVY_RGB, 255), font=font_badge)
+
+    logo_path = BASE_DIR / "static" / "img" / "logo-header.png"
+    if logo_path.exists():
+        logo = Image.open(logo_path).convert("RGBA")
+        lh = 55
+        lr = logo.width / logo.height
+        logo = logo.resize((int(lh * lr), lh), Image.LANCZOS)
+        overlay.paste(logo, (W_VID - logo.width - 60, 55), logo)
+
+    y = H_VID - 380
+    draw.rectangle([60, y, W_VID - 60, y + 3], fill=(*GOLD_RGB, 255))
+    y += 30
+    draw.text((60, y), data.get("precio_formateado", ""), fill=(*WHITE_RGB, 255), font=font_price)
+    y += 100
+    ubic = f"{data.get('direccion', '')}, {data.get('ciudad', '')}"
+    if len(ubic) > 45:
+        ubic = ubic[:42] + "..."
+    draw.text((60, y), ubic, fill=(255, 255, 255, 180), font=font_loc)
+    return overlay
+
+
+def _build_overlay_specs(data: dict) -> Image.Image:
+    """Construye SOLO el overlay transparente de la escena specs."""
+    overlay = Image.new("RGBA", (W_VID, H_VID), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    _draw_gradient(draw, W_VID, H_VID, 120, 210)
+
+    fb = _find_font(True)
+    fr = _find_font(False)
+    font_val = ImageFont.truetype(fb, 64) if fb else ImageFont.load_default()
+    font_lbl = ImageFont.truetype(fr, 24) if fr else ImageFont.load_default()
+    font_badge = ImageFont.truetype(fb, 30) if fb else ImageFont.load_default()
+
+    tipo = data.get("tipoPropiedad", "").upper()
+    bb = font_badge.getbbox(tipo)
+    bw = bb[2] - bb[0] + 48
+    bh = bb[3] - bb[1] + 22
+    draw.rounded_rectangle([60, 80, 60 + bw, 80 + bh], radius=6,
+                           fill=(26, 60, 94, 200), outline=(*GOLD_RGB, 255), width=2)
+    draw.text((60 + 24, 80 + 9), tipo, fill=(*GOLD_RGB, 255), font=font_badge)
+
+    specs = []
+    if data.get("recamaras"): specs.append(("Rec", data["recamaras"]))
+    if data.get("banos"): specs.append(("Banos", data["banos"]))
+    if data.get("metros_construidos"): specs.append(("m2", data["metros_construidos"]))
+    if data.get("estacionamientos"): specs.append(("Est", data["estacionamientos"]))
+
+    if specs:
+        y = H_VID - 300
+        draw.rectangle([60, y, W_VID - 60, y + 3], fill=(*GOLD_RGB, 255))
+        y += 30
+        col_w = (W_VID - 120) // len(specs)
+        for i, (lbl, val) in enumerate(specs):
+            x = 60 + i * col_w + col_w // 2
+            vbb = font_val.getbbox(str(val))
+            vw = vbb[2] - vbb[0]
+            draw.text((x - vw // 2, y), str(val), fill=(*WHITE_RGB, 255), font=font_val)
+            lbb = font_lbl.getbbox(lbl.upper())
+            lw = lbb[2] - lbb[0]
+            draw.text((x - lw // 2, y + 72), lbl.upper(), fill=(*GOLD_RGB, 255), font=font_lbl)
+        draw.rectangle([60, y + 115, W_VID - 60, y + 118], fill=(*GOLD_RGB, 255))
+    return overlay
+
+
+def _build_overlay_detail(data: dict) -> Image.Image:
+    """Construye SOLO el overlay transparente de la escena detail."""
+    overlay = Image.new("RGBA", (W_VID, H_VID), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+    _draw_gradient(draw, W_VID, H_VID, 80, 200)
+
+    fb = _find_font(True)
+    fr = _find_font(False)
+    font_price = ImageFont.truetype(fb, 60) if fb else ImageFont.load_default()
+    font_loc = ImageFont.truetype(fr, 30) if fr else ImageFont.load_default()
+
+    y = H_VID - 260
+    draw.text((60, y), data.get("precio_formateado", ""), fill=(*WHITE_RGB, 255), font=font_price)
+    draw.rectangle([60, y + 75, 260, y + 78], fill=(*GOLD_RGB, 255))
+    draw.text((60, y + 90), f"{data.get('direccion', '')}, {data.get('ciudad', '')}",
+              fill=(255, 255, 255, 170), font=font_loc)
+    return overlay
+
+
+def _make_kb_clip(photo_path: str, overlay: Image.Image, duration: float, direction: str = "in"):
+    """Crea un VideoClip con efecto Ken Burns sobre la foto + overlay de texto."""
+    from moviepy import VideoClip
+    import numpy as np
+
+    base = _load_and_crop_vertical(photo_path)
+
+    def make_frame(t):
+        kb = _apply_ken_burns(base, t, duration, direction)
+        combined = Image.alpha_composite(kb.convert("RGBA"), overlay)
+        return np.array(combined.convert("RGB"))
+
+    return VideoClip(make_frame, duration=duration).with_fps(FPS_VID)
+
+
 def render_video_sync(data: dict, output_path: Path, job_id: str):
     """Renderiza el reel MP4 con MoviePy + Pillow (puro Python)."""
-    from moviepy import ImageClip, concatenate_videoclips, CompositeVideoClip
+    from moviepy import ImageClip, concatenate_videoclips
     import numpy as np
 
     photos = data.get("photos", [])
     scenes = []
 
-    # Escena 1: Cover
+    # Escena 1: Cover — Ken Burns zoom IN
     if photos:
-        cover_img = _build_scene_cover(photos[0], data)
-        base_cover = _load_and_crop_vertical(photos[0])
-
-        def make_cover_frame(t):
-            kb = _apply_ken_burns(base_cover, t, COVER_SECS, "in")
-            # Componer overlay encima del ken burns
-            ov = Image.new("RGBA", (W_VID, H_VID), (0, 0, 0, 0))
-            draw = ImageDraw.Draw(ov)
-            _draw_gradient(draw, W_VID, H_VID, 150, 230)
-            # Reusar el overlay de cover_img (truco: blend)
-            combined = Image.alpha_composite(kb.convert("RGBA"), ov)
-            return _pil_to_frame(combined)
-
-        # Usar cover_img estatico (mas rapido, el ken burns es sutil)
-        clip = ImageClip(_pil_to_frame(cover_img), duration=COVER_SECS)
+        ov_cover = _build_overlay_cover(data)
+        clip = _make_kb_clip(photos[0], ov_cover, COVER_SECS, "in")
         scenes.append(clip)
         video_jobs[job_id]["progress"] = 20
 
-    # Escena 2: Specs
+    # Escena 2: Specs — Ken Burns zoom OUT
     if len(photos) > 1:
-        specs_img = _build_scene_specs(photos[1], data)
-        clip = ImageClip(_pil_to_frame(specs_img), duration=SCENE_SECS)
+        ov_specs = _build_overlay_specs(data)
+        clip = _make_kb_clip(photos[1], ov_specs, SCENE_SECS, "out")
         scenes.append(clip)
         video_jobs[job_id]["progress"] = 35
 
-    # Escenas intermedias: detail
+    # Escenas intermedias: detail — alternar zoom in/out
     detail_start = 2
     for i in range(min(len(photos) - detail_start, 3)):
         idx = detail_start + i
         if idx < len(photos):
-            detail_img = _build_scene_detail(photos[idx], data)
-            clip = ImageClip(_pil_to_frame(detail_img), duration=SCENE_SECS)
+            ov_detail = _build_overlay_detail(data)
+            direction = "in" if i % 2 == 0 else "out"
+            clip = _make_kb_clip(photos[idx], ov_detail, SCENE_SECS, direction)
             scenes.append(clip)
         video_jobs[job_id]["progress"] = 35 + (i + 1) * 10
 
-    # Escena final: contacto
+    # Escena final: contacto — estatica (sin foto, fondo navy)
     contact_img = _build_scene_contact(data)
     clip = ImageClip(_pil_to_frame(contact_img), duration=CONTACT_SECS)
     scenes.append(clip)
