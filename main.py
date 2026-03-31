@@ -890,15 +890,6 @@ async def render_video_task(job_id: str, props: dict, output_path: Path):
         video_jobs[job_id]["status"] = "rendering"
         video_jobs[job_id]["progress"] = 5
 
-        # Calcular duracion basada en numero de fotos
-        num_photos = len(props.get("photos", []))
-        cover_frames = 150   # 5s
-        spec_frames = 120 if num_photos > 0 else 0  # 4s
-        detail_scenes = min(max(num_photos - 2, 0), 3)
-        detail_frames = detail_scenes * 120  # 4s each
-        contact_frames = 180  # 6s
-        total_frames = cover_frames + spec_frames + detail_frames + contact_frames
-
         # Escribir props a archivo temporal (evita problemas con JSON en CLI)
         props_file = output_path.parent / f"{job_id}_props.json"
         with open(props_file, "w", encoding="utf-8") as f:
@@ -910,7 +901,6 @@ async def render_video_task(job_id: str, props: dict, output_path: Path):
             "PropertyReel",
             str(output_path),
             "--props", str(props_file),
-            "--frames", f"0-{total_frames - 1}",
             "--gl", "swangle",
             "--concurrency", "1",
             "--disable-web-security",
