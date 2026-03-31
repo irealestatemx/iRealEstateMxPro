@@ -34,6 +34,16 @@ app = FastAPI(title="iRealEstateMxPro")
 @app.on_event("startup")
 async def startup():
     await init_db()
+    # Cargar desarrollos iniciales si la tabla esta vacia
+    try:
+        devs = await get_all_desarrollos(active_only=False)
+        if not devs:
+            from seed_desarrollos import DESARROLLOS_INICIALES
+            for dev in DESARROLLOS_INICIALES:
+                await save_desarrollo(dev)
+            print(f"[SEED] Cargados {len(DESARROLLOS_INICIALES)} desarrollos iniciales")
+    except Exception as e:
+        print(f"[SEED] Error cargando desarrollos: {e}")
 
 
 @app.on_event("shutdown")
