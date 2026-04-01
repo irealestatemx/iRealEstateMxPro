@@ -132,8 +132,7 @@ async def save_property(data: dict) -> int:
         :metros_terreno, :estacionamientos, :amenidades::jsonb, :descripcion_agente,
         :descripcion_profesional, :instagram_copy,
         :agente_nombre, :agente_telefono, :agente_email,
-        :foto_portada_url, :fotos_extra_urls::jsonb
-    ) RETURNING id
+        :foto_portada_url, :fotos_extra_urls    ) RETURNING id
     """
     values = {
         "session_id": data.get("session_id", ""),
