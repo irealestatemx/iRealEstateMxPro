@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS propiedades (
     agente_email    VARCHAR(300),
     foto_portada_url VARCHAR(500),
     fotos_extra_urls JSONB DEFAULT '[]',
+    user_id             INTEGER,
     publicada_instagram BOOLEAN DEFAULT FALSE,
     publicada_web       BOOLEAN DEFAULT FALSE,
     activa              BOOLEAN DEFAULT TRUE,
@@ -101,6 +102,11 @@ CREATE_INDEXES = [
 ]
 
 
+MIGRATIONS = [
+    "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS user_id INTEGER;",
+]
+
+
 async def init_db():
     """Conecta y crea las tablas si no existen."""
     await database.connect()
@@ -109,6 +115,11 @@ async def init_db():
     await database.execute(CREATE_DESARROLLOS)
     for idx in CREATE_INDEXES:
         await database.execute(idx)
+    for mig in MIGRATIONS:
+        try:
+            await database.execute(mig)
+        except Exception:
+            pass
 
 
 async def close_db():
@@ -125,14 +136,15 @@ async def save_property(data: dict) -> int:
         metros_terreno, estacionamientos, amenidades, descripcion_agente,
         descripcion_profesional, instagram_copy,
         agente_nombre, agente_telefono, agente_email,
-        foto_portada_url, fotos_extra_urls
+        foto_portada_url, fotos_extra_urls, user_id
     ) VALUES (
         :session_id, :tipo_propiedad, :operacion, :direccion, :ciudad, :estado,
         :precio, :precio_formateado, :recamaras, :banos, :metros_construidos,
-        :metros_terreno, :estacionamientos, :amenidades::jsonb, :descripcion_agente,
+        :metros_terreno, :estacionamientos, :amenidades, :descripcion_agente,
         :descripcion_profesional, :instagram_copy,
         :agente_nombre, :agente_telefono, :agente_email,
-        :foto_portada_url, :fotos_extra_urls    ) RETURNING id
+        :foto_portada_url, :fotos_extra_urls, :user_id
+    ) RETURNING id
     """
     values = {
         "session_id": data.get("session_id", ""),
@@ -157,9 +169,20 @@ async def save_property(data: dict) -> int:
         "agente_email": data.get("agente_email", ""),
         "foto_portada_url": data.get("foto_portada_url"),
         "fotos_extra_urls": json.dumps(data.get("fotos_extra_urls", [])),
+        "user_id": data.get("user_id"),
     }
     row_id = await database.execute(query=query, values=values)
     return row_id
+
+
+async def get_properties_by_user(user_id: int, limit: int = 50, offset: int = 0):
+    """Lista propiedades de un usuario especifico."""
+    query = """
+    SELECT * FROM propiedades WHERE user_id = :user_id
+    ORDER BY created_at DESC LIMIT :limit OFFSET :offset
+    """
+    rows = await database.fetch_all(query=query, values={"user_id": user_id, "limit": limit, "offset": offset})
+    return [dict(r._mapping) for r in rows]
 
 
 async def get_all_properties(active_only: bool = True, limit: int = 50, offset: int = 0):

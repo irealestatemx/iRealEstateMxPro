@@ -29,6 +29,7 @@ from database import (
     search_desarrollos, update_desarrollo,
     authenticate_user, get_user_by_id, get_all_users, create_user,
     update_user, delete_user, seed_admin_user,
+    get_properties_by_user,
 )
 
 # ─── Sesiones con cookie firmada ───
@@ -732,6 +733,124 @@ async def admin_toggle_user(request: Request, user_id: int):
     return RedirectResponse("/admin/usuarios", status_code=302)
 
 
+# ─── Dashboard de Propiedades ───
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request, agente: Optional[int] = None):
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    # Admin ve todas, agente solo las suyas
+    if user["rol"] == "admin":
+        if agente:
+            props = await get_properties_by_user(agente)
+        else:
+            props = await get_all_properties(active_only=False, limit=100)
+        agents = await get_all_users()
+    else:
+        props = await get_properties_by_user(user["id"])
+        agents = []
+
+    # Serializar campos especiales
+    for p in props:
+        for k, v in p.items():
+            if hasattr(v, 'isoformat'):
+                p[k] = v.isoformat()
+            elif not isinstance(v, (int, float, str, bool, list, dict, type(None))):
+                p[k] = str(v)
+
+    return templates.TemplateResponse(request=request, name="dashboard.html", context={
+        "user": user,
+        "propiedades": props,
+        "agents": agents,
+        "selected_agent": agente,
+    })
+
+
+@app.get("/dashboard/editar/{prop_id}", response_class=HTMLResponse)
+async def edit_property_page(request: Request, prop_id: int):
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    prop = await get_property_by_id(prop_id)
+    if not prop:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    # Solo el dueño o admin puede editar
+    if user["rol"] != "admin" and prop.get("user_id") != user["id"]:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    return templates.TemplateResponse(request=request, name="edit_property.html", context={
+        "user": user,
+        "prop": prop,
+    })
+
+
+@app.post("/dashboard/editar/{prop_id}")
+async def edit_property_submit(
+    request: Request,
+    prop_id: int,
+    tipo_propiedad: str = Form(""),
+    operacion: str = Form(""),
+    direccion: str = Form(""),
+    ciudad: str = Form(""),
+    estado: str = Form(""),
+    precio_formateado: str = Form(""),
+    recamaras: Optional[str] = Form(None),
+    banos: Optional[str] = Form(None),
+    metros_construidos: Optional[str] = Form(None),
+    metros_terreno: Optional[str] = Form(None),
+    estacionamientos: Optional[str] = Form(None),
+    agente_nombre: str = Form(""),
+    agente_telefono: str = Form(""),
+    agente_email: str = Form(""),
+):
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    prop = await get_property_by_id(prop_id)
+    if not prop:
+        return RedirectResponse("/dashboard", status_code=302)
+    if user["rol"] != "admin" and prop.get("user_id") != user["id"]:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    updates = {
+        "tipo_propiedad": tipo_propiedad,
+        "operacion": operacion,
+        "direccion": direccion,
+        "ciudad": ciudad,
+        "estado": estado,
+        "precio_formateado": precio_formateado,
+        "recamaras": recamaras,
+        "banos": banos,
+        "metros_construidos": metros_construidos,
+        "metros_terreno": metros_terreno,
+        "estacionamientos": estacionamientos,
+        "agente_nombre": agente_nombre,
+        "agente_telefono": agente_telefono,
+        "agente_email": agente_email,
+    }
+    await update_property(prop_id, updates)
+    return RedirectResponse("/dashboard", status_code=302)
+
+
+@app.post("/dashboard/toggle/{prop_id}")
+async def dashboard_toggle(request: Request, prop_id: int):
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    prop = await get_property_by_id(prop_id)
+    if not prop:
+        return RedirectResponse("/dashboard", status_code=302)
+    if user["rol"] != "admin" and prop.get("user_id") != user["id"]:
+        return RedirectResponse("/dashboard", status_code=302)
+    await toggle_property(prop_id, not prop["activa"])
+    return RedirectResponse("/dashboard", status_code=302)
+
+
 # ─── API REST de Propiedades (para web, chatbot, n8n) ───
 
 @app.get("/api/propiedades")
@@ -1046,10 +1165,12 @@ async def generate(
 
     # ─── Guardar propiedad en base de datos ───
     try:
+        user = await require_auth(request)
         db_data = {
             **context,
             "session_id": session_id,
             "precio": precio,
+            "user_id": user["id"] if user else None,
         }
         prop_id = await save_property(db_data)
         context["property_id"] = prop_id
