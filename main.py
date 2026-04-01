@@ -736,15 +736,18 @@ async def admin_toggle_user(request: Request, user_id: int):
 # ─── Dashboard de Propiedades ───
 
 @app.get("/dashboard", response_class=HTMLResponse)
-async def dashboard(request: Request, agente: Optional[int] = None):
+async def dashboard(request: Request, agente: Optional[str] = None):
     user = await require_auth(request)
     if not user:
         return RedirectResponse("/login", status_code=302)
 
+    # Convertir agente a int (puede venir vacio)
+    agente_id = int(agente) if agente and agente.isdigit() else None
+
     # Admin ve todas, agente solo las suyas
     if user["rol"] == "admin":
-        if agente:
-            props = await get_properties_by_user(agente)
+        if agente_id:
+            props = await get_properties_by_user(agente_id)
         else:
             props = await get_all_properties(active_only=False, limit=100)
         agents = await get_all_users()
@@ -764,7 +767,7 @@ async def dashboard(request: Request, agente: Optional[int] = None):
         "user": user,
         "propiedades": props,
         "agents": agents,
-        "selected_agent": agente,
+        "selected_agent": agente_id,
     })
 
 
