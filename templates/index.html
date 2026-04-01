@@ -15,6 +15,12 @@
         <img src="/static/img/logo-header.png" alt="iRealEstateMx" class="logo-img" />
       </div>
       <p class="header-tagline">Genera contenido profesional para tus propiedades en segundos</p>
+      <div style="display:flex;gap:12px;align-items:center;">
+        {% if user and user.rol == 'admin' %}
+        <a href="/admin/usuarios" style="color:#c9a227;font-size:13px;text-decoration:none;font-weight:500;">Usuarios</a>
+        {% endif %}
+        <a href="/logout" style="color:#e2e8f0;font-size:13px;text-decoration:none;font-weight:500;">Salir</a>
+      </div>
     </div>
   </header>
 

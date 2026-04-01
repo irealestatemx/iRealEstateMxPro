@@ -7,6 +7,7 @@ import os
 import json
 from datetime import datetime
 from databases import Database
+from passlib.hash import bcrypt
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
@@ -77,6 +78,18 @@ CREATE TABLE IF NOT EXISTS desarrollos (
 );
 """
 
+CREATE_USERS = """
+CREATE TABLE IF NOT EXISTS usuarios (
+    id          SERIAL PRIMARY KEY,
+    email       VARCHAR(300) UNIQUE NOT NULL,
+    password    VARCHAR(300) NOT NULL,
+    nombre      VARCHAR(300),
+    rol         VARCHAR(50) DEFAULT 'agente',
+    activo      BOOLEAN DEFAULT TRUE,
+    created_at  TIMESTAMP DEFAULT NOW()
+);
+"""
+
 CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_propiedades_ciudad ON propiedades(ciudad);",
     "CREATE INDEX IF NOT EXISTS idx_propiedades_operacion ON propiedades(operacion);",
@@ -92,6 +105,7 @@ async def init_db():
     """Conecta y crea las tablas si no existen."""
     await database.connect()
     await database.execute(CREATE_TABLES)
+    await database.execute(CREATE_USERS)
     await database.execute(CREATE_DESARROLLOS)
     for idx in CREATE_INDEXES:
         await database.execute(idx)
@@ -338,3 +352,86 @@ async def update_desarrollo(dev_id: int, updates: dict):
     query = f"UPDATE desarrollos SET {set_clause} WHERE id = :id"
     await database.execute(query=query, values=fields)
     return True
+
+
+# ─── Usuarios ───
+
+async def create_user(email: str, password: str, nombre: str, rol: str = "agente") -> int:
+    """Crea un usuario con password hasheada."""
+    hashed = bcrypt.hash(password)
+    query = """
+    INSERT INTO usuarios (email, password, nombre, rol)
+    VALUES (:email, :password, :nombre, :rol)
+    RETURNING id
+    """
+    return await database.execute(query=query, values={
+        "email": email.lower().strip(),
+        "password": hashed,
+        "nombre": nombre,
+        "rol": rol,
+    })
+
+
+async def authenticate_user(email: str, password: str):
+    """Verifica credenciales. Devuelve el usuario o None."""
+    query = "SELECT * FROM usuarios WHERE email = :email AND activo = TRUE"
+    row = await database.fetch_one(query=query, values={"email": email.lower().strip()})
+    if not row:
+        return None
+    user = dict(row._mapping)
+    if bcrypt.verify(password, user["password"]):
+        return user
+    return None
+
+
+async def get_user_by_id(user_id: int):
+    """Obtiene usuario por ID."""
+    query = "SELECT id, email, nombre, rol, activo, created_at FROM usuarios WHERE id = :id"
+    row = await database.fetch_one(query=query, values={"id": user_id})
+    return dict(row._mapping) if row else None
+
+
+async def get_all_users():
+    """Lista todos los usuarios."""
+    query = "SELECT id, email, nombre, rol, activo, created_at FROM usuarios ORDER BY created_at DESC"
+    rows = await database.fetch_all(query=query)
+    return [dict(r._mapping) for r in rows]
+
+
+async def update_user(user_id: int, updates: dict):
+    """Actualiza un usuario."""
+    allowed = {"nombre", "email", "rol", "activo"}
+    fields = {k: v for k, v in updates.items() if k in allowed}
+    if "password" in updates and updates["password"]:
+        fields["password"] = bcrypt.hash(updates["password"])
+    if not fields:
+        return False
+    set_clause = ", ".join(f"{k} = :{k}" for k in fields)
+    fields["id"] = user_id
+    query = f"UPDATE usuarios SET {set_clause} WHERE id = :id"
+    await database.execute(query=query, values=fields)
+    return True
+
+
+async def delete_user(user_id: int):
+    """Desactiva un usuario."""
+    query = "UPDATE usuarios SET activo = FALSE WHERE id = :id"
+    await database.execute(query=query, values={"id": user_id})
+
+
+async def count_users() -> int:
+    """Cuenta usuarios activos."""
+    query = "SELECT COUNT(*) as total FROM usuarios WHERE activo = TRUE"
+    row = await database.fetch_one(query=query)
+    return row._mapping["total"] if row else 0
+
+
+async def seed_admin_user():
+    """Crea el usuario admin si no existe ningun usuario."""
+    total = await count_users()
+    if total == 0:
+        admin_email = os.getenv("ADMIN_EMAIL", "irealestatemx@gmail.com")
+        admin_pass = os.getenv("ADMIN_PASSWORD", "admin123")
+        admin_name = os.getenv("ADMIN_NAME", "Esteban Castellanos")
+        await create_user(admin_email, admin_pass, admin_name, "admin")
+        print(f"[SEED] Usuario admin creado: {admin_email}")

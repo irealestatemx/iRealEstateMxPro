@@ -8,14 +8,15 @@ import subprocess
 from pathlib import Path
 from typing import List, Optional, Dict
 
-from fastapi import FastAPI, Request, Form, File, UploadFile
-from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse, JSONResponse
+from fastapi import FastAPI, Request, Form, File, UploadFile, Depends
+from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from openai import OpenAI
 from dotenv import load_dotenv
 from fpdf import FPDF
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 import httpx
 
 load_dotenv()
@@ -26,7 +27,34 @@ from database import (
     update_property, toggle_property, count_properties,
     save_desarrollo, get_all_desarrollos, get_desarrollo_by_id,
     search_desarrollos, update_desarrollo,
+    authenticate_user, get_user_by_id, get_all_users, create_user,
+    update_user, delete_user, seed_admin_user,
 )
+
+# ─── Sesiones con cookie firmada ───
+SECRET_KEY = os.getenv("SECRET_KEY", "irealestatemx-secret-key-change-me-2026")
+serializer = URLSafeTimedSerializer(SECRET_KEY)
+SESSION_MAX_AGE = 86400 * 7  # 7 dias
+
+
+def get_session_user_id(request: Request) -> Optional[int]:
+    """Lee el user_id de la cookie de sesion."""
+    token = request.cookies.get("session")
+    if not token:
+        return None
+    try:
+        user_id = serializer.loads(token, max_age=SESSION_MAX_AGE)
+        return user_id
+    except (BadSignature, SignatureExpired):
+        return None
+
+
+async def require_auth(request: Request):
+    """Dependencia que redirige a login si no hay sesion."""
+    user_id = get_session_user_id(request)
+    if not user_id:
+        return None
+    return await get_user_by_id(user_id)
 
 app = FastAPI(title="iRealEstateMxPro")
 
@@ -44,6 +72,11 @@ async def startup():
             print(f"[SEED] Cargados {len(DESARROLLOS_INICIALES)} desarrollos iniciales")
     except Exception as e:
         print(f"[SEED] Error cargando desarrollos: {e}")
+    # Crear admin si no existe
+    try:
+        await seed_admin_user()
+    except Exception as e:
+        print(f"[SEED] Error creando admin: {e}")
 
 
 @app.on_event("shutdown")
@@ -623,9 +656,80 @@ def generate_instagram_image(data: dict) -> bytes:
 
 # ─── Rutas ───
 
+# ─── Autenticacion ───
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    user_id = get_session_user_id(request)
+    if user_id:
+        return RedirectResponse("/", status_code=302)
+    return templates.TemplateResponse(request=request, name="login.html", context={"error": None})
+
+
+@app.post("/login", response_class=HTMLResponse)
+async def login_submit(request: Request, email: str = Form(...), password: str = Form(...)):
+    user = await authenticate_user(email, password)
+    if not user:
+        return templates.TemplateResponse(request=request, name="login.html", context={"error": "Email o contraseña incorrectos"})
+    token = serializer.dumps(user["id"])
+    response = RedirectResponse("/", status_code=302)
+    response.set_cookie("session", token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax")
+    return response
+
+
+@app.get("/logout")
+async def logout():
+    response = RedirectResponse("/login", status_code=302)
+    response.delete_cookie("session")
+    return response
+
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse(request=request, name="index.html")
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    return templates.TemplateResponse(request=request, name="index.html", context={"user": user})
+
+
+# ─── Panel de Usuarios (solo admin) ───
+
+@app.get("/admin/usuarios", response_class=HTMLResponse)
+async def admin_users_page(request: Request):
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    users = await get_all_users()
+    return templates.TemplateResponse(request=request, name="admin_users.html", context={"user": user, "users": users})
+
+
+@app.post("/admin/usuarios/crear")
+async def admin_create_user(
+    request: Request,
+    email: str = Form(...),
+    password: str = Form(...),
+    nombre: str = Form(...),
+    rol: str = Form("agente"),
+):
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    try:
+        await create_user(email, password, nombre, rol)
+    except Exception as e:
+        print(f"[AUTH] Error creando usuario: {e}")
+    return RedirectResponse("/admin/usuarios", status_code=302)
+
+
+@app.post("/admin/usuarios/{user_id}/toggle")
+async def admin_toggle_user(request: Request, user_id: int):
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    target = await get_user_by_id(user_id)
+    if target and target["id"] != user["id"]:
+        await update_user(user_id, {"activo": not target["activo"]})
+    return RedirectResponse("/admin/usuarios", status_code=302)
 
 
 # ─── API REST de Propiedades (para web, chatbot, n8n) ───
@@ -863,6 +967,11 @@ async def generate(
     agente_email: str = Form(...),
     fotos: List[UploadFile] = File(default=[]),
 ):
+    # Auth check
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
     # Recoger amenidades desde el form (checkboxes)
     form_data = await request.form()
     amenidades = form_data.getlist("amenidades")

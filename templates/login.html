@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iRealEstateMxPro — Iniciar Sesion</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #0d1f33 0%, #1a3c5e 50%, #0d1f33 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .login-container {
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      width: 100%;
+      max-width: 420px;
+      padding: 48px 40px;
+      text-align: center;
+    }
+    .login-logo {
+      height: 60px;
+      margin-bottom: 12px;
+    }
+    .login-title {
+      font-size: 22px;
+      font-weight: 700;
+      color: #1a3c5e;
+      margin-bottom: 4px;
+    }
+    .login-subtitle {
+      font-size: 14px;
+      color: #7a8a9e;
+      margin-bottom: 32px;
+    }
+    .form-group {
+      text-align: left;
+      margin-bottom: 20px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      color: #1a3c5e;
+      margin-bottom: 6px;
+    }
+    .form-group input {
+      width: 100%;
+      padding: 12px 16px;
+      border: 2px solid #e2e8f0;
+      border-radius: 10px;
+      font-size: 15px;
+      font-family: 'Inter', sans-serif;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+    .form-group input:focus {
+      border-color: #c9a227;
+    }
+    .error-msg {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      color: #dc2626;
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 13px;
+      margin-bottom: 20px;
+    }
+    .btn-login {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #c9a227, #d4af37);
+      color: #1a3c5e;
+      border: none;
+      border-radius: 10px;
+      font-size: 16px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      font-family: 'Inter', sans-serif;
+    }
+    .btn-login:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 15px rgba(201, 162, 39, 0.4);
+    }
+    .login-footer {
+      margin-top: 24px;
+      font-size: 12px;
+      color: #a0aec0;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <img src="/static/img/logo-full.png" alt="iRealEstateMx" class="login-logo" />
+    <h1 class="login-title">Bienvenido</h1>
+    <p class="login-subtitle">Inicia sesion para continuar</p>
+
+    {% if error %}
+    <div class="error-msg">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/login">
+      <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" placeholder="tu@email.com" required />
+      </div>
+      <div class="form-group">
+        <label for="password">Contrasena</label>
+        <input type="password" id="password" name="password" placeholder="Tu contrasena" required />
+      </div>
+      <button type="submit" class="btn-login">Iniciar Sesion</button>
+    </form>
+
+    <p class="login-footer">iRealEstateMxPro &copy; 2026</p>
+  </div>
+</body>
+</html>

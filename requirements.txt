@@ -11,3 +11,5 @@ httpx
 moviepy
 asyncpg
 databases[postgresql]
+passlib[bcrypt]
+itsdangerous

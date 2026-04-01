@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iRealEstateMxPro — Usuarios</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f0f2f5;
+      min-height: 100vh;
+    }
+    .topbar {
+      background: #1a3c5e;
+      padding: 16px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .topbar-logo { height: 36px; }
+    .topbar-nav { display: flex; gap: 16px; align-items: center; }
+    .topbar-nav a {
+      color: #c9a227;
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .topbar-nav a:hover { color: #fff; }
+    .topbar-user {
+      color: #e2e8f0;
+      font-size: 13px;
+    }
+    .container {
+      max-width: 900px;
+      margin: 32px auto;
+      padding: 0 20px;
+    }
+    h1 {
+      font-size: 24px;
+      color: #1a3c5e;
+      margin-bottom: 24px;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      padding: 28px;
+      margin-bottom: 24px;
+    }
+    .card h2 {
+      font-size: 18px;
+      color: #1a3c5e;
+      margin-bottom: 16px;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    th {
+      text-align: left;
+      font-size: 12px;
+      font-weight: 600;
+      color: #7a8a9e;
+      text-transform: uppercase;
+      padding: 8px 12px;
+      border-bottom: 2px solid #e2e8f0;
+    }
+    td {
+      padding: 12px;
+      font-size: 14px;
+      border-bottom: 1px solid #f0f2f5;
+      color: #2d3748;
+    }
+    .badge {
+      display: inline-block;
+      padding: 3px 10px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge-admin { background: #c9a227; color: #1a3c5e; }
+    .badge-agente { background: #e2e8f0; color: #4a5568; }
+    .badge-activo { background: #c6f6d5; color: #22543d; }
+    .badge-inactivo { background: #fed7d7; color: #9b2c2c; }
+    .btn-sm {
+      padding: 6px 14px;
+      border: none;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+    }
+    .btn-toggle { background: #e2e8f0; color: #4a5568; }
+    .btn-toggle:hover { background: #cbd5e0; }
+    .form-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: end;
+    }
+    .form-row .fg {
+      flex: 1;
+      min-width: 140px;
+    }
+    .form-row label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 4px;
+    }
+    .form-row input, .form-row select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 2px solid #e2e8f0;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: 'Inter', sans-serif;
+    }
+    .form-row input:focus, .form-row select:focus {
+      border-color: #c9a227;
+      outline: none;
+    }
+    .btn-add {
+      padding: 10px 24px;
+      background: linear-gradient(135deg, #c9a227, #d4af37);
+      color: #1a3c5e;
+      border: none;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      white-space: nowrap;
+    }
+    .btn-add:hover { box-shadow: 0 2px 10px rgba(201,162,39,0.4); }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <img src="/static/img/logo-header.png" alt="iRealEstateMx" class="topbar-logo" />
+    <div class="topbar-nav">
+      <a href="/">Nueva Propiedad</a>
+      <a href="/admin/usuarios">Usuarios</a>
+      <span class="topbar-user">{{ user.nombre }}</span>
+      <a href="/logout">Salir</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <h1>Administrar Usuarios</h1>
+
+    <!-- Crear usuario -->
+    <div class="card">
+      <h2>Agregar usuario</h2>
+      <form method="post" action="/admin/usuarios/crear">
+        <div class="form-row">
+          <div class="fg">
+            <label>Nombre</label>
+            <input type="text" name="nombre" placeholder="Nombre completo" required />
+          </div>
+          <div class="fg">
+            <label>Email</label>
+            <input type="email" name="email" placeholder="email@ejemplo.com" required />
+          </div>
+          <div class="fg">
+            <label>Contrasena</label>
+            <input type="password" name="password" placeholder="Minimo 6 caracteres" required />
+          </div>
+          <div class="fg" style="max-width:130px">
+            <label>Rol</label>
+            <select name="rol">
+              <option value="agente">Agente</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <button type="submit" class="btn-add">Agregar</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Lista usuarios -->
+    <div class="card">
+      <h2>Usuarios registrados</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Nombre</th>
+            <th>Email</th>
+            <th>Rol</th>
+            <th>Estado</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td>{{ u.nombre }}</td>
+            <td>{{ u.email }}</td>
+            <td><span class="badge {{ 'badge-admin' if u.rol == 'admin' else 'badge-agente' }}">{{ u.rol }}</span></td>
+            <td><span class="badge {{ 'badge-activo' if u.activo else 'badge-inactivo' }}">{{ 'Activo' if u.activo else 'Inactivo' }}</span></td>
+            <td>
+              {% if u.id != user.id %}
+              <form method="post" action="/admin/usuarios/{{ u.id }}/toggle" style="display:inline">
+                <button type="submit" class="btn-sm btn-toggle">
+                  {{ 'Desactivar' if u.activo else 'Activar' }}
+                </button>
+              </form>
+              {% else %}
+              <span style="color:#a0aec0;font-size:12px">Tu cuenta</span>
+              {% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

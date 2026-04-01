@@ -34,6 +34,9 @@ DESARROLLOS_INICIALES = [
             "Casas con diseño contemporáneo y acabados premium. "
             "Ubicación estratégica cerca de ALAÏA y centro histórico."
         ),
+        "agente_nombre": "Esteban Castellanos",
+        "agente_telefono": "4737365219",
+        "agente_email": "irealestatemx@gmail.com",
         "pdf_url": "/static/docs/carcamos-residencial.pdf",
     },
     {
@@ -66,6 +69,9 @@ DESARROLLOS_INICIALES = [
             "Algunas casas con sótano. "
             "Privada con vigilancia 24/7."
         ),
+        "agente_nombre": "Esteban Castellanos",
+        "agente_telefono": "4737365219",
+        "agente_email": "irealestatemx@gmail.com",
         "pdf_url": "/static/docs/privada-del-fresno.pdf",
     },
 ]
