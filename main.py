@@ -854,6 +854,22 @@ async def dashboard_toggle(request: Request, prop_id: int):
     return RedirectResponse("/dashboard", status_code=302)
 
 
+@app.post("/dashboard/eliminar/{prop_id}")
+async def dashboard_delete(request: Request, prop_id: int):
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    prop = await get_property_by_id(prop_id)
+    if not prop:
+        return RedirectResponse("/dashboard", status_code=302)
+    if user["rol"] != "admin" and prop.get("user_id") != user["id"]:
+        return RedirectResponse("/dashboard", status_code=302)
+    # Eliminar permanentemente
+    from database import database as db
+    await db.execute("DELETE FROM propiedades WHERE id = :id", values={"id": prop_id})
+    return RedirectResponse("/dashboard", status_code=302)
+
+
 # ─── API REST de Propiedades (para web, chatbot, n8n) ───
 
 @app.get("/api/propiedades")

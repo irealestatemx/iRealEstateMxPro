@@ -83,6 +83,8 @@
     }
     .empty-state h2 { font-size: 20px; margin-bottom: 8px; color: #7a8a9e; }
     .empty-state a { color: #c9a227; text-decoration: none; font-weight: 600; }
+    .btn-delete { background: #e53e3e; color: #fff; }
+    .btn-delete:hover { background: #c53030; }
   </style>
 </head>
 <body>
@@ -208,6 +210,11 @@
               <button type="submit" class="btn-sm {{ 'btn-toggle-off' if p.activa else 'btn-toggle-on' }}">
                 {{ 'Desactivar' if p.activa else 'Activar' }}
               </button>
+            </form>
+            <!-- Eliminar propiedad -->
+            <form method="post" action="/dashboard/eliminar/{{ p.id }}" style="display:inline"
+                  onsubmit="return confirm('¿Estás seguro de eliminar esta propiedad permanentemente? Esta acción no se puede deshacer.')">
+              <button type="submit" class="btn-sm btn-delete">Eliminar</button>
             </form>
             {% endif %}
           </div>
