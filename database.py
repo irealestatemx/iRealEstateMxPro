@@ -81,13 +81,31 @@ CREATE TABLE IF NOT EXISTS desarrollos (
 
 CREATE_USERS = """
 CREATE TABLE IF NOT EXISTS usuarios (
-    id          SERIAL PRIMARY KEY,
-    email       VARCHAR(300) UNIQUE NOT NULL,
-    password    VARCHAR(300) NOT NULL,
-    nombre      VARCHAR(300),
-    rol         VARCHAR(50) DEFAULT 'agente',
-    activo      BOOLEAN DEFAULT TRUE,
-    created_at  TIMESTAMP DEFAULT NOW()
+    id                  SERIAL PRIMARY KEY,
+    email               VARCHAR(300) UNIQUE NOT NULL,
+    password            VARCHAR(300) NOT NULL,
+    nombre              VARCHAR(300),
+    rol                 VARCHAR(50) DEFAULT 'agente',
+    prefijo_whatsapp    VARCHAR(10) UNIQUE,
+    activo              BOOLEAN DEFAULT TRUE,
+    created_at          TIMESTAMP DEFAULT NOW()
+);
+"""
+
+CREATE_PROSPECTOS = """
+CREATE TABLE IF NOT EXISTS prospectos (
+    id                  SERIAL PRIMARY KEY,
+    referido_id         INTEGER REFERENCES usuarios(id),
+    agente_id           INTEGER REFERENCES usuarios(id),
+    nombre_cliente      VARCHAR(300),
+    telefono_cliente    VARCHAR(50),
+    mensaje_original    TEXT,
+    prefijo             VARCHAR(10),
+    desarrollo_interes  VARCHAR(300),
+    estado              VARCHAR(50) DEFAULT 'nuevo',
+    notas               TEXT,
+    created_at          TIMESTAMP DEFAULT NOW(),
+    updated_at          TIMESTAMP DEFAULT NOW()
 );
 """
 
@@ -99,11 +117,15 @@ CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_desarrollos_ciudad ON desarrollos(ciudad);",
     "CREATE INDEX IF NOT EXISTS idx_desarrollos_activo ON desarrollos(activo);",
     "CREATE INDEX IF NOT EXISTS idx_desarrollos_nombre ON desarrollos(nombre);",
+    "CREATE INDEX IF NOT EXISTS idx_prospectos_referido ON prospectos(referido_id);",
+    "CREATE INDEX IF NOT EXISTS idx_prospectos_estado ON prospectos(estado);",
+    "CREATE INDEX IF NOT EXISTS idx_prospectos_created ON prospectos(created_at DESC);",
 ]
 
 
 MIGRATIONS = [
     "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS user_id INTEGER;",
+    "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS prefijo_whatsapp VARCHAR(10);",
 ]
 
 
@@ -113,6 +135,7 @@ async def init_db():
     await database.execute(CREATE_TABLES)
     await database.execute(CREATE_USERS)
     await database.execute(CREATE_DESARROLLOS)
+    await database.execute(CREATE_PROSPECTOS)
     for idx in CREATE_INDEXES:
         await database.execute(idx)
     for mig in MIGRATIONS:
@@ -408,21 +431,21 @@ async def authenticate_user(email: str, password: str):
 
 async def get_user_by_id(user_id: int):
     """Obtiene usuario por ID."""
-    query = "SELECT id, email, nombre, rol, activo, created_at FROM usuarios WHERE id = :id"
+    query = "SELECT id, email, nombre, rol, prefijo_whatsapp, activo, created_at FROM usuarios WHERE id = :id"
     row = await database.fetch_one(query=query, values={"id": user_id})
     return dict(row._mapping) if row else None
 
 
 async def get_all_users():
     """Lista todos los usuarios."""
-    query = "SELECT id, email, nombre, rol, activo, created_at FROM usuarios ORDER BY created_at DESC"
+    query = "SELECT id, email, nombre, rol, prefijo_whatsapp, activo, created_at FROM usuarios ORDER BY created_at DESC"
     rows = await database.fetch_all(query=query)
     return [dict(r._mapping) for r in rows]
 
 
 async def update_user(user_id: int, updates: dict):
     """Actualiza un usuario."""
-    allowed = {"nombre", "email", "rol", "activo"}
+    allowed = {"nombre", "email", "rol", "activo", "prefijo_whatsapp"}
     fields = {k: v for k, v in updates.items() if k in allowed}
     if "password" in updates and updates["password"]:
         fields["password"] = bcrypt.hash(updates["password"])
@@ -457,3 +480,116 @@ async def seed_admin_user():
         admin_name = os.getenv("ADMIN_NAME", "Esteban Castellanos")
         await create_user(admin_email, admin_pass, admin_name, "admin")
         print(f"[SEED] Usuario admin creado: {admin_email}")
+
+
+# ─── Referidos (buscar por prefijo) ───
+
+async def get_user_by_prefijo(prefijo: str):
+    """Obtiene un referido por su prefijo de WhatsApp."""
+    query = "SELECT id, email, nombre, rol, prefijo_whatsapp, activo FROM usuarios WHERE UPPER(prefijo_whatsapp) = :prefijo AND activo = TRUE"
+    row = await database.fetch_one(query=query, values={"prefijo": prefijo.upper().strip()})
+    return dict(row._mapping) if row else None
+
+
+async def get_all_referidos():
+    """Lista todos los usuarios con rol referido."""
+    query = "SELECT id, email, nombre, rol, prefijo_whatsapp, activo, created_at FROM usuarios WHERE rol = 'referido' ORDER BY nombre"
+    rows = await database.fetch_all(query=query)
+    return [dict(r._mapping) for r in rows]
+
+
+# ─── Prospectos ───
+
+async def create_prospecto(data: dict) -> int:
+    """Crea un prospecto y devuelve su ID."""
+    query = """
+    INSERT INTO prospectos (
+        referido_id, agente_id, nombre_cliente, telefono_cliente,
+        mensaje_original, prefijo, desarrollo_interes, estado, notas
+    ) VALUES (
+        :referido_id, :agente_id, :nombre_cliente, :telefono_cliente,
+        :mensaje_original, :prefijo, :desarrollo_interes, :estado, :notas
+    ) RETURNING id
+    """
+    values = {
+        "referido_id": data.get("referido_id"),
+        "agente_id": data.get("agente_id"),
+        "nombre_cliente": data.get("nombre_cliente", ""),
+        "telefono_cliente": data.get("telefono_cliente", ""),
+        "mensaje_original": data.get("mensaje_original", ""),
+        "prefijo": data.get("prefijo", ""),
+        "desarrollo_interes": data.get("desarrollo_interes", ""),
+        "estado": data.get("estado", "nuevo"),
+        "notas": data.get("notas", ""),
+    }
+    return await database.execute(query=query, values=values)
+
+
+async def get_all_prospectos(referido_id: int = None, limit: int = 100):
+    """Lista prospectos. Si referido_id se pasa, filtra por ese referido."""
+    if referido_id:
+        query = """
+        SELECT p.*, u.nombre as referido_nombre
+        FROM prospectos p
+        LEFT JOIN usuarios u ON p.referido_id = u.id
+        WHERE p.referido_id = :referido_id
+        ORDER BY p.created_at DESC LIMIT :limit
+        """
+        rows = await database.fetch_all(query=query, values={"referido_id": referido_id, "limit": limit})
+    else:
+        query = """
+        SELECT p.*, u.nombre as referido_nombre
+        FROM prospectos p
+        LEFT JOIN usuarios u ON p.referido_id = u.id
+        ORDER BY p.created_at DESC LIMIT :limit
+        """
+        rows = await database.fetch_all(query=query, values={"limit": limit})
+    return [dict(r._mapping) for r in rows]
+
+
+async def get_prospecto_by_id(prospecto_id: int):
+    """Obtiene un prospecto por ID."""
+    query = """
+    SELECT p.*, u.nombre as referido_nombre
+    FROM prospectos p
+    LEFT JOIN usuarios u ON p.referido_id = u.id
+    WHERE p.id = :id
+    """
+    row = await database.fetch_one(query=query, values={"id": prospecto_id})
+    return dict(row._mapping) if row else None
+
+
+async def update_prospecto(prospecto_id: int, updates: dict):
+    """Actualiza un prospecto (estado, notas, etc.)."""
+    allowed = {"nombre_cliente", "telefono_cliente", "desarrollo_interes", "estado", "notas", "agente_id"}
+    fields = {k: v for k, v in updates.items() if k in allowed}
+    if not fields:
+        return False
+    fields["updated_at"] = datetime.utcnow()
+    set_clause = ", ".join(f"{k} = :{k}" for k in fields)
+    fields["id"] = prospecto_id
+    query = f"UPDATE prospectos SET {set_clause} WHERE id = :id"
+    await database.execute(query=query, values=fields)
+    return True
+
+
+async def count_prospectos(referido_id: int = None) -> dict:
+    """Cuenta prospectos por estado. Retorna dict con totales."""
+    if referido_id:
+        query = "SELECT estado, COUNT(*) as total FROM prospectos WHERE referido_id = :referido_id GROUP BY estado"
+        rows = await database.fetch_all(query=query, values={"referido_id": referido_id})
+    else:
+        query = "SELECT estado, COUNT(*) as total FROM prospectos GROUP BY estado"
+        rows = await database.fetch_all(query=query)
+    counts = {}
+    for r in rows:
+        m = r._mapping
+        counts[m["estado"]] = m["total"]
+    counts["total"] = sum(counts.values())
+    return counts
+
+
+async def delete_prospecto(prospecto_id: int):
+    """Elimina un prospecto permanentemente."""
+    query = "DELETE FROM prospectos WHERE id = :id"
+    await database.execute(query=query, values={"id": prospecto_id})

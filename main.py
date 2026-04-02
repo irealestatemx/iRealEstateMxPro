@@ -30,6 +30,9 @@ from database import (
     authenticate_user, get_user_by_id, get_all_users, create_user,
     update_user, delete_user, seed_admin_user,
     get_properties_by_user,
+    get_user_by_prefijo, get_all_referidos,
+    create_prospecto, get_all_prospectos, get_prospecto_by_id,
+    update_prospecto, count_prospectos, delete_prospecto,
 )
 
 # ─── Sesiones con cookie firmada ───
@@ -711,12 +714,15 @@ async def admin_create_user(
     password: str = Form(...),
     nombre: str = Form(...),
     rol: str = Form("agente"),
+    prefijo_whatsapp: str = Form(""),
 ):
     user = await require_auth(request)
     if not user or user["rol"] != "admin":
         return RedirectResponse("/login", status_code=302)
     try:
-        await create_user(email, password, nombre, rol)
+        user_id = await create_user(email, password, nombre, rol)
+        if prefijo_whatsapp.strip():
+            await update_user(user_id, {"prefijo_whatsapp": prefijo_whatsapp.strip().upper()})
     except Exception as e:
         print(f"[AUTH] Error creando usuario: {e}")
     return RedirectResponse("/admin/usuarios", status_code=302)
@@ -868,6 +874,153 @@ async def dashboard_delete(request: Request, prop_id: int):
     from database import database as db
     await db.execute("DELETE FROM propiedades WHERE id = :id", values={"id": prop_id})
     return RedirectResponse("/dashboard", status_code=302)
+
+
+# ─── Dashboard de Referidos ───
+
+@app.get("/mis-prospectos", response_class=HTMLResponse)
+async def dashboard_referido(request: Request):
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    if user["rol"] == "referido":
+        prospectos = await get_all_prospectos(referido_id=user["id"])
+        counts = await count_prospectos(referido_id=user["id"])
+    elif user["rol"] == "admin":
+        prospectos = await get_all_prospectos()
+        counts = await count_prospectos()
+    else:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    # Serializar fechas
+    for p in prospectos:
+        for k, v in p.items():
+            if hasattr(v, 'isoformat'):
+                p[k] = v.isoformat()
+            elif not isinstance(v, (int, float, str, bool, list, dict, type(None))):
+                p[k] = str(v)
+
+    return templates.TemplateResponse(request=request, name="dashboard_referido.html", context={
+        "user": user,
+        "prospectos": prospectos,
+        "counts": counts,
+    })
+
+
+# ─── Admin: Gestion de Prospectos ───
+
+@app.get("/admin/prospectos", response_class=HTMLResponse)
+async def admin_prospectos_page(request: Request, referido: Optional[str] = None, estado: Optional[str] = None):
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    referido_id = int(referido) if referido and referido.isdigit() else None
+    prospectos = await get_all_prospectos(referido_id=referido_id)
+    if estado:
+        prospectos = [p for p in prospectos if p["estado"] == estado]
+    counts = await count_prospectos()
+    referidos = await get_all_referidos()
+
+    for p in prospectos:
+        for k, v in p.items():
+            if hasattr(v, 'isoformat'):
+                p[k] = v.isoformat()
+            elif not isinstance(v, (int, float, str, bool, list, dict, type(None))):
+                p[k] = str(v)
+
+    return templates.TemplateResponse(request=request, name="admin_prospectos.html", context={
+        "user": user,
+        "prospectos": prospectos,
+        "counts": counts,
+        "referidos": referidos,
+        "selected_referido": referido_id,
+        "selected_estado": estado or "",
+    })
+
+
+@app.post("/admin/prospectos/{prospecto_id}/estado")
+async def admin_update_prospecto_estado(
+    request: Request,
+    prospecto_id: int,
+    estado: str = Form(...),
+    notas: str = Form(""),
+):
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    updates = {"estado": estado}
+    if notas:
+        updates["notas"] = notas
+    await update_prospecto(prospecto_id, updates)
+    return RedirectResponse("/admin/prospectos", status_code=302)
+
+
+@app.post("/admin/prospectos/crear")
+async def admin_create_prospecto(
+    request: Request,
+    nombre_cliente: str = Form(""),
+    telefono_cliente: str = Form(""),
+    desarrollo_interes: str = Form(""),
+    referido_id: str = Form(""),
+    notas: str = Form(""),
+):
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    data = {
+        "nombre_cliente": nombre_cliente,
+        "telefono_cliente": telefono_cliente,
+        "desarrollo_interes": desarrollo_interes,
+        "referido_id": int(referido_id) if referido_id and referido_id.isdigit() else None,
+        "agente_id": user["id"],
+        "notas": notas,
+        "estado": "nuevo",
+    }
+    await create_prospecto(data)
+    return RedirectResponse("/admin/prospectos", status_code=302)
+
+
+@app.post("/admin/prospectos/{prospecto_id}/eliminar")
+async def admin_delete_prospecto(request: Request, prospecto_id: int):
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    await delete_prospecto(prospecto_id)
+    return RedirectResponse("/admin/prospectos", status_code=302)
+
+
+# ─── API: Registro automatico de prospectos desde n8n/WhatsApp ───
+
+@app.post("/api/prospectos/registrar")
+async def api_registrar_prospecto(request: Request):
+    """Endpoint para que n8n registre prospectos automaticamente desde WhatsApp."""
+    body = await request.json()
+    prefijo = body.get("prefijo", "").strip().upper()
+    mensaje = body.get("mensaje", "")
+    telefono = body.get("telefono", "")
+    nombre = body.get("nombre", "")
+    desarrollo = body.get("desarrollo", "")
+
+    # Buscar referido por prefijo
+    referido = None
+    if prefijo:
+        referido = await get_user_by_prefijo(prefijo)
+
+    data = {
+        "referido_id": referido["id"] if referido else None,
+        "nombre_cliente": nombre,
+        "telefono_cliente": telefono,
+        "mensaje_original": mensaje,
+        "prefijo": prefijo,
+        "desarrollo_interes": desarrollo,
+        "estado": "nuevo",
+    }
+    prospecto_id = await create_prospecto(data)
+    return JSONResponse({
+        "ok": True,
+        "prospecto_id": prospecto_id,
+        "referido": referido["nombre"] if referido else None,
+    })
 
 
 # ─── API REST de Propiedades (para web, chatbot, n8n) ───
