@@ -676,7 +676,9 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
     if not user:
         return templates.TemplateResponse(request=request, name="login.html", context={"error": "Email o contraseña incorrectos"})
     token = serializer.dumps(user["id"])
-    response = RedirectResponse("/", status_code=302)
+    # Referidos van directo a su dashboard de prospectos
+    redirect_url = "/mis-prospectos" if user["rol"] == "referido" else "/"
+    response = RedirectResponse(redirect_url, status_code=302)
     response.set_cookie("session", token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax")
     return response
 

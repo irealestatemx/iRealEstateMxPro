@@ -83,6 +83,7 @@
     }
     .badge-admin { background: #c9a227; color: #1a3c5e; }
     .badge-agente { background: #e2e8f0; color: #4a5568; }
+    .badge-referido { background: #c6f6d5; color: #276749; }
     .badge-activo { background: #c6f6d5; color: #22543d; }
     .badge-inactivo { background: #fed7d7; color: #9b2c2c; }
     .btn-sm {
@@ -145,7 +146,9 @@
     <img src="/static/img/logo-header.png" alt="iRealEstateMx" class="topbar-logo" />
     <div class="topbar-nav">
       <a href="/">Nueva Propiedad</a>
-      <a href="/admin/usuarios">Usuarios</a>
+      <a href="/dashboard">Propiedades</a>
+      <a href="/admin/prospectos">Prospectos</a>
+      <a href="/admin/usuarios" class="active">Usuarios</a>
       <span class="topbar-user">{{ user.nombre }}</span>
       <a href="/logout">Salir</a>
     </div>
@@ -173,10 +176,15 @@
           </div>
           <div class="fg" style="max-width:130px">
             <label>Rol</label>
-            <select name="rol">
+            <select name="rol" id="rol-select" onchange="togglePrefijo()">
               <option value="agente">Agente</option>
+              <option value="referido">Referido</option>
               <option value="admin">Admin</option>
             </select>
+          </div>
+          <div class="fg" style="max-width:100px" id="prefijo-group">
+            <label>Prefijo WA</label>
+            <input type="text" name="prefijo_whatsapp" placeholder="Ej: N" maxlength="5" style="text-transform:uppercase" />
           </div>
           <button type="submit" class="btn-add">Agregar</button>
         </div>
@@ -192,6 +200,7 @@
             <th>Nombre</th>
             <th>Email</th>
             <th>Rol</th>
+            <th>Prefijo</th>
             <th>Estado</th>
             <th>Acciones</th>
           </tr>
@@ -201,7 +210,8 @@
           <tr>
             <td>{{ u.nombre }}</td>
             <td>{{ u.email }}</td>
-            <td><span class="badge {{ 'badge-admin' if u.rol == 'admin' else 'badge-agente' }}">{{ u.rol }}</span></td>
+            <td><span class="badge badge-{{ u.rol }}">{{ u.rol }}</span></td>
+            <td>{{ u.prefijo_whatsapp or '—' }}</td>
             <td><span class="badge {{ 'badge-activo' if u.activo else 'badge-inactivo' }}">{{ 'Activo' if u.activo else 'Inactivo' }}</span></td>
             <td>
               {% if u.id != user.id %}
@@ -220,5 +230,13 @@
       </table>
     </div>
   </div>
+  <script>
+    function togglePrefijo() {
+      var rol = document.getElementById('rol-select').value;
+      var prefijoGroup = document.getElementById('prefijo-group');
+      prefijoGroup.style.display = (rol === 'referido') ? 'block' : 'none';
+    }
+    togglePrefijo();
+  </script>
 </body>
 </html>

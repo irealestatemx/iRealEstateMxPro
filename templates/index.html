@@ -16,8 +16,9 @@
       </div>
       <p class="header-tagline">Genera contenido profesional para tus propiedades en segundos</p>
       <div style="display:flex;gap:12px;align-items:center;">
-        <a href="/dashboard" style="color:#c9a227;font-size:13px;text-decoration:none;font-weight:500;">Mis Propiedades</a>
+        <a href="/dashboard" style="color:#c9a227;font-size:13px;text-decoration:none;font-weight:500;">Propiedades</a>
         {% if user and user.rol == 'admin' %}
+        <a href="/admin/prospectos" style="color:#c9a227;font-size:13px;text-decoration:none;font-weight:500;">Prospectos</a>
         <a href="/admin/usuarios" style="color:#c9a227;font-size:13px;text-decoration:none;font-weight:500;">Usuarios</a>
         {% endif %}
         <a href="/logout" style="color:#e2e8f0;font-size:13px;text-decoration:none;font-weight:500;">Salir</a>

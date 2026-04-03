@@ -92,8 +92,9 @@
     <img src="/static/img/logo-header.png" alt="iRealEstateMx" class="topbar-logo" />
     <div class="topbar-nav">
       <a href="/">Nueva Propiedad</a>
-      <a href="/dashboard" class="active">Mis Propiedades</a>
+      <a href="/dashboard" class="active">Propiedades</a>
       {% if user.rol == 'admin' %}
+      <a href="/admin/prospectos">Prospectos</a>
       <a href="/admin/usuarios">Usuarios</a>
       {% endif %}
       <span class="topbar-user">{{ user.nombre }}</span>
