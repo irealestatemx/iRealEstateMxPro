@@ -997,6 +997,8 @@ async def admin_delete_prospecto(request: Request, prospecto_id: int):
 
 _message_buffer: Dict[str, dict] = {}
 _kommo_created: Dict[str, float] = {}  # telefono -> timestamp de ultimo lead creado
+_paused_chats: Dict[str, float] = {}  # telefono -> timestamp de cuando se pauso
+PAUSE_DURATION = 3600 * 4  # 4 horas de pausa por defecto
 
 KOMMO_SUBDOMAIN = os.getenv("KOMMO_SUBDOMAIN", "irealestatemxclaude")
 KOMMO_ACCESS_TOKEN = os.getenv("KOMMO_ACCESS_TOKEN", "")
@@ -1046,6 +1048,37 @@ async def _create_kommo_lead(phone: str, name: str):
     return None
 
 
+@app.post("/api/whatsapp/pause")
+async def whatsapp_pause(request: Request):
+    """Pausa el bot para un telefono. Esteban toma el control."""
+    body = await request.json()
+    phone = body.get("phone", "")
+    hours = body.get("hours", 4)
+    import time
+    _paused_chats[phone] = time.time()
+    print(f"[BOT] Pausado para {phone} por {hours}h")
+    return JSONResponse({"ok": True, "paused": phone, "hours": hours})
+
+
+@app.post("/api/whatsapp/resume")
+async def whatsapp_resume(request: Request):
+    """Reactiva el bot para un telefono."""
+    body = await request.json()
+    phone = body.get("phone", "")
+    _paused_chats.pop(phone, None)
+    print(f"[BOT] Reactivado para {phone}")
+    return JSONResponse({"ok": True, "resumed": phone})
+
+
+@app.get("/api/whatsapp/paused")
+async def whatsapp_paused_list():
+    """Lista todos los chats pausados."""
+    import time
+    now = time.time()
+    active = {k: round((PAUSE_DURATION - (now - v)) / 60) for k, v in _paused_chats.items() if now - v < PAUSE_DURATION}
+    return JSONResponse({"paused": active})
+
+
 @app.post("/api/whatsapp/debounce")
 async def whatsapp_debounce(request: Request):
     """
@@ -1062,6 +1095,14 @@ async def whatsapp_debounce(request: Request):
     desarrollo = body.get("desarrollo", "")
 
     import time
+
+    # ─── Verificar si el bot esta pausado para este numero ───
+    if phone in _paused_chats:
+        elapsed = time.time() - _paused_chats[phone]
+        if elapsed < PAUSE_DURATION:
+            return JSONResponse({"process": False, "reason": "paused"})
+        else:
+            _paused_chats.pop(phone, None)  # Ya expiro la pausa
     now = time.time()
 
     # Acumular mensaje en el buffer
