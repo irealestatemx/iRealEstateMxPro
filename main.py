@@ -991,6 +991,77 @@ async def admin_delete_prospecto(request: Request, prospecto_id: int):
     return RedirectResponse("/admin/prospectos", status_code=302)
 
 
+# ─── API: Debounce de mensajes WhatsApp ───
+# Acumula mensajes del mismo numero y espera a que termine de escribir
+
+_message_buffer: Dict[str, dict] = {}
+
+@app.post("/api/whatsapp/debounce")
+async def whatsapp_debounce(request: Request):
+    """
+    Recibe cada mensaje de WhatsApp. Acumula mensajes del mismo telefono
+    y espera 12 segundos sin nuevos mensajes antes de devolver el resultado.
+    Si llegan mas mensajes durante la espera, devuelve process=false.
+    """
+    body = await request.json()
+    phone = body.get("phone", "")
+    message = body.get("message", "")
+    name = body.get("name", "")
+    chat_id = body.get("chatId", "")
+    prefijo = body.get("prefijo", "")
+    desarrollo = body.get("desarrollo", "")
+
+    import time
+    now = time.time()
+
+    # Acumular mensaje en el buffer
+    if phone not in _message_buffer:
+        _message_buffer[phone] = {
+            "messages": [],
+            "name": name,
+            "chatId": chat_id,
+            "prefijo": prefijo,
+            "desarrollo": desarrollo,
+            "last_time": now,
+            "sequence": 0,
+        }
+
+    buf = _message_buffer[phone]
+    buf["messages"].append(message)
+    buf["last_time"] = now
+    buf["sequence"] += 1
+    my_sequence = buf["sequence"]
+
+    if prefijo and not buf["prefijo"]:
+        buf["prefijo"] = prefijo
+    if desarrollo and not buf["desarrollo"]:
+        buf["desarrollo"] = desarrollo
+
+    # Esperar 12 segundos para que termine de escribir
+    await asyncio.sleep(12)
+
+    # Verificar si llegaron mas mensajes despues del nuestro
+    if phone in _message_buffer and _message_buffer[phone]["sequence"] != my_sequence:
+        # Llego otro mensaje, ese se encargara de responder
+        return JSONResponse({"process": False})
+
+    # Somos el ultimo mensaje, combinar todo y responder
+    if phone in _message_buffer:
+        final = _message_buffer.pop(phone)
+        combined = "\n".join(final["messages"])
+        return JSONResponse({
+            "process": True,
+            "phone": phone,
+            "message": combined,
+            "chatId": final["chatId"],
+            "name": final["name"],
+            "prefijo": final["prefijo"],
+            "desarrollo": final["desarrollo"],
+        })
+
+    return JSONResponse({"process": False})
+
+
 # ─── API: Registro automatico de prospectos desde n8n/WhatsApp ───
 
 @app.post("/api/prospectos/registrar")
