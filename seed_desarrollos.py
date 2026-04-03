@@ -33,6 +33,7 @@ DESARROLLOS_INICIALES = [
             "Privada exclusiva en Guanajuato Capital. "
             "Casas con diseño contemporáneo y acabados premium. "
             "Ubicación estratégica cerca de ALAÏA y centro histórico."
+            "Casas desde 178 m2 de construcción"
         ),
         "agente_nombre": "Esteban Castellanos",
         "agente_telefono": "4737365219",
@@ -51,7 +52,7 @@ DESARROLLOS_INICIALES = [
         "ubicacion": "Muy cerca de Las Teresas, Guanajuato",
         "ciudad": "Guanajuato",
         "estado": "Guanajuato",
-        "precio_desde": None,
+        "precio_desde": 3250000,
         "precio_hasta": None,
         "tipo_propiedad": "Casa",
         "amenidades": [
@@ -68,6 +69,7 @@ DESARROLLOS_INICIALES = [
             "Terrenos desde 120 m2 hasta 160 m2. "
             "Algunas casas con sótano. "
             "Privada con vigilancia 24/7."
+            "Desde 209 m2 de construcción"
         ),
         "agente_nombre": "Esteban Castellanos",
         "agente_telefono": "4737365219",
