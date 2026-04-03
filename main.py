@@ -993,15 +993,65 @@ async def admin_delete_prospecto(request: Request, prospecto_id: int):
 
 # ─── API: Debounce de mensajes WhatsApp ───
 # Acumula mensajes del mismo numero y espera a que termine de escribir
+# Tambien registra prospecto y crea lead en Kommo (una sola vez)
 
 _message_buffer: Dict[str, dict] = {}
+_kommo_created: Dict[str, float] = {}  # telefono -> timestamp de ultimo lead creado
+
+KOMMO_SUBDOMAIN = os.getenv("KOMMO_SUBDOMAIN", "irealestatemxclaude")
+KOMMO_ACCESS_TOKEN = os.getenv("KOMMO_ACCESS_TOKEN", "")
+KOMMO_PIPELINE_ID = 13474343
+KOMMO_STATUS_ID = 103949563
+
+
+async def _create_kommo_lead(phone: str, name: str):
+    """Crea un lead en Kommo si no se creo uno para este telefono en las ultimas 24h."""
+    import time
+    now = time.time()
+    last = _kommo_created.get(phone, 0)
+    if now - last < 86400:  # 24 horas
+        return None
+
+    if not KOMMO_ACCESS_TOKEN:
+        return None
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                f"https://{KOMMO_SUBDOMAIN}.kommo.com/api/v4/leads/complex",
+                headers={"Authorization": f"Bearer {KOMMO_ACCESS_TOKEN}"},
+                json=[{
+                    "name": f"WhatsApp - {name or 'Cliente'}",
+                    "pipeline_id": KOMMO_PIPELINE_ID,
+                    "status_id": KOMMO_STATUS_ID,
+                    "_embedded": {
+                        "contacts": [{
+                            "first_name": name or "Cliente WhatsApp",
+                            "custom_fields_values": [{
+                                "field_code": "PHONE",
+                                "values": [{"value": f"+{phone}", "enum_code": "WORK"}]
+                            }]
+                        }]
+                    }
+                }]
+            )
+            if resp.status_code in (200, 201):
+                _kommo_created[phone] = now
+                print(f"[KOMMO] Lead creado para {name} ({phone})")
+                return resp.json()
+            else:
+                print(f"[KOMMO] Error {resp.status_code}: {resp.text}")
+    except Exception as e:
+        print(f"[KOMMO] Error: {e}")
+    return None
+
 
 @app.post("/api/whatsapp/debounce")
 async def whatsapp_debounce(request: Request):
     """
     Recibe cada mensaje de WhatsApp. Acumula mensajes del mismo telefono
     y espera 12 segundos sin nuevos mensajes antes de devolver el resultado.
-    Si llegan mas mensajes durante la espera, devuelve process=false.
+    Si es el ultimo mensaje, registra prospecto y crea lead en Kommo.
     """
     body = await request.json()
     phone = body.get("phone", "")
@@ -1042,13 +1092,33 @@ async def whatsapp_debounce(request: Request):
 
     # Verificar si llegaron mas mensajes despues del nuestro
     if phone in _message_buffer and _message_buffer[phone]["sequence"] != my_sequence:
-        # Llego otro mensaje, ese se encargara de responder
         return JSONResponse({"process": False})
 
     # Somos el ultimo mensaje, combinar todo y responder
     if phone in _message_buffer:
         final = _message_buffer.pop(phone)
         combined = "\n".join(final["messages"])
+
+        # ─── Registrar prospecto en nuestra BD (una vez) ───
+        try:
+            referido = None
+            if final["prefijo"]:
+                referido = await get_user_by_prefijo(final["prefijo"])
+            await create_prospecto({
+                "referido_id": referido["id"] if referido else None,
+                "nombre_cliente": final["name"],
+                "telefono_cliente": phone,
+                "mensaje_original": combined,
+                "prefijo": final["prefijo"],
+                "desarrollo_interes": final["desarrollo"],
+                "estado": "nuevo",
+            })
+        except Exception as e:
+            print(f"[PROSPECTO] Error: {e}")
+
+        # ─── Crear lead en Kommo (una vez cada 24h por telefono) ───
+        await _create_kommo_lead(phone, final["name"])
+
         return JSONResponse({
             "process": True,
             "phone": phone,
