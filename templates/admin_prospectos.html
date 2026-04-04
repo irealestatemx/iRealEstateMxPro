@@ -103,9 +103,59 @@
       text-align: center; padding: 60px 20px; color: #a0aec0;
     }
     .empty-state h2 { font-size: 20px; margin-bottom: 8px; color: #7a8a9e; }
+    /* ─── Barra de acciones masivas ─── */
+    .bulk-bar {
+      display: none;
+      position: sticky; top: 0; z-index: 100;
+      background: linear-gradient(135deg, #1a3c5e, #234b73);
+      color: #fff;
+      padding: 12px 20px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+      align-items: center; gap: 12px;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      flex-wrap: wrap;
+      animation: slideDown 0.2s ease;
+    }
+    .bulk-bar.active { display: flex; }
+    @keyframes slideDown {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .bulk-bar .count {
+      font-size: 14px; font-weight: 700;
+      background: #c9a227; color: #1a3c5e;
+      padding: 4px 12px; border-radius: 20px;
+      min-width: 28px; text-align: center;
+    }
+    .bulk-bar .label { font-size: 13px; font-weight: 500; }
+    .bulk-bar select {
+      padding: 7px 12px; border: 2px solid rgba(255,255,255,0.3);
+      border-radius: 8px; font-size: 13px; font-family: 'Inter', sans-serif;
+      background: rgba(255,255,255,0.1); color: #fff;
+    }
+    .bulk-bar select option { color: #1a3c5e; background: #fff; }
+    .bulk-bar .btn-bulk {
+      padding: 8px 18px; border: none; border-radius: 8px;
+      font-size: 13px; font-weight: 700; cursor: pointer;
+      font-family: 'Inter', sans-serif;
+    }
+    .btn-bulk-apply { background: #c9a227; color: #1a3c5e; }
+    .btn-bulk-apply:hover { background: #d4af37; }
+    .btn-bulk-cancel { background: rgba(255,255,255,0.15); color: #e2e8f0; }
+    .btn-bulk-cancel:hover { background: rgba(255,255,255,0.25); }
+    /* Checkbox styling */
+    .cb-col { width: 36px; text-align: center; }
+    .row-cb, .select-all-cb {
+      width: 17px; height: 17px; cursor: pointer;
+      accent-color: #c9a227;
+    }
+    tr.selected-row { background: #fffdf0 !important; }
     @media (max-width: 768px) {
       .topbar { padding: 12px 16px; }
       td, th { padding: 6px 4px; font-size: 11px; }
+      .bulk-bar { padding: 10px 12px; }
+      .bulk-bar .label { display: none; }
     }
   </style>
 </head>
@@ -207,12 +257,40 @@
 
     <!-- Lista de prospectos -->
     {% if prospectos %}
+
+    <!-- Barra de acciones masivas -->
+    <div class="bulk-bar" id="bulkBar">
+      <span class="count" id="bulkCount">0</span>
+      <span class="label">seleccionados</span>
+      <form method="post" action="/admin/prospectos/bulk" id="bulkForm" style="display:contents;">
+        <div id="bulkHiddenInputs"></div>
+        <select name="bulk_action" id="bulkAction">
+          <option value="">Elegir accion...</option>
+          <optgroup label="Cambiar estado">
+            <option value="estado_nuevo">Marcar como Nuevo</option>
+            <option value="estado_contactado">Marcar como Contactado</option>
+            <option value="estado_cita_agendada">Marcar como Cita agendada</option>
+            <option value="estado_cita_asistio">Marcar como Cita asistio</option>
+            <option value="estado_en_negociacion">Marcar como En negociacion</option>
+            <option value="estado_venta_cerrada">Marcar como Venta cerrada</option>
+            <option value="estado_perdido">Marcar como Perdido</option>
+          </optgroup>
+          <optgroup label="Eliminar">
+            <option value="eliminar">Eliminar seleccionados</option>
+          </optgroup>
+        </select>
+        <button type="button" onclick="executeBulk()" class="btn-bulk btn-bulk-apply">Aplicar</button>
+      </form>
+      <button type="button" onclick="clearSelection()" class="btn-bulk btn-bulk-cancel">Cancelar</button>
+    </div>
+
     <div class="card">
       <h2>Prospectos ({{ prospectos | length }})</h2>
       <div style="overflow-x:auto;">
         <table>
           <thead>
             <tr>
+              <th class="cb-col"><input type="checkbox" class="select-all-cb" id="selectAll" title="Seleccionar todos" /></th>
               <th>Cliente</th>
               <th>Telefono</th>
               <th>Referido</th>
@@ -225,7 +303,8 @@
           </thead>
           <tbody>
             {% for p in prospectos %}
-            <tr>
+            <tr data-id="{{ p.id }}">
+              <td class="cb-col"><input type="checkbox" class="row-cb" value="{{ p.id }}" /></td>
               <td>{{ p.nombre_cliente or 'Sin nombre' }}</td>
               <td>{{ p.telefono_cliente or '—' }}</td>
               <td>{{ p.referido_nombre or 'Directo' }}</td>
@@ -274,5 +353,107 @@
     </div>
     {% endif %}
   </div>
+
+  <script>
+    // ─── Selección masiva de prospectos ───
+    var selectAll = document.getElementById('selectAll');
+    var bulkBar = document.getElementById('bulkBar');
+    var bulkCount = document.getElementById('bulkCount');
+    var bulkAction = document.getElementById('bulkAction');
+    var bulkForm = document.getElementById('bulkForm');
+    var bulkHidden = document.getElementById('bulkHiddenInputs');
+
+    function getCheckboxes() {
+      return document.querySelectorAll('.row-cb');
+    }
+
+    function getSelected() {
+      var checked = [];
+      getCheckboxes().forEach(function(cb) {
+        if (cb.checked) checked.push(cb.value);
+      });
+      return checked;
+    }
+
+    function updateBulkBar() {
+      var selected = getSelected();
+      var count = selected.length;
+      bulkCount.textContent = count;
+      if (count > 0) {
+        bulkBar.classList.add('active');
+      } else {
+        bulkBar.classList.remove('active');
+      }
+      // Update "select all" checkbox state
+      var all = getCheckboxes();
+      if (all.length > 0 && count === all.length) {
+        selectAll.checked = true;
+        selectAll.indeterminate = false;
+      } else if (count > 0) {
+        selectAll.checked = false;
+        selectAll.indeterminate = true;
+      } else {
+        selectAll.checked = false;
+        selectAll.indeterminate = false;
+      }
+      // Row highlight
+      document.querySelectorAll('tbody tr[data-id]').forEach(function(tr) {
+        var cb = tr.querySelector('.row-cb');
+        if (cb && cb.checked) {
+          tr.classList.add('selected-row');
+        } else {
+          tr.classList.remove('selected-row');
+        }
+      });
+    }
+
+    // Select all checkbox
+    if (selectAll) {
+      selectAll.addEventListener('change', function() {
+        var checked = this.checked;
+        getCheckboxes().forEach(function(cb) {
+          cb.checked = checked;
+        });
+        updateBulkBar();
+      });
+    }
+
+    // Individual checkboxes
+    getCheckboxes().forEach(function(cb) {
+      cb.addEventListener('change', updateBulkBar);
+    });
+
+    function clearSelection() {
+      getCheckboxes().forEach(function(cb) { cb.checked = false; });
+      bulkAction.value = '';
+      updateBulkBar();
+    }
+
+    function executeBulk() {
+      var action = bulkAction.value;
+      var selected = getSelected();
+      if (!action) { alert('Selecciona una accion'); return; }
+      if (selected.length === 0) { alert('Selecciona al menos un prospecto'); return; }
+
+      if (action === 'eliminar') {
+        if (!confirm('¿Estás seguro de eliminar ' + selected.length + ' prospecto(s)? Esta acción no se puede deshacer.')) return;
+      } else {
+        var actionLabel = bulkAction.options[bulkAction.selectedIndex].text;
+        if (!confirm('¿' + actionLabel + ' para ' + selected.length + ' prospecto(s)?')) return;
+      }
+
+      // Add hidden inputs for selected IDs
+      bulkHidden.innerHTML = '';
+      selected.forEach(function(id) {
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'selected_ids';
+        input.value = id;
+        bulkHidden.appendChild(input);
+      });
+
+      bulkForm.submit();
+    }
+  </script>
 </body>
 </html>

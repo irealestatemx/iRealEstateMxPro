@@ -1168,6 +1168,33 @@ async def admin_delete_prospecto(request: Request, prospecto_id: int):
     return RedirectResponse("/admin/prospectos", status_code=302)
 
 
+@app.post("/admin/prospectos/bulk")
+async def admin_bulk_prospectos(request: Request):
+    """Acciones masivas sobre prospectos: eliminar o cambiar estado en grupo."""
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    form = await request.form()
+    action = form.get("bulk_action", "")
+    ids = form.getlist("selected_ids")
+
+    if not ids or not action:
+        return RedirectResponse("/admin/prospectos", status_code=302)
+
+    for pid_str in ids:
+        try:
+            pid = int(pid_str)
+            if action == "eliminar":
+                await delete_prospecto(pid)
+            elif action.startswith("estado_"):
+                nuevo_estado = action.replace("estado_", "")
+                await update_prospecto(pid, {"estado": nuevo_estado})
+        except (ValueError, Exception) as e:
+            print(f"[BULK] Error procesando prospecto {pid_str}: {e}")
+
+    return RedirectResponse("/admin/prospectos", status_code=302)
+
+
 # ─── API: Debounce de mensajes WhatsApp ───
 # Acumula mensajes del mismo numero y espera a que termine de escribir
 # Tambien registra prospecto y crea lead en Kommo (una sola vez)
