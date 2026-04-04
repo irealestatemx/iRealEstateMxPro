@@ -1001,8 +1001,10 @@ _message_buffer: Dict[str, dict] = {}
 _kommo_created: Dict[str, float] = {}  # telefono -> timestamp de ultimo lead creado
 _paused_chats: Dict[str, float] = {}  # telefono -> timestamp de cuando se pauso
 _active_chats: Dict[str, float] = {}  # telefono -> timestamp de cuando se activo la conversacion
+_bot_last_sent: Dict[str, float] = {}  # telefono -> timestamp de cuando el bot envio su ultima respuesta
 PAUSE_DURATION = 3600 * 4  # 4 horas de pausa por defecto
 ACTIVE_DURATION = 3600 * 2  # 2 horas de actividad máxima del bot
+BOT_ECHO_WINDOW = 90  # segundos para considerar un fromMe como eco del bot (no de Esteban)
 
 # Palabras clave que activan el bot (sin importar mayúsculas)
 BOT_KEYWORDS = [
@@ -1157,14 +1159,22 @@ async def whatsapp_debounce(request: Request):
 
     now = time.time()
 
-    # ─── 1. Si Esteban escribió (fromMe) → pausar bot ───
+    # ─── 1. Si fromMe → ¿es eco del bot o Esteban escribiendo? ───
     if from_me:
-        _paused_chats[phone] = now
-        _active_chats.pop(phone, None)
-        if phone in _message_buffer:
-            _message_buffer.pop(phone, None)
-        print(f"[BOT] Esteban escribió en {phone} → bot pausado 4h")
-        return JSONResponse({"process": False, "reason": "fromMe_paused"})
+        last_bot = _bot_last_sent.get(phone, 0)
+        seconds_since_bot = now - last_bot
+        if seconds_since_bot < BOT_ECHO_WINDOW:
+            # El bot acaba de responder → este fromMe es el eco del bot, ignorar
+            print(f"[BOT] Eco del bot en {phone} (hace {seconds_since_bot:.0f}s) → ignorar")
+            return JSONResponse({"process": False, "reason": "bot_echo"})
+        else:
+            # No hay respuesta reciente del bot → Esteban escribió manualmente → pausar
+            _paused_chats[phone] = now
+            _active_chats.pop(phone, None)
+            if phone in _message_buffer:
+                _message_buffer.pop(phone, None)
+            print(f"[BOT] Esteban escribió en {phone} → bot pausado 4h")
+            return JSONResponse({"process": False, "reason": "fromMe_paused"})
 
     # ─── 2. Verificar si el bot está pausado ───
     if phone in _paused_chats:
@@ -1246,6 +1256,9 @@ async def whatsapp_debounce(request: Request):
 
         # ─── Crear lead en Kommo (una vez cada 24h por telefono) ───
         await _create_kommo_lead(phone, final["name"])
+
+        # ─── Marcar que el bot va a responder (para ignorar el eco fromMe) ───
+        _bot_last_sent[phone] = time.time()
 
         return JSONResponse({
             "process": True,
