@@ -1,7 +1,9 @@
 import os
 import io
+import re
 import json
 import uuid
+import time
 import shutil
 import asyncio
 import subprocess
@@ -998,7 +1000,29 @@ async def admin_delete_prospecto(request: Request, prospecto_id: int):
 _message_buffer: Dict[str, dict] = {}
 _kommo_created: Dict[str, float] = {}  # telefono -> timestamp de ultimo lead creado
 _paused_chats: Dict[str, float] = {}  # telefono -> timestamp de cuando se pauso
+_active_chats: Dict[str, float] = {}  # telefono -> timestamp de cuando se activo la conversacion
 PAUSE_DURATION = 3600 * 4  # 4 horas de pausa por defecto
+ACTIVE_DURATION = 3600 * 2  # 2 horas de actividad máxima del bot
+
+# Palabras clave que activan el bot (sin importar mayúsculas)
+BOT_KEYWORDS = [
+    # Desarrollos
+    "cárcamos", "carcamos", "fresno", "privada del fresno",
+    # Inmobiliarias
+    "casa", "departamento", "terreno", "propiedad", "lote",
+    "venta", "renta", "comprar", "rentar",
+    "inmueble", "residencial", "fraccionamiento",
+    "recámara", "recamara", "habitación", "habitacion",
+    "precio", "costo", "cuánto", "cuanto", "crédito", "credito",
+    "infonavit", "fovissste", "hipoteca",
+    "metros", "m2", "m²",
+    "ubicación", "ubicacion", "dirección", "direccion", "dónde", "donde",
+    "disponible", "disponibilidad",
+    "agendar", "cita", "visitar", "visita", "ver la casa",
+    "información", "informacion", "info",
+    "interesa", "interesado", "interesada",
+    "planos", "amenidades",
+]
 
 KOMMO_SUBDOMAIN = os.getenv("KOMMO_SUBDOMAIN", "irealestatemxclaude")
 KOMMO_ACCESS_TOKEN = os.getenv("KOMMO_ACCESS_TOKEN", "")
@@ -1006,9 +1030,31 @@ KOMMO_PIPELINE_ID = 13474343
 KOMMO_STATUS_ID = 103949563
 
 
+def _has_bot_keyword(text: str) -> bool:
+    """Verifica si el mensaje contiene alguna palabra clave que activa el bot."""
+    text_lower = text.lower()
+    for kw in BOT_KEYWORDS:
+        if kw in text_lower:
+            return True
+    # También detectar prefijos de referidos (ej: N-, A-, etc.)
+    if re.search(r'[A-Z]\s*-\s', text, re.IGNORECASE):
+        return True
+    return False
+
+
+def _is_chat_active(phone: str) -> bool:
+    """Verifica si hay una conversación activa del bot con este número."""
+    if phone not in _active_chats:
+        return False
+    elapsed = time.time() - _active_chats[phone]
+    if elapsed > ACTIVE_DURATION:
+        _active_chats.pop(phone, None)
+        return False
+    return True
+
+
 async def _create_kommo_lead(phone: str, name: str):
     """Crea un lead en Kommo si no se creo uno para este telefono en las ultimas 24h."""
-    import time
     now = time.time()
     last = _kommo_created.get(phone, 0)
     if now - last < 86400:  # 24 horas
@@ -1054,8 +1100,8 @@ async def whatsapp_pause(request: Request):
     body = await request.json()
     phone = body.get("phone", "")
     hours = body.get("hours", 4)
-    import time
     _paused_chats[phone] = time.time()
+    _active_chats.pop(phone, None)  # Desactivar conversación activa
     print(f"[BOT] Pausado para {phone} por {hours}h")
     return JSONResponse({"ok": True, "paused": phone, "hours": hours})
 
@@ -1072,19 +1118,33 @@ async def whatsapp_resume(request: Request):
 
 @app.get("/api/whatsapp/paused")
 async def whatsapp_paused_list():
-    """Lista todos los chats pausados."""
-    import time
+    """Lista todos los chats pausados y activos."""
     now = time.time()
-    active = {k: round((PAUSE_DURATION - (now - v)) / 60) for k, v in _paused_chats.items() if now - v < PAUSE_DURATION}
-    return JSONResponse({"paused": active})
+    paused = {k: round((PAUSE_DURATION - (now - v)) / 60) for k, v in _paused_chats.items() if now - v < PAUSE_DURATION}
+    active = {k: round((ACTIVE_DURATION - (now - v)) / 60) for k, v in _active_chats.items() if now - v < ACTIVE_DURATION}
+    return JSONResponse({"paused": paused, "active_chats": active})
+
+
+@app.post("/api/whatsapp/deactivate")
+async def whatsapp_deactivate(request: Request):
+    """Desactiva la conversación del bot (flujo completado)."""
+    body = await request.json()
+    phone = body.get("phone", "")
+    _active_chats.pop(phone, None)
+    print(f"[BOT] Conversación desactivada para {phone} (flujo completado)")
+    return JSONResponse({"ok": True, "deactivated": phone})
 
 
 @app.post("/api/whatsapp/debounce")
 async def whatsapp_debounce(request: Request):
     """
-    Recibe cada mensaje de WhatsApp. Acumula mensajes del mismo telefono
-    y espera 12 segundos sin nuevos mensajes antes de devolver el resultado.
-    Si es el ultimo mensaje, registra prospecto y crea lead en Kommo.
+    Recibe cada mensaje de WhatsApp (tanto del cliente como de Esteban).
+    Lógica:
+    1. Si fromMe=true → Esteban escribió → pausar bot y desactivar chat
+    2. Si el bot está pausado → no procesar
+    3. Si NO hay conversación activa → solo activar si hay palabras clave
+    4. Si hay conversación activa → acumular mensajes con debounce de 12s
+    5. Al final: registrar prospecto + crear lead Kommo (una sola vez)
     """
     body = await request.json()
     phone = body.get("phone", "")
@@ -1093,19 +1153,46 @@ async def whatsapp_debounce(request: Request):
     chat_id = body.get("chatId", "")
     prefijo = body.get("prefijo", "")
     desarrollo = body.get("desarrollo", "")
+    from_me = body.get("fromMe", False)
 
-    import time
-
-    # ─── Verificar si el bot esta pausado para este numero ───
-    if phone in _paused_chats:
-        elapsed = time.time() - _paused_chats[phone]
-        if elapsed < PAUSE_DURATION:
-            return JSONResponse({"process": False, "reason": "paused"})
-        else:
-            _paused_chats.pop(phone, None)  # Ya expiro la pausa
     now = time.time()
 
-    # Acumular mensaje en el buffer
+    # ─── 1. Si Esteban escribió (fromMe) → pausar bot ───
+    if from_me:
+        _paused_chats[phone] = now
+        _active_chats.pop(phone, None)
+        if phone in _message_buffer:
+            _message_buffer.pop(phone, None)
+        print(f"[BOT] Esteban escribió en {phone} → bot pausado 4h")
+        return JSONResponse({"process": False, "reason": "fromMe_paused"})
+
+    # ─── 2. Verificar si el bot está pausado ───
+    if phone in _paused_chats:
+        elapsed = now - _paused_chats[phone]
+        if elapsed < PAUSE_DURATION:
+            print(f"[BOT] Chat {phone} pausado, faltan {round((PAUSE_DURATION - elapsed) / 60)}min")
+            return JSONResponse({"process": False, "reason": "paused"})
+        else:
+            _paused_chats.pop(phone, None)  # Ya expiró la pausa
+
+    # ─── 3. Verificar si hay conversación activa o si tiene keywords ───
+    chat_active = _is_chat_active(phone)
+
+    if not chat_active:
+        # No hay conversación activa → verificar si el mensaje tiene keywords
+        if _has_bot_keyword(message):
+            # ¡Activar conversación!
+            _active_chats[phone] = now
+            print(f"[BOT] Keyword detectada en {phone} → conversación ACTIVADA")
+        else:
+            # No tiene keywords → ignorar, Esteban conversa normal
+            print(f"[BOT] Mensaje de {phone} sin keywords, bot inactivo → ignorar")
+            return JSONResponse({"process": False, "reason": "no_keywords"})
+
+    # ─── 4. Conversación activa → acumular con debounce ───
+    # Refrescar el timestamp de actividad
+    _active_chats[phone] = now
+
     if phone not in _message_buffer:
         _message_buffer[phone] = {
             "messages": [],
@@ -1131,11 +1218,11 @@ async def whatsapp_debounce(request: Request):
     # Esperar 12 segundos para que termine de escribir
     await asyncio.sleep(12)
 
-    # Verificar si llegaron mas mensajes despues del nuestro
+    # Verificar si llegaron más mensajes después del nuestro
     if phone in _message_buffer and _message_buffer[phone]["sequence"] != my_sequence:
-        return JSONResponse({"process": False})
+        return JSONResponse({"process": False, "reason": "debounce_waiting"})
 
-    # Somos el ultimo mensaje, combinar todo y responder
+    # Somos el último mensaje, combinar todo y responder
     if phone in _message_buffer:
         final = _message_buffer.pop(phone)
         combined = "\n".join(final["messages"])
