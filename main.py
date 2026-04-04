@@ -29,7 +29,7 @@ from database import (
     update_property, toggle_property, count_properties,
     save_desarrollo, get_all_desarrollos, get_desarrollo_by_id,
     search_desarrollos, update_desarrollo,
-    authenticate_user, get_user_by_id, get_all_users, create_user,
+    authenticate_user, get_user_by_email, get_user_by_id, get_all_users, create_user,
     update_user, delete_user, seed_admin_user,
     get_properties_by_user,
     get_user_by_prefijo, get_all_referidos,
@@ -685,6 +685,157 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
     return response
 
 
+# ─── Recuperación de contraseña ───
+
+SMTP_HOST = os.getenv("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
+SMTP_USER = os.getenv("SMTP_USER", "")
+SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "iRealEstateMxPro")
+APP_URL = os.getenv("APP_URL", "https://api.irealestatemx.cloud")
+
+
+def _send_reset_email(to_email: str, to_name: str, reset_link: str):
+    """Envía email de recuperación de contraseña."""
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    if not SMTP_USER or not SMTP_PASSWORD:
+        print(f"[EMAIL] SMTP no configurado. Link de reset: {reset_link}")
+        return False
+
+    msg = MIMEMultipart("alternative")
+    msg["From"] = f"{SMTP_FROM_NAME} <{SMTP_USER}>"
+    msg["To"] = to_email
+    msg["Subject"] = "Recupera tu contraseña — iRealEstateMxPro"
+
+    html = f"""
+    <div style="font-family:'Inter',Arial,sans-serif;max-width:500px;margin:0 auto;padding:40px 20px;">
+      <div style="text-align:center;margin-bottom:30px;">
+        <h1 style="color:#1a3c5e;font-size:22px;margin:0;">iRealEstateMxPro</h1>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <h2 style="color:#1a3c5e;font-size:18px;margin-top:0;">Hola {to_name},</h2>
+        <p style="color:#4a5568;font-size:14px;line-height:1.6;">
+          Recibimos una solicitud para restablecer tu contraseña. Haz clic en el botón de abajo para crear una nueva.
+        </p>
+        <div style="text-align:center;margin:28px 0;">
+          <a href="{reset_link}"
+             style="background:linear-gradient(135deg,#c9a227,#d4af37);color:#1a3c5e;
+                    padding:14px 32px;border-radius:10px;text-decoration:none;
+                    font-weight:700;font-size:15px;display:inline-block;">
+            Restablecer contraseña
+          </a>
+        </div>
+        <p style="color:#7a8a9e;font-size:12px;line-height:1.5;">
+          Este enlace expira en <strong>1 hora</strong>. Si no solicitaste este cambio, ignora este correo.
+        </p>
+        <hr style="border:none;border-top:1px solid #e2e8f0;margin:20px 0;" />
+        <p style="color:#a0aec0;font-size:11px;">
+          Si el botón no funciona, copia y pega este enlace en tu navegador:<br />
+          <a href="{reset_link}" style="color:#c9a227;word-break:break-all;">{reset_link}</a>
+        </p>
+      </div>
+      <p style="text-align:center;color:#a0aec0;font-size:11px;margin-top:20px;">
+        iRealEstateMxPro &copy; 2026
+      </p>
+    </div>
+    """
+
+    msg.attach(MIMEText(html, "html"))
+
+    try:
+        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
+        server.starttls()
+        server.login(SMTP_USER, SMTP_PASSWORD)
+        server.sendmail(SMTP_USER, to_email, msg.as_string())
+        server.quit()
+        print(f"[EMAIL] Enviado reset a {to_email}")
+        return True
+    except Exception as e:
+        print(f"[EMAIL] Error: {e}")
+        return False
+
+
+@app.get("/forgot-password", response_class=HTMLResponse)
+async def forgot_password_page(request: Request):
+    return templates.TemplateResponse(request=request, name="forgot_password.html", context={"message": None, "error": None})
+
+
+@app.post("/forgot-password", response_class=HTMLResponse)
+async def forgot_password_submit(request: Request, email: str = Form(...)):
+    user = await get_user_by_email(email)
+    if user:
+        # Generar token con el ID del usuario (expira en 1 hora)
+        reset_token = serializer.dumps(user["id"], salt="password-reset")
+        reset_link = f"{APP_URL}/reset-password?token={reset_token}"
+        _send_reset_email(user["email"], user["nombre"], reset_link)
+
+    # Siempre mostrar el mismo mensaje (no revelar si el email existe o no)
+    return templates.TemplateResponse(request=request, name="forgot_password.html", context={
+        "message": "Si el email existe en nuestro sistema, recibirás un correo con instrucciones para restablecer tu contraseña.",
+        "error": None,
+    })
+
+
+@app.get("/reset-password", response_class=HTMLResponse)
+async def reset_password_page(request: Request):
+    token = request.query_params.get("token", "")
+    if not token:
+        return RedirectResponse("/login", status_code=302)
+    # Validar que el token sea válido (sin expirar aún)
+    try:
+        user_id = serializer.loads(token, salt="password-reset", max_age=3600)
+    except (BadSignature, SignatureExpired):
+        return templates.TemplateResponse(request=request, name="reset_password.html", context={
+            "error": "El enlace ha expirado o no es válido. Solicita uno nuevo.",
+            "token": "",
+            "success": False,
+        })
+    return templates.TemplateResponse(request=request, name="reset_password.html", context={
+        "error": None,
+        "token": token,
+        "success": False,
+    })
+
+
+@app.post("/reset-password", response_class=HTMLResponse)
+async def reset_password_submit(request: Request, token: str = Form(...), password: str = Form(...), password2: str = Form(...)):
+    # Validar token
+    try:
+        user_id = serializer.loads(token, salt="password-reset", max_age=3600)
+    except (BadSignature, SignatureExpired):
+        return templates.TemplateResponse(request=request, name="reset_password.html", context={
+            "error": "El enlace ha expirado o no es válido. Solicita uno nuevo.",
+            "token": "",
+            "success": False,
+        })
+
+    # Validar contraseñas
+    if password != password2:
+        return templates.TemplateResponse(request=request, name="reset_password.html", context={
+            "error": "Las contraseñas no coinciden.",
+            "token": token,
+            "success": False,
+        })
+
+    if len(password) < 6:
+        return templates.TemplateResponse(request=request, name="reset_password.html", context={
+            "error": "La contraseña debe tener al menos 6 caracteres.",
+            "token": token,
+            "success": False,
+        })
+
+    # Actualizar contraseña
+    await update_user(user_id, {"password": password})
+    return templates.TemplateResponse(request=request, name="reset_password.html", context={
+        "error": None,
+        "token": "",
+        "success": True,
+    })
+
+
 @app.get("/logout")
 async def logout():
     response = RedirectResponse("/login", status_code=302)
@@ -708,7 +859,19 @@ async def admin_users_page(request: Request):
     if not user or user["rol"] != "admin":
         return RedirectResponse("/login", status_code=302)
     users = await get_all_users()
-    return templates.TemplateResponse(request=request, name="admin_users.html", context={"user": user, "users": users})
+    # Credenciales del usuario recién creado (si las hay en el query string)
+    params = request.query_params
+    context = {"user": user, "users": users}
+    if params.get("created") == "1":
+        context.update({
+            "created": True,
+            "c_nombre": params.get("c_nombre", ""),
+            "c_email": params.get("c_email", ""),
+            "c_password": params.get("c_password", ""),
+            "c_rol": params.get("c_rol", ""),
+            "c_prefijo": params.get("c_prefijo", ""),
+        })
+    return templates.TemplateResponse(request=request, name="admin_users.html", context=context)
 
 
 @app.post("/admin/usuarios/crear")
@@ -723,10 +886,22 @@ async def admin_create_user(
     user = await require_auth(request)
     if not user or user["rol"] != "admin":
         return RedirectResponse("/login", status_code=302)
+    error_msg = ""
     try:
         user_id = await create_user(email, password, nombre, rol)
         if prefijo_whatsapp.strip():
             await update_user(user_id, {"prefijo_whatsapp": prefijo_whatsapp.strip().upper()})
+        # Redirigir con credenciales visibles una sola vez
+        from urllib.parse import urlencode
+        params = urlencode({
+            "created": "1",
+            "c_nombre": nombre,
+            "c_email": email,
+            "c_password": password,
+            "c_rol": rol,
+            "c_prefijo": prefijo_whatsapp.strip().upper(),
+        })
+        return RedirectResponse(f"/admin/usuarios?{params}", status_code=302)
     except Exception as e:
         print(f"[AUTH] Error creando usuario: {e}")
     return RedirectResponse("/admin/usuarios", status_code=302)

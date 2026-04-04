@@ -157,6 +157,26 @@
   <div class="container">
     <h1>Administrar Usuarios</h1>
 
+    <!-- Credenciales del usuario recién creado -->
+    {% if created %}
+    <div class="card" id="credencialesCard" style="border: 2px solid #c9a227; background: #fffdf5;">
+      <h2 style="color:#22543d;">✅ Usuario creado exitosamente</h2>
+      <p style="font-size:13px;color:#4a5568;margin-bottom:12px;">Copia estas credenciales y compártelas. <strong>La contraseña no se puede recuperar después.</strong></p>
+      <div style="background:#f7fafc;border-radius:8px;padding:16px;font-family:monospace;font-size:14px;line-height:2;border:1px solid #e2e8f0;">
+        <div><strong>Nombre:</strong> {{ c_nombre }}</div>
+        <div><strong>Email:</strong> {{ c_email }}</div>
+        <div><strong>Contraseña:</strong> {{ c_password }}</div>
+        <div><strong>Rol:</strong> {{ c_rol }}</div>
+        {% if c_prefijo %}<div><strong>Prefijo WA:</strong> {{ c_prefijo }}</div>{% endif %}
+        <div><strong>URL de acceso:</strong> https://api.irealestatemx.cloud/login</div>
+      </div>
+      <div style="margin-top:12px;display:flex;gap:8px;">
+        <button onclick="copiarCredenciales()" class="btn-add" style="font-size:12px;padding:8px 16px;">📋 Copiar credenciales</button>
+        <button onclick="document.getElementById('credencialesCard').style.display='none'" class="btn-sm btn-toggle" style="padding:8px 16px;">Cerrar</button>
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Crear usuario -->
     <div class="card">
       <h2>Agregar usuario</h2>
@@ -237,6 +257,24 @@
       prefijoGroup.style.display = (rol === 'referido') ? 'block' : 'none';
     }
     togglePrefijo();
+
+    function copiarCredenciales() {
+      var nombre = '{{ c_nombre|default("") }}';
+      var email = '{{ c_email|default("") }}';
+      var password = '{{ c_password|default("") }}';
+      var rol = '{{ c_rol|default("") }}';
+      var prefijo = '{{ c_prefijo|default("") }}';
+      var texto = '🔑 Tus credenciales de iRealEstateMxPro\n\n';
+      texto += '👤 Nombre: ' + nombre + '\n';
+      texto += '📧 Email: ' + email + '\n';
+      texto += '🔒 Contraseña: ' + password + '\n';
+      texto += '🏷️ Rol: ' + rol + '\n';
+      if (prefijo) texto += '📱 Prefijo WA: ' + prefijo + '\n';
+      texto += '\n🌐 Entra aquí: https://api.irealestatemx.cloud/login';
+      navigator.clipboard.writeText(texto).then(function() {
+        alert('✅ Credenciales copiadas al portapapeles');
+      });
+    }
   </script>
 </body>
 </html>

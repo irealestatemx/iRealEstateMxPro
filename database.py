@@ -417,6 +417,15 @@ async def create_user(email: str, password: str, nombre: str, rol: str = "agente
     })
 
 
+async def get_user_by_email(email: str):
+    """Obtiene un usuario por email (sin verificar contraseña)."""
+    query = "SELECT id, email, nombre, rol, prefijo_whatsapp, activo, created_at FROM usuarios WHERE email = :email"
+    row = await database.fetch_one(query=query, values={"email": email.lower().strip()})
+    if not row:
+        return None
+    return dict(row._mapping)
+
+
 async def authenticate_user(email: str, password: str):
     """Verifica credenciales. Devuelve el usuario o None."""
     query = "SELECT * FROM usuarios WHERE email = :email AND activo = TRUE"
