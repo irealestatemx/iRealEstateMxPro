@@ -194,21 +194,37 @@
         <div class="result-card-header" style="background: linear-gradient(135deg, #1a3c5e, #0d1f33);">
           <div class="result-card-title">
             <span class="result-icon">🎬</span>
-            <h2 style="color:#fff;">Video Reel (1080x1920)</h2>
+            <h2 style="color:#fff;">Video {{ video_tipo|default('Reel') }} (1080x1920){% if voice_over_enabled %} + Voice Over{% endif %}</h2>
           </div>
+          {% if video_job_id %}
+          <span class="btn-video" id="generateVideoBtn" style="cursor:default;">
+            <span>⏳</span> Renderizando...
+          </span>
+          {% else %}
           <button type="button" class="btn-video" id="generateVideoBtn" onclick="generateVideo()">
             <span>🎬</span> Generar Video
           </button>
+          {% endif %}
         </div>
         <div class="result-content" id="videoContent">
-          <p class="video-hint">Genera un reel vertical con fotos animadas, datos de la propiedad y contacto del agente. Tarda 1-3 minutos en renderizarse.</p>
+          {% if video_script %}
+          <p style="font-size:13px;color:#7a8a9e;margin-bottom:12px;font-weight:600;">Guión generado:</p>
+          {% for scene, text in video_script.items() %}
+          <p style="font-size:12px;margin-bottom:6px;"><strong style="color:#c9a227;">{{ scene|upper }}:</strong> {{ text }}</p>
+          {% endfor %}
+          <hr style="border:none;border-top:1px solid #e9ecef;margin:14px 0;" />
+          {% endif %}
 
-          <!-- Barra de progreso (oculta por defecto) -->
-          <div class="video-progress" id="videoProgress" style="display:none;">
+          {% if not video_job_id %}
+          <p class="video-hint">Genera un reel vertical con fotos animadas, datos de la propiedad y contacto del agente. Tarda 1-3 minutos en renderizarse.</p>
+          {% endif %}
+
+          <!-- Barra de progreso -->
+          <div class="video-progress" id="videoProgress" style="{% if video_job_id %}display:block{% else %}display:none{% endif %};">
             <div class="progress-bar-bg">
-              <div class="progress-bar-fill" id="videoProgressBar" style="width:0%"></div>
+              <div class="progress-bar-fill" id="videoProgressBar" style="width:5%"></div>
             </div>
-            <p class="progress-text" id="videoProgressText">Preparando...</p>
+            <p class="progress-text" id="videoProgressText">{% if video_job_id %}Renderizando video con{% if voice_over_enabled %} narración{% endif %}...{% else %}Preparando...{% endif %}</p>
           </div>
 
           <!-- Resultado del video (oculto por defecto) -->
@@ -245,12 +261,67 @@
         {% endfor %}
       </form>
 
-      <div class="action-row">
+      <!-- Formulario Story -->
+      <form id="storyForm" action="/download-story" method="post" style="display:none;">
+        <input type="hidden" name="tipo_propiedad" value="{{ tipo_propiedad }}" />
+        <input type="hidden" name="operacion" value="{{ operacion }}" />
+        <input type="hidden" name="direccion" value="{{ direccion }}" />
+        <input type="hidden" name="ciudad" value="{{ ciudad }}" />
+        <input type="hidden" name="estado" value="{{ estado }}" />
+        <input type="hidden" name="precio_formateado" value="{{ precio_formateado }}" />
+        <input type="hidden" name="recamaras" value="{{ recamaras or '' }}" />
+        <input type="hidden" name="banos" value="{{ banos or '' }}" />
+        <input type="hidden" name="metros_construidos" value="{{ metros_construidos or '' }}" />
+        <input type="hidden" name="metros_terreno" value="{{ metros_terreno or '' }}" />
+        <input type="hidden" name="estacionamientos" value="{{ estacionamientos or '' }}" />
+        <input type="hidden" name="agente_nombre" value="{{ agente_nombre }}" />
+        <input type="hidden" name="agente_telefono" value="{{ agente_telefono }}" />
+        <input type="hidden" name="agente_email" value="{{ agente_email }}" />
+        {% if foto_portada_url %}
+        <input type="hidden" name="foto_portada_url" value="{{ foto_portada_url }}" />
+        {% endif %}
+      </form>
+
+      <!-- Formulario Carrusel -->
+      <form id="carouselForm" action="/download-carousel" method="post" style="display:none;">
+        <input type="hidden" name="tipo_propiedad" value="{{ tipo_propiedad }}" />
+        <input type="hidden" name="operacion" value="{{ operacion }}" />
+        <input type="hidden" name="direccion" value="{{ direccion }}" />
+        <input type="hidden" name="ciudad" value="{{ ciudad }}" />
+        <input type="hidden" name="estado" value="{{ estado }}" />
+        <input type="hidden" name="precio_formateado" value="{{ precio_formateado }}" />
+        <input type="hidden" name="recamaras" value="{{ recamaras or '' }}" />
+        <input type="hidden" name="banos" value="{{ banos or '' }}" />
+        <input type="hidden" name="metros_construidos" value="{{ metros_construidos or '' }}" />
+        <input type="hidden" name="metros_terreno" value="{{ metros_terreno or '' }}" />
+        <input type="hidden" name="estacionamientos" value="{{ estacionamientos or '' }}" />
+        <input type="hidden" name="agente_nombre" value="{{ agente_nombre }}" />
+        <input type="hidden" name="agente_telefono" value="{{ agente_telefono }}" />
+        <input type="hidden" name="agente_email" value="{{ agente_email }}" />
+        <input type="hidden" name="descripcion_profesional" value="{{ descripcion_profesional or '' }}" />
+        {% if foto_portada_url %}
+        <input type="hidden" name="foto_portada_url" value="{{ foto_portada_url }}" />
+        {% endif %}
+        {% for url in fotos_extra_urls %}
+        <input type="hidden" name="fotos_extra_urls" value="{{ url }}" />
+        {% endfor %}
+        {% for am in amenidades %}
+        <input type="hidden" name="amenidades" value="{{ am }}" />
+        {% endfor %}
+      </form>
+
+      <div class="action-row" style="flex-wrap:wrap;">
         <button type="button" class="btn-publish-ig" id="publishIgBtn" onclick="publishToInstagram()">
           <span>🚀</span> Publicar en Instagram
         </button>
         <button type="submit" form="imgForm" class="btn-instagram-dl">
-          <span>📸</span> Descargar Imagen IG
+          <span>📸</span> Imagen Post 1080×1080
+        </button>
+        <button type="submit" form="storyForm" class="btn-instagram-dl" style="background:linear-gradient(135deg, #833ab4, #c13584, #e1306c);">
+          <span>📲</span> Story 1080×1920
+        </button>
+        <button type="submit" form="carouselForm" class="btn-instagram-dl" style="background:linear-gradient(135deg, #405de6, #833ab4, #c13584);">
+          <span>🎠</span> Carrusel (ZIP)
         </button>
         <button type="submit" form="pdfForm" class="btn-pdf">
           <span>📄</span> Descargar PDF
@@ -274,5 +345,45 @@
   </footer>
 
   <script src="/static/js/app.js"></script>
+  {% if video_job_id %}
+  <script>
+    // Auto-iniciar polling del video que ya está renderizando
+    (function() {
+      var jobId = "{{ video_job_id }}";
+      var progressDiv = document.getElementById('videoProgress');
+      var progressBar = document.getElementById('videoProgressBar');
+      var progressText = document.getElementById('videoProgressText');
+      var resultDiv = document.getElementById('videoResult');
+      var videoPreview = document.getElementById('videoPreview');
+      var downloadLink = document.getElementById('videoDownloadLink');
+      var btn = document.getElementById('generateVideoBtn');
+
+      var poll = setInterval(async function() {
+        try {
+          var resp = await fetch('/video-status/' + jobId);
+          var data = await resp.json();
+          if (data.status === 'rendering' || data.status === 'queued') {
+            var pct = data.progress || 0;
+            progressBar.style.width = pct + '%';
+            progressText.textContent = 'Renderizando... ' + pct + '%';
+          } else if (data.status === 'done') {
+            clearInterval(poll);
+            progressBar.style.width = '100%';
+            progressText.textContent = 'Video listo';
+            resultDiv.style.display = 'flex';
+            videoPreview.src = data.download_url;
+            downloadLink.href = '/download-video/' + jobId;
+            if (btn) btn.innerHTML = '<span>✅</span> Video generado';
+            if (typeof showToast === 'function') showToast('Video generado exitosamente', true);
+          } else if (data.status === 'error') {
+            clearInterval(poll);
+            progressText.textContent = 'Error: ' + (data.error || 'desconocido');
+            if (btn) { btn.innerHTML = '<span>❌</span> Error'; }
+          }
+        } catch(e) {}
+      }, 2500);
+    })();
+  </script>
+  {% endif %}
 </body>
 </html>

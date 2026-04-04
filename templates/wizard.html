@@ -1,0 +1,1195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iRealEstateMxPro — Nueva Propiedad</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --black: #0a0a0a;
+      --black-soft: #141414;
+      --black-card: #1a1a1a;
+      --black-lighter: #232323;
+      --navy: #1a3c5e;
+      --navy-glow: #2a5a8a;
+      --gold: #c9a227;
+      --gold-light: #e0c050;
+      --gold-dim: rgba(201,162,39,0.15);
+      --red: #c0392b;
+      --red-soft: #e74c3c;
+      --white: #ffffff;
+      --gray-100: #f5f5f5;
+      --gray-300: #b0b0b0;
+      --gray-500: #6b6b6b;
+      --gray-700: #3a3a3a;
+      --radius: 10px;
+      --radius-lg: 16px;
+      --transition: .22s ease;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--black);
+      color: var(--gray-100);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    .topbar {
+      background: var(--black-soft);
+      border-bottom: 1px solid rgba(201,162,39,0.15);
+      padding: 14px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar-logo { height: 34px; }
+    .topbar-nav { display: flex; gap: 18px; align-items: center; }
+    .topbar-nav a {
+      color: var(--gray-300); text-decoration: none; font-size: 13px; font-weight: 500;
+      transition: color var(--transition);
+    }
+    .topbar-nav a:hover { color: var(--gold); }
+    .topbar-nav a.active { color: var(--gold); }
+    .topbar-user { color: var(--gray-500); font-size: 12px; }
+
+    /* ── PROGRESS BAR ── */
+    .wizard-progress {
+      max-width: 900px; width: 100%; margin: 32px auto 0; padding: 0 24px;
+    }
+    .progress-steps {
+      display: flex; align-items: center; justify-content: space-between;
+      position: relative;
+    }
+    .progress-steps::before {
+      content: ''; position: absolute; top: 18px; left: 40px; right: 40px;
+      height: 2px; background: var(--gray-700); z-index: 0;
+    }
+    .progress-fill {
+      position: absolute; top: 18px; left: 40px; height: 2px;
+      background: linear-gradient(90deg, var(--gold), var(--red-soft));
+      z-index: 1; transition: width 0.5s ease;
+    }
+    .step-dot {
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      z-index: 2; cursor: pointer;
+    }
+    .step-circle {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: var(--black-card); border: 2px solid var(--gray-700);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; font-weight: 700; color: var(--gray-500);
+      transition: all 0.3s ease;
+    }
+    .step-dot.active .step-circle {
+      border-color: var(--gold); color: var(--gold);
+      box-shadow: 0 0 15px rgba(201,162,39,0.3);
+    }
+    .step-dot.done .step-circle {
+      background: var(--gold); border-color: var(--gold); color: var(--black);
+    }
+    .step-label {
+      font-size: 10px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.5px; color: var(--gray-500);
+      transition: color 0.3s ease;
+    }
+    .step-dot.active .step-label { color: var(--gold); }
+    .step-dot.done .step-label { color: var(--gray-300); }
+
+    /* ── WIZARD BODY ── */
+    .wizard-body {
+      max-width: 900px; width: 100%; margin: 28px auto; padding: 0 24px; flex: 1;
+    }
+    .wizard-step { display: none; animation: fadeIn 0.35s ease; }
+    .wizard-step.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+
+    .step-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 28px; color: var(--white); margin-bottom: 6px;
+    }
+    .step-subtitle {
+      font-size: 14px; color: var(--gray-500); margin-bottom: 28px;
+    }
+
+    /* ── CARDS ── */
+    .wz-card {
+      background: var(--black-card); border: 1px solid var(--gray-700);
+      border-radius: var(--radius-lg); padding: 28px; margin-bottom: 20px;
+      transition: border-color var(--transition);
+    }
+    .wz-card:hover { border-color: rgba(201,162,39,0.25); }
+    .wz-card h3 {
+      font-size: 14px; font-weight: 700; color: var(--gold);
+      text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 18px;
+    }
+
+    /* ── FORM FIELDS ── */
+    .wz-grid { display: grid; gap: 16px; }
+    .wz-grid-2 { grid-template-columns: 1fr 1fr; }
+    .wz-grid-3 { grid-template-columns: repeat(3, 1fr); }
+    .wz-grid-5 { grid-template-columns: repeat(5, 1fr); }
+    @media (max-width: 640px) {
+      .wz-grid-2, .wz-grid-3, .wz-grid-5 { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 420px) {
+      .wz-grid-2, .wz-grid-3, .wz-grid-5 { grid-template-columns: 1fr; }
+    }
+
+    .wz-field { display: flex; flex-direction: column; gap: 6px; }
+    .wz-field label {
+      font-size: 11px; font-weight: 600; color: var(--gray-300);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .wz-field .required { color: var(--red-soft); }
+
+    .wz-input, .wz-select, .wz-textarea {
+      width: 100%; padding: 11px 14px;
+      background: var(--black-lighter); border: 1.5px solid var(--gray-700);
+      border-radius: var(--radius); color: var(--white);
+      font-family: 'Inter', sans-serif; font-size: 14px;
+      transition: border-color var(--transition), box-shadow var(--transition);
+      outline: none;
+    }
+    .wz-input:focus, .wz-select:focus, .wz-textarea:focus {
+      border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201,162,39,0.1);
+    }
+    .wz-select { cursor: pointer; appearance: auto; }
+    .wz-textarea { resize: vertical; min-height: 80px; }
+
+    .input-prefix-wrap {
+      position: relative; display: flex; align-items: center;
+    }
+    .input-prefix-wrap .prefix {
+      position: absolute; left: 14px; color: var(--gray-500); font-weight: 600;
+      pointer-events: none; font-size: 14px;
+    }
+    .input-prefix-wrap .wz-input { padding-left: 28px; }
+    .price-display {
+      font-size: 12px; color: var(--gold); min-height: 16px; margin-top: 2px;
+    }
+
+    /* ── AMENIDADES ── */
+    .amenities-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px;
+    }
+    .amenity-card {
+      display: flex; flex-direction: column; align-items: center; gap: 6px;
+      padding: 14px 8px; border: 1.5px solid var(--gray-700);
+      border-radius: var(--radius); cursor: pointer;
+      transition: all var(--transition); font-size: 12px;
+      font-weight: 500; text-align: center; user-select: none;
+      background: var(--black-lighter);
+    }
+    .amenity-card input { display: none; }
+    .amenity-card .icon { font-size: 22px; }
+    .amenity-card:hover { border-color: var(--gold-dim); background: rgba(201,162,39,0.05); }
+    .amenity-card:has(input:checked) {
+      border-color: var(--gold); background: rgba(201,162,39,0.1); color: var(--gold);
+    }
+
+    .custom-amenities-area {
+      margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--gray-700);
+    }
+    .custom-amenities-hint {
+      font-size: 11px; color: var(--gray-500); margin-top: 4px;
+    }
+    .tags-container {
+      display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;
+    }
+    .tag {
+      background: var(--gold-dim); color: var(--gold); border: 1px solid rgba(201,162,39,0.3);
+      padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .tag .remove {
+      cursor: pointer; font-size: 14px; line-height: 1; opacity: 0.7;
+    }
+    .tag .remove:hover { opacity: 1; }
+
+    /* ── VIDEO OPTIONS ── */
+    .video-type-cards {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 20px;
+    }
+    @media (max-width: 500px) { .video-type-cards { grid-template-columns: 1fr; } }
+    .video-type-card {
+      border: 2px solid var(--gray-700); border-radius: var(--radius-lg);
+      padding: 22px; cursor: pointer; transition: all 0.3s ease;
+      background: var(--black-lighter); position: relative;
+    }
+    .video-type-card input { display: none; }
+    .video-type-card:hover { border-color: var(--navy-glow); }
+    .video-type-card:has(input:checked) {
+      border-color: var(--gold);
+      background: linear-gradient(135deg, rgba(201,162,39,0.08), rgba(26,60,94,0.08));
+    }
+    .video-type-card .vtc-icon { font-size: 28px; margin-bottom: 8px; }
+    .video-type-card .vtc-title {
+      font-size: 15px; font-weight: 700; color: var(--white); margin-bottom: 4px;
+    }
+    .video-type-card .vtc-desc { font-size: 12px; color: var(--gray-500); line-height: 1.5; }
+    .video-type-card .vtc-badge {
+      position: absolute; top: 12px; right: 12px;
+      background: var(--gold); color: var(--black); font-size: 10px;
+      font-weight: 800; padding: 2px 8px; border-radius: 10px;
+    }
+
+    /* Voice over toggle */
+    .vo-toggle-row {
+      display: flex; align-items: center; gap: 14px; margin: 20px 0;
+      padding: 16px; background: var(--black-lighter); border-radius: var(--radius);
+      border: 1px solid var(--gray-700);
+    }
+    .toggle-switch {
+      position: relative; width: 48px; height: 26px; flex-shrink: 0;
+    }
+    .toggle-switch input { display: none; }
+    .toggle-slider {
+      position: absolute; inset: 0; background: var(--gray-700);
+      border-radius: 26px; cursor: pointer; transition: background 0.3s;
+    }
+    .toggle-slider::before {
+      content: ''; position: absolute; top: 3px; left: 3px;
+      width: 20px; height: 20px; background: var(--white);
+      border-radius: 50%; transition: transform 0.3s;
+    }
+    .toggle-switch input:checked + .toggle-slider { background: var(--gold); }
+    .toggle-switch input:checked + .toggle-slider::before { transform: translateX(22px); }
+    .vo-label { font-size: 14px; font-weight: 600; color: var(--white); }
+    .vo-sublabel { font-size: 12px; color: var(--gray-500); }
+
+    /* Voice gender */
+    .gender-options { display: flex; gap: 10px; }
+    .gender-btn {
+      flex: 1; padding: 12px; border: 1.5px solid var(--gray-700);
+      border-radius: var(--radius); background: var(--black-lighter);
+      cursor: pointer; text-align: center; transition: all var(--transition);
+    }
+    .gender-btn input { display: none; }
+    .gender-btn:has(input:checked) { border-color: var(--gold); background: var(--gold-dim); }
+    .gender-btn .g-icon { font-size: 24px; display: block; margin-bottom: 4px; }
+    .gender-btn .g-label { font-size: 12px; font-weight: 600; color: var(--gray-300); }
+    .gender-btn:has(input:checked) .g-label { color: var(--gold); }
+
+    /* Tone chips */
+    .tone-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .tone-chip {
+      padding: 7px 16px; border: 1.5px solid var(--gray-700);
+      border-radius: 20px; background: var(--black-lighter);
+      font-size: 12px; font-weight: 600; color: var(--gray-300);
+      cursor: pointer; transition: all var(--transition); user-select: none;
+    }
+    .tone-chip input { display: none; }
+    .tone-chip:hover { border-color: var(--gold-dim); }
+    .tone-chip:has(input:checked) {
+      border-color: var(--gold); color: var(--gold); background: var(--gold-dim);
+    }
+
+    /* ── SCENE EDITOR (Step 5) ── */
+    .scene-card {
+      background: var(--black-card); border: 1px solid var(--gray-700);
+      border-radius: var(--radius-lg); padding: 24px; margin-bottom: 16px;
+      display: grid; grid-template-columns: 1fr 180px; gap: 20px;
+      transition: border-color var(--transition);
+    }
+    .scene-card:hover { border-color: rgba(201,162,39,0.2); }
+    @media (max-width: 600px) { .scene-card { grid-template-columns: 1fr; } }
+    .scene-header {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+    }
+    .scene-number {
+      background: var(--gold); color: var(--black); font-size: 11px;
+      font-weight: 800; width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .scene-title { font-size: 15px; font-weight: 700; color: var(--white); }
+    .scene-textarea {
+      width: 100%; min-height: 80px; padding: 12px;
+      background: var(--black-lighter); border: 1.5px solid var(--gray-700);
+      border-radius: var(--radius); color: var(--white);
+      font-family: 'Inter', sans-serif; font-size: 13px; line-height: 1.6;
+      resize: vertical; outline: none; transition: border-color var(--transition);
+    }
+    .scene-textarea:focus { border-color: var(--gold); }
+    .scene-upload {
+      border: 2px dashed var(--gray-700); border-radius: var(--radius);
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; gap: 6px; cursor: pointer;
+      transition: all var(--transition); min-height: 140px;
+      position: relative; overflow: hidden;
+    }
+    .scene-upload:hover { border-color: var(--gold-dim); }
+    .scene-upload input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+    .scene-upload .su-icon { font-size: 24px; opacity: 0.5; }
+    .scene-upload .su-text { font-size: 11px; color: var(--gray-500); }
+    .scene-upload img {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      object-fit: cover; border-radius: var(--radius);
+    }
+
+    /* ── UPLOAD PHOTOS ── */
+    .upload-zone {
+      border: 2px dashed var(--gray-700); border-radius: var(--radius-lg);
+      padding: 36px 20px; text-align: center; cursor: pointer;
+      transition: all var(--transition); background: var(--black-lighter);
+      position: relative;
+    }
+    .upload-zone:hover { border-color: var(--gold); background: rgba(201,162,39,0.03); }
+    .upload-zone input {
+      position: absolute; inset: 0; width: 100%; height: 100%;
+      opacity: 0; cursor: pointer;
+    }
+    .upload-zone .uz-icon { font-size: 36px; margin-bottom: 8px; opacity: 0.6; }
+    .upload-zone .uz-text { font-size: 14px; color: var(--gray-500); }
+    .upload-zone .uz-hint { font-size: 11px; color: var(--gray-700); margin-top: 4px; }
+    .photo-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      gap: 8px; margin-top: 14px;
+    }
+    .photo-thumb {
+      aspect-ratio: 1; border-radius: 8px; overflow: hidden;
+      border: 2px solid var(--gray-700); position: relative;
+    }
+    .photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-thumb.cover { border-color: var(--gold); }
+    .photo-thumb .cover-tag {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: var(--gold); color: var(--black);
+      font-size: 9px; font-weight: 800; text-align: center;
+      padding: 2px 0; text-transform: uppercase;
+    }
+
+    /* ── CONTENT OPTIONS (Step 6) ── */
+    .content-option {
+      display: flex; align-items: center; gap: 16px;
+      padding: 18px; background: var(--black-lighter);
+      border: 1.5px solid var(--gray-700); border-radius: var(--radius);
+      cursor: pointer; transition: all var(--transition); margin-bottom: 10px;
+    }
+    .content-option:hover { border-color: var(--gold-dim); }
+    .content-option:has(input:checked) {
+      border-color: var(--gold); background: var(--gold-dim);
+    }
+    .content-option input { display: none; }
+    .co-icon { font-size: 28px; flex-shrink: 0; }
+    .co-info { flex: 1; }
+    .co-title { font-size: 14px; font-weight: 700; color: var(--white); }
+    .co-desc { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+    .co-check {
+      width: 22px; height: 22px; border: 2px solid var(--gray-700);
+      border-radius: 50%; flex-shrink: 0; display: flex;
+      align-items: center; justify-content: center; transition: all var(--transition);
+    }
+    .content-option:has(input:checked) .co-check {
+      border-color: var(--gold); background: var(--gold); color: var(--black);
+      font-size: 12px; font-weight: 800;
+    }
+
+    /* ── NAVIGATION BUTTONS ── */
+    .wizard-nav {
+      display: flex; justify-content: space-between; align-items: center;
+      margin-top: 32px; padding-top: 24px; border-top: 1px solid var(--gray-700);
+    }
+    .btn-back {
+      padding: 12px 28px; background: transparent;
+      border: 1.5px solid var(--gray-700); border-radius: var(--radius);
+      color: var(--gray-300); font-family: 'Inter', sans-serif;
+      font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: all var(--transition);
+    }
+    .btn-back:hover { border-color: var(--white); color: var(--white); }
+    .btn-next {
+      padding: 12px 32px;
+      background: linear-gradient(135deg, var(--gold), #d4af37);
+      border: none; border-radius: var(--radius);
+      color: var(--black); font-family: 'Inter', sans-serif;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      transition: all var(--transition);
+      box-shadow: 0 4px 15px rgba(201,162,39,0.25);
+    }
+    .btn-next:hover {
+      box-shadow: 0 6px 25px rgba(201,162,39,0.4);
+      transform: translateY(-1px);
+    }
+    .btn-generate {
+      padding: 14px 40px;
+      background: linear-gradient(135deg, var(--red), var(--red-soft));
+      border: none; border-radius: var(--radius);
+      color: var(--white); font-family: 'Inter', sans-serif;
+      font-size: 15px; font-weight: 700; cursor: pointer;
+      transition: all var(--transition);
+      box-shadow: 0 4px 15px rgba(192,57,43,0.3);
+    }
+    .btn-generate:hover {
+      box-shadow: 0 6px 25px rgba(192,57,43,0.5);
+      transform: translateY(-1px);
+    }
+
+    /* ── FOOTER ── */
+    .wz-footer {
+      text-align: center; padding: 20px;
+      font-size: 11px; color: var(--gray-700);
+      border-top: 1px solid rgba(201,162,39,0.08);
+      margin-top: 40px;
+    }
+
+    /* ── LOADING ── */
+    .loading-overlay {
+      display: none; position: fixed; inset: 0;
+      background: rgba(0,0,0,0.85); z-index: 999;
+      align-items: center; justify-content: center;
+    }
+    .loading-overlay.active { display: flex; }
+    .loading-box {
+      background: var(--black-card); border: 1px solid var(--gold);
+      border-radius: var(--radius-lg); padding: 48px;
+      text-align: center; max-width: 380px; width: 90%;
+    }
+    .ld-spinner {
+      width: 48px; height: 48px;
+      border: 3px solid var(--gray-700); border-top-color: var(--gold);
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .ld-title { font-size: 16px; font-weight: 700; color: var(--gold); margin-bottom: 6px; }
+    .ld-sub { font-size: 13px; color: var(--gray-500); }
+  </style>
+</head>
+<body>
+
+  <!-- HEADER -->
+  <div class="topbar">
+    <img src="/static/img/logo-header.png" alt="iRealEstateMx" class="topbar-logo" />
+    <div class="topbar-nav">
+      <a href="/" class="active">Nueva Propiedad</a>
+      <a href="/dashboard">Propiedades</a>
+      {% if user and user.rol == 'admin' %}
+      <a href="/admin/prospectos">Prospectos</a>
+      <a href="/admin/usuarios">Usuarios</a>
+      {% endif %}
+      <span class="topbar-user">{{ user.nombre }}</span>
+      <a href="/logout">Salir</a>
+    </div>
+  </div>
+
+  <!-- PROGRESS BAR -->
+  <div class="wizard-progress">
+    <div class="progress-steps">
+      <div class="progress-fill" id="progressFill"></div>
+      <div class="step-dot active" data-step="1" onclick="goToStep(1)">
+        <div class="step-circle">1</div>
+        <span class="step-label">Datos</span>
+      </div>
+      <div class="step-dot" data-step="2" onclick="goToStep(2)">
+        <div class="step-circle">2</div>
+        <span class="step-label">Detalles</span>
+      </div>
+      <div class="step-dot" data-step="3" onclick="goToStep(3)">
+        <div class="step-circle">3</div>
+        <span class="step-label">Amenidades</span>
+      </div>
+      <div class="step-dot" data-step="4" onclick="goToStep(4)">
+        <div class="step-circle">4</div>
+        <span class="step-label">Video</span>
+      </div>
+      <div class="step-dot" data-step="5" onclick="goToStep(5)">
+        <div class="step-circle">5</div>
+        <span class="step-label">Fotos</span>
+      </div>
+      <div class="step-dot" data-step="6" onclick="goToStep(6)">
+        <div class="step-circle">6</div>
+        <span class="step-label">Contacto</span>
+      </div>
+      <div class="step-dot" data-step="7" onclick="goToStep(7)">
+        <div class="step-circle">7</div>
+        <span class="step-label">Generar</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- WIZARD BODY -->
+  <div class="wizard-body">
+    <form id="wizardForm" action="/generate" method="post" enctype="multipart/form-data">
+
+      <!-- ═══════ STEP 1: Datos de la propiedad ═══════ -->
+      <div class="wizard-step active" data-step="1">
+        <h1 class="step-title">Datos de la propiedad</h1>
+        <p class="step-subtitle">Información básica de la propiedad que vas a publicar</p>
+
+        <div class="wz-card">
+          <h3>Información general</h3>
+          <div class="wz-grid wz-grid-2">
+            <div class="wz-field">
+              <label>Tipo de propiedad <span class="required">*</span></label>
+              <select name="tipo_propiedad" class="wz-select" required>
+                <option value="" disabled selected>Selecciona...</option>
+                <option value="Casa">Casa</option>
+                <option value="Departamento">Departamento</option>
+                <option value="Terreno">Terreno</option>
+                <option value="Penthouse">Penthouse</option>
+                <option value="Local Comercial">Local Comercial</option>
+                <option value="Oficina">Oficina</option>
+              </select>
+            </div>
+            <div class="wz-field">
+              <label>Operación <span class="required">*</span></label>
+              <select name="operacion" class="wz-select" required>
+                <option value="" disabled selected>Selecciona...</option>
+                <option value="Venta">Venta</option>
+                <option value="Renta">Renta</option>
+                <option value="Preventa">Preventa</option>
+              </select>
+            </div>
+          </div>
+          <div class="wz-grid" style="margin-top:16px;">
+            <div class="wz-field">
+              <label>Dirección / Colonia / Zona <span class="required">*</span></label>
+              <input type="text" name="direccion" class="wz-input" placeholder="Ej: Col. Jardines del Moral, Blvd. Campestre" required />
+            </div>
+          </div>
+          <div class="wz-grid wz-grid-2" style="margin-top:16px;">
+            <div class="wz-field">
+              <label>Ciudad <span class="required">*</span></label>
+              <select name="ciudad" class="wz-select" required>
+                <option value="León" selected>León</option>
+                <option value="Guanajuato">Guanajuato</option>
+                <option value="Irapuato">Irapuato</option>
+                <option value="Celaya">Celaya</option>
+                <option value="San Miguel de Allende">San Miguel de Allende</option>
+              </select>
+            </div>
+            <div class="wz-field">
+              <label>Estado <span class="required">*</span></label>
+              <input type="text" name="estado" class="wz-input" value="Guanajuato" required />
+            </div>
+          </div>
+          <div class="wz-grid" style="margin-top:16px;">
+            <div class="wz-field">
+              <label>Precio (MXN) <span class="required">*</span></label>
+              <div class="input-prefix-wrap">
+                <span class="prefix">$</span>
+                <input type="text" name="precio" id="precioInput" class="wz-input" placeholder="3,500,000" required inputmode="numeric" />
+              </div>
+              <div class="price-display" id="precioDisplay"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-nav">
+          <div></div>
+          <button type="button" class="btn-next" onclick="nextStep()">Siguiente →</button>
+        </div>
+      </div>
+
+      <!-- ═══════ STEP 2: Características ═══════ -->
+      <div class="wizard-step" data-step="2">
+        <h1 class="step-title">Características</h1>
+        <p class="step-subtitle">Detalles técnicos y dimensiones de la propiedad</p>
+
+        <div class="wz-card">
+          <h3>Espacios y medidas</h3>
+          <div class="wz-grid wz-grid-5">
+            <div class="wz-field">
+              <label>Recámaras</label>
+              <input type="number" name="recamaras" class="wz-input" min="0" max="20" placeholder="0" />
+            </div>
+            <div class="wz-field">
+              <label>Baños</label>
+              <input type="number" name="banos" class="wz-input" min="0" max="20" step="0.5" placeholder="0" />
+            </div>
+            <div class="wz-field">
+              <label>Estac.</label>
+              <input type="number" name="estacionamientos" class="wz-input" min="0" max="10" placeholder="0" />
+            </div>
+            <div class="wz-field">
+              <label>m² Construidos</label>
+              <input type="number" name="metros_construidos" class="wz-input" min="0" placeholder="0" />
+            </div>
+            <div class="wz-field">
+              <label>m² Terreno</label>
+              <input type="number" name="metros_terreno" class="wz-input" min="0" placeholder="0" />
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-nav">
+          <button type="button" class="btn-back" onclick="prevStep()">← Atrás</button>
+          <button type="button" class="btn-next" onclick="nextStep()">Siguiente →</button>
+        </div>
+      </div>
+
+      <!-- ═══════ STEP 3: Amenidades ═══════ -->
+      <div class="wizard-step" data-step="3">
+        <h1 class="step-title">Amenidades</h1>
+        <p class="step-subtitle">Selecciona las amenidades incluidas o agrega nuevas</p>
+
+        <div class="wz-card">
+          <h3>Amenidades disponibles</h3>
+          <div class="amenities-grid">
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Alberca" /><span class="icon">🏊</span><span>Alberca</span></label>
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Jardín" /><span class="icon">🌿</span><span>Jardín</span></label>
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Seguridad 24h" /><span class="icon">🔒</span><span>Seguridad 24h</span></label>
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Gimnasio" /><span class="icon">🏋️</span><span>Gimnasio</span></label>
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Roof Garden" /><span class="icon">🌇</span><span>Roof Garden</span></label>
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Cuarto de servicio" /><span class="icon">🛏️</span><span>Cuarto servicio</span></label>
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Bodega" /><span class="icon">📦</span><span>Bodega</span></label>
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Área de juegos" /><span class="icon">🎠</span><span>Área de juegos</span></label>
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Salón de eventos" /><span class="icon">🎉</span><span>Salón de eventos</span></label>
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Área deportiva" /><span class="icon">⚽</span><span>Área deportiva</span></label>
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Pet Friendly" /><span class="icon">🐾</span><span>Pet Friendly</span></label>
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Bar / Lounge" /><span class="icon">🍸</span><span>Bar / Lounge</span></label>
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Cisterna" /><span class="icon">💧</span><span>Cisterna</span></label>
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Parking invitados" /><span class="icon">🅿️</span><span>Parking invitados</span></label>
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Vista panorámica" /><span class="icon">🌄</span><span>Vista panorámica</span></label>
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Paneles solares" /><span class="icon">☀️</span><span>Paneles solares</span></label>
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Smart Home" /><span class="icon">🏠</span><span>Smart Home</span></label>
+            <label class="amenity-card"><input type="checkbox" name="amenidades" value="Terraza" /><span class="icon">🏖️</span><span>Terraza</span></label>
+          </div>
+
+          <div class="custom-amenities-area">
+            <div class="wz-field">
+              <label>Agregar amenidades personalizadas</label>
+              <input type="text" id="customAmenityInput" class="wz-input" placeholder="Escribe y separa por coma: Asador, Cava de vinos, Chimenea" />
+              <span class="custom-amenities-hint">Presiona Enter o separa con coma para agregar varias</span>
+            </div>
+            <div class="tags-container" id="customTags"></div>
+            <input type="hidden" name="amenidades_custom" id="customAmenitiesHidden" />
+          </div>
+        </div>
+
+        <div class="wz-card">
+          <h3>Notas adicionales</h3>
+          <div class="wz-field">
+            <label>¿Qué destaca de esta propiedad? (opcional)</label>
+            <textarea name="descripcion_agente" class="wz-textarea" rows="3"
+              placeholder="Ej: Acabados de lujo, excelente iluminación natural, a 5 minutos del centro comercial..."></textarea>
+          </div>
+        </div>
+
+        <div class="wizard-nav">
+          <button type="button" class="btn-back" onclick="prevStep()">← Atrás</button>
+          <button type="button" class="btn-next" onclick="nextStep()">Siguiente →</button>
+        </div>
+      </div>
+
+      <!-- ═══════ STEP 4: Video & Voice Over ═══════ -->
+      <div class="wizard-step" data-step="4">
+        <h1 class="step-title">Video & Voice Over</h1>
+        <p class="step-subtitle">Configura el tipo de video y narración para tu propiedad</p>
+
+        <div class="wz-card">
+          <h3>Tipo de video</h3>
+          <div class="video-type-cards">
+            <label class="video-type-card">
+              <input type="radio" name="video_tipo" value="reel" checked />
+              <div class="vtc-badge">REEL</div>
+              <div class="vtc-icon">⚡</div>
+              <div class="vtc-title">Reel Rápido</div>
+              <div class="vtc-desc">Showcase dinámico de 15-25 segundos. Ideal para captar atención rápida en Instagram y TikTok.</div>
+            </label>
+            <label class="video-type-card">
+              <input type="radio" name="video_tipo" value="tour" />
+              <div class="vtc-badge">TOUR</div>
+              <div class="vtc-icon">🎬</div>
+              <div class="vtc-title">Tour Narrado</div>
+              <div class="vtc-desc">Recorrido completo de 45-60 segundos con narración detallada de cada espacio de la propiedad.</div>
+            </label>
+          </div>
+        </div>
+
+        <div class="wz-card">
+          <h3>Voice Over (Narración)</h3>
+
+          <div class="vo-toggle-row">
+            <label class="toggle-switch">
+              <input type="checkbox" name="voice_over_enabled" id="voiceOverToggle" checked />
+              <span class="toggle-slider"></span>
+            </label>
+            <div>
+              <div class="vo-label">Activar Voice Over</div>
+              <div class="vo-sublabel">La IA narrará el video con voz profesional</div>
+            </div>
+          </div>
+
+          <div id="voiceOverOptions">
+            <div class="wz-field" style="margin-bottom:16px;">
+              <label>Voz del narrador</label>
+              <div class="gender-options">
+                <label class="gender-btn">
+                  <input type="radio" name="voice_gender" value="feminine" checked />
+                  <span class="g-icon">👩</span>
+                  <span class="g-label">Femenina</span>
+                </label>
+                <label class="gender-btn">
+                  <input type="radio" name="voice_gender" value="masculine" />
+                  <span class="g-icon">👨</span>
+                  <span class="g-label">Masculina</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="wz-field">
+              <label>Tono de la narración</label>
+              <div class="tone-chips">
+                <label class="tone-chip"><input type="checkbox" name="voice_tone" value="profesional" checked /> Profesional</label>
+                <label class="tone-chip"><input type="checkbox" name="voice_tone" value="lujo" /> Lujo</label>
+                <label class="tone-chip"><input type="checkbox" name="voice_tone" value="energetico" /> Energético</label>
+                <label class="tone-chip"><input type="checkbox" name="voice_tone" value="acogedor" /> Acogedor</label>
+                <label class="tone-chip"><input type="checkbox" name="voice_tone" value="exclusivo" /> Exclusivo</label>
+                <label class="tone-chip"><input type="checkbox" name="voice_tone" value="moderno" /> Moderno</label>
+                <label class="tone-chip"><input type="checkbox" name="voice_tone" value="familiar" /> Familiar</label>
+              </div>
+            </div>
+
+            <div class="wz-field" style="margin-top:16px;">
+              <label>Contexto adicional para la narración (opcional)</label>
+              <textarea name="voice_context" class="wz-textarea" rows="2"
+                placeholder="Ej: Enfatizar que la propiedad está a 5 min de escuelas, mencionar que acepta crédito Infonavit..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-nav">
+          <button type="button" class="btn-back" onclick="prevStep()">← Atrás</button>
+          <button type="button" class="btn-next" onclick="nextStep()">Siguiente →</button>
+        </div>
+      </div>
+
+      <!-- ═══════ STEP 5: Fotos ═══════ -->
+      <div class="wizard-step" data-step="5">
+        <h1 class="step-title">Fotos de la propiedad</h1>
+        <p class="step-subtitle">Sube las fotos por escena para el video y las publicaciones</p>
+
+        <div class="wz-card">
+          <h3>Fotos principales (la primera será la portada)</h3>
+          <div class="upload-zone" id="mainUploadZone">
+            <input type="file" name="fotos" id="mainPhotos" accept="image/*" multiple required />
+            <div class="uz-icon">📷</div>
+            <div class="uz-text">Arrastra fotos aquí o <strong style="color:var(--gold)">haz clic para seleccionar</strong></div>
+            <div class="uz-hint">JPG, PNG, WEBP — primera foto = portada</div>
+          </div>
+          <div class="photo-grid" id="mainPhotoGrid"></div>
+        </div>
+
+        <div class="wz-card">
+          <h3>Fotos por escena del video (opcional)</h3>
+          <p style="font-size:12px;color:var(--gray-500);margin-bottom:16px;">Si quieres asignar una foto específica a cada escena del video, súbelas aquí. Si no, usaremos las fotos principales.</p>
+
+          <div class="scene-card">
+            <div>
+              <div class="scene-header"><div class="scene-number">1</div><div class="scene-title">Fachada</div></div>
+              <textarea name="scene_fachada_text" class="scene-textarea" placeholder="Texto del guión para la fachada (se generará automáticamente si lo dejas vacío)"></textarea>
+            </div>
+            <div class="scene-upload">
+              <input type="file" name="scene_fachada" accept="image/*" onchange="previewScene(this)" />
+              <div class="su-icon">🏠</div>
+              <div class="su-text">Foto fachada</div>
+            </div>
+          </div>
+
+          <div class="scene-card">
+            <div>
+              <div class="scene-header"><div class="scene-number">2</div><div class="scene-title">Sala / Estancia</div></div>
+              <textarea name="scene_sala_text" class="scene-textarea" placeholder="Texto del guión para la sala..."></textarea>
+            </div>
+            <div class="scene-upload">
+              <input type="file" name="scene_sala" accept="image/*" onchange="previewScene(this)" />
+              <div class="su-icon">🛋️</div>
+              <div class="su-text">Foto sala</div>
+            </div>
+          </div>
+
+          <div class="scene-card">
+            <div>
+              <div class="scene-header"><div class="scene-number">3</div><div class="scene-title">Cocina</div></div>
+              <textarea name="scene_cocina_text" class="scene-textarea" placeholder="Texto del guión para la cocina..."></textarea>
+            </div>
+            <div class="scene-upload">
+              <input type="file" name="scene_cocina" accept="image/*" onchange="previewScene(this)" />
+              <div class="su-icon">🍳</div>
+              <div class="su-text">Foto cocina</div>
+            </div>
+          </div>
+
+          <div class="scene-card">
+            <div>
+              <div class="scene-header"><div class="scene-number">4</div><div class="scene-title">Recámara Principal</div></div>
+              <textarea name="scene_recamara_text" class="scene-textarea" placeholder="Texto del guión para la recámara principal..."></textarea>
+            </div>
+            <div class="scene-upload">
+              <input type="file" name="scene_recamara" accept="image/*" onchange="previewScene(this)" />
+              <div class="su-icon">🛏️</div>
+              <div class="su-text">Foto recámara</div>
+            </div>
+          </div>
+
+          <div class="scene-card">
+            <div>
+              <div class="scene-header"><div class="scene-number">5</div><div class="scene-title">Baño / Espacios</div></div>
+              <textarea name="scene_bano_text" class="scene-textarea" placeholder="Texto del guión para baños u otros espacios destacados..."></textarea>
+            </div>
+            <div class="scene-upload">
+              <input type="file" name="scene_bano" accept="image/*" onchange="previewScene(this)" />
+              <div class="su-icon">🚿</div>
+              <div class="su-text">Foto baño/espacios</div>
+            </div>
+          </div>
+
+          <div class="scene-card">
+            <div>
+              <div class="scene-header"><div class="scene-number">6</div><div class="scene-title">Cierre</div></div>
+              <textarea name="scene_cierre_text" class="scene-textarea" placeholder="Texto de cierre: llamada a la acción, urgencia, invitación a agendar cita..."></textarea>
+            </div>
+            <div class="scene-upload">
+              <input type="file" name="scene_cierre" accept="image/*" onchange="previewScene(this)" />
+              <div class="su-icon">🏷️</div>
+              <div class="su-text">Foto cierre</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-nav">
+          <button type="button" class="btn-back" onclick="prevStep()">← Atrás</button>
+          <button type="button" class="btn-next" onclick="nextStep()">Siguiente →</button>
+        </div>
+      </div>
+
+      <!-- ═══════ STEP 6: Contacto del agente ═══════ -->
+      <div class="wizard-step" data-step="6">
+        <h1 class="step-title">Datos del agente</h1>
+        <p class="step-subtitle">Información de contacto que aparecerá en todas las publicaciones</p>
+
+        <div class="wz-card">
+          <h3>Contacto</h3>
+          <div class="wz-grid wz-grid-3">
+            <div class="wz-field">
+              <label>Nombre completo <span class="required">*</span></label>
+              <input type="text" name="agente_nombre" class="wz-input" placeholder="María González" required />
+            </div>
+            <div class="wz-field">
+              <label>Teléfono <span class="required">*</span></label>
+              <input type="tel" name="agente_telefono" class="wz-input" placeholder="477 123 4567" required />
+            </div>
+            <div class="wz-field">
+              <label>Email <span class="required">*</span></label>
+              <input type="email" name="agente_email" class="wz-input" placeholder="maria@agencia.com" required />
+            </div>
+          </div>
+          <div class="wz-grid wz-grid-2" style="margin-top:16px;">
+            <div class="wz-field">
+              <label>Instagram (opcional)</label>
+              <input type="text" name="agente_instagram" class="wz-input" placeholder="@agente_leon" />
+            </div>
+            <div class="wz-field">
+              <label>Inmobiliaria (opcional)</label>
+              <input type="text" name="agente_inmobiliaria" class="wz-input" placeholder="iRealEstateMx" />
+            </div>
+          </div>
+        </div>
+
+        <div class="wizard-nav">
+          <button type="button" class="btn-back" onclick="prevStep()">← Atrás</button>
+          <button type="button" class="btn-next" onclick="nextStep()">Siguiente →</button>
+        </div>
+      </div>
+
+      <!-- ═══════ STEP 7: Contenido a generar ═══════ -->
+      <div class="wizard-step" data-step="7">
+        <h1 class="step-title">¿Qué quieres generar?</h1>
+        <p class="step-subtitle">Selecciona todo lo que necesitas — la IA lo creará todo de una vez</p>
+
+        <div class="wz-card">
+          <h3>Textos con IA</h3>
+          <label class="content-option">
+            <input type="checkbox" name="gen_descripcion" checked />
+            <span class="co-icon">📝</span>
+            <div class="co-info">
+              <div class="co-title">Descripción profesional</div>
+              <div class="co-desc">Texto para portales inmobiliarios y fichas técnicas</div>
+            </div>
+            <div class="co-check">✓</div>
+          </label>
+          <label class="content-option">
+            <input type="checkbox" name="gen_instagram_copy" checked />
+            <span class="co-icon">📱</span>
+            <div class="co-info">
+              <div class="co-title">Copy para Instagram</div>
+              <div class="co-desc">Texto + hashtags optimizados para tu publicación de feed</div>
+            </div>
+            <div class="co-check">✓</div>
+          </label>
+        </div>
+
+        <div class="wz-card">
+          <h3>Documentos</h3>
+          <label class="content-option">
+            <input type="checkbox" name="gen_pdf" checked />
+            <span class="co-icon">📄</span>
+            <div class="co-info">
+              <div class="co-title">PDF / Ficha técnica</div>
+              <div class="co-desc">Brochure profesional con fotos, datos y contacto del agente</div>
+            </div>
+            <div class="co-check">✓</div>
+          </label>
+        </div>
+
+        <div class="wz-card">
+          <h3>Imágenes para redes</h3>
+          <label class="content-option">
+            <input type="checkbox" name="gen_ig_post" checked />
+            <span class="co-icon">🖼️</span>
+            <div class="co-info">
+              <div class="co-title">Imagen para Post (1080x1080)</div>
+              <div class="co-desc">Foto de portada con datos sobrepuestos para feed de Instagram</div>
+            </div>
+            <div class="co-check">✓</div>
+          </label>
+          <label class="content-option">
+            <input type="checkbox" name="gen_ig_story" />
+            <span class="co-icon">📲</span>
+            <div class="co-info">
+              <div class="co-title">Story para Instagram (1080x1920)</div>
+              <div class="co-desc">Diseño vertical optimizado para stories</div>
+            </div>
+            <div class="co-check">✓</div>
+          </label>
+          <label class="content-option">
+            <input type="checkbox" name="gen_ig_carousel" />
+            <span class="co-icon">🎠</span>
+            <div class="co-info">
+              <div class="co-title">Carrusel de Instagram (5-7 slides)</div>
+              <div class="co-desc">Slides con fotos + datos de la propiedad para deslizar</div>
+            </div>
+            <div class="co-check">✓</div>
+          </label>
+        </div>
+
+        <div class="wz-card">
+          <h3>Video</h3>
+          <label class="content-option">
+            <input type="checkbox" name="gen_video" checked />
+            <span class="co-icon">🎬</span>
+            <div class="co-info">
+              <div class="co-title">Video con Voice Over</div>
+              <div class="co-desc">Video tipo reel o tour con narración de IA según tu configuración del paso 4</div>
+            </div>
+            <div class="co-check">✓</div>
+          </label>
+        </div>
+
+        <div class="wizard-nav">
+          <button type="button" class="btn-back" onclick="prevStep()">← Atrás</button>
+          <button type="submit" class="btn-generate" id="submitBtn" onclick="showLoading()">
+            ✨ Generar todo con IA
+          </button>
+        </div>
+      </div>
+
+    </form>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="wz-footer">iRealEstateMxPro &copy; 2026 — Herramienta para agentes inmobiliarios</div>
+
+  <!-- LOADING -->
+  <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-box">
+      <div class="ld-spinner"></div>
+      <div class="ld-title">Generando contenido...</div>
+      <div class="ld-sub" id="loadingText">La IA está creando tu material de marketing</div>
+    </div>
+  </div>
+
+  <script>
+    // ═══════ WIZARD NAVIGATION ═══════
+    var currentStep = 1;
+    var totalSteps = 7;
+
+    function goToStep(n) {
+      if (n < 1 || n > totalSteps) return;
+      // Only allow going to completed steps or next step
+      if (n > currentStep + 1) return;
+
+      document.querySelectorAll('.wizard-step').forEach(function(s) { s.classList.remove('active'); });
+      document.querySelector('.wizard-step[data-step="' + n + '"]').classList.add('active');
+
+      // Update dots
+      document.querySelectorAll('.step-dot').forEach(function(d) {
+        var step = parseInt(d.dataset.step);
+        d.classList.remove('active', 'done');
+        if (step === n) d.classList.add('active');
+        else if (step < n) d.classList.add('done');
+      });
+
+      // Update progress fill
+      var pct = ((n - 1) / (totalSteps - 1)) * 100;
+      var fill = document.getElementById('progressFill');
+      var totalWidth = document.querySelector('.progress-steps').offsetWidth - 80;
+      fill.style.width = (totalWidth * pct / 100) + 'px';
+
+      currentStep = n;
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function nextStep() {
+      if (currentStep < totalSteps) goToStep(currentStep + 1);
+    }
+    function prevStep() {
+      if (currentStep > 1) goToStep(currentStep - 1);
+    }
+
+    // ═══════ PRICE FORMATTER ═══════
+    var precioInput = document.getElementById('precioInput');
+    var precioDisplay = document.getElementById('precioDisplay');
+    if (precioInput) {
+      precioInput.addEventListener('input', function() {
+        var raw = this.value.replace(/\D/g, '');
+        if (raw) {
+          precioDisplay.textContent = '$ ' + Number(raw).toLocaleString('es-MX') + ' MXN';
+        } else {
+          precioDisplay.textContent = '';
+        }
+      });
+    }
+
+    // ═══════ CUSTOM AMENITIES ═══════
+    var customInput = document.getElementById('customAmenityInput');
+    var customTags = document.getElementById('customTags');
+    var customHidden = document.getElementById('customAmenitiesHidden');
+    var customList = [];
+
+    if (customInput) {
+      customInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' || e.key === ',') {
+          e.preventDefault();
+          addCustomAmenities(this.value);
+          this.value = '';
+        }
+      });
+      customInput.addEventListener('blur', function() {
+        if (this.value.trim()) {
+          addCustomAmenities(this.value);
+          this.value = '';
+        }
+      });
+    }
+
+    function addCustomAmenities(text) {
+      var items = text.split(',').map(function(s) { return s.trim(); }).filter(function(s) { return s.length > 0; });
+      items.forEach(function(item) {
+        if (customList.indexOf(item) === -1) {
+          customList.push(item);
+        }
+      });
+      renderCustomTags();
+    }
+
+    function removeCustom(index) {
+      customList.splice(index, 1);
+      renderCustomTags();
+    }
+
+    function renderCustomTags() {
+      customTags.innerHTML = '';
+      customList.forEach(function(tag, i) {
+        var el = document.createElement('span');
+        el.className = 'tag';
+        el.innerHTML = tag + ' <span class="remove" onclick="removeCustom(' + i + ')">×</span>';
+        customTags.appendChild(el);
+      });
+      customHidden.value = customList.join(', ');
+    }
+
+    // ═══════ VOICE OVER TOGGLE ═══════
+    var voToggle = document.getElementById('voiceOverToggle');
+    var voOptions = document.getElementById('voiceOverOptions');
+    if (voToggle) {
+      voToggle.addEventListener('change', function() {
+        voOptions.style.display = this.checked ? 'block' : 'none';
+      });
+    }
+
+    // ═══════ PHOTO PREVIEW ═══════
+    var mainPhotos = document.getElementById('mainPhotos');
+    var mainGrid = document.getElementById('mainPhotoGrid');
+    if (mainPhotos) {
+      mainPhotos.addEventListener('change', function() {
+        mainGrid.innerHTML = '';
+        Array.from(this.files).forEach(function(file, i) {
+          if (!file.type.startsWith('image/')) return;
+          var reader = new FileReader();
+          reader.onload = function(e) {
+            var div = document.createElement('div');
+            div.className = 'photo-thumb' + (i === 0 ? ' cover' : '');
+            div.innerHTML = '<img src="' + e.target.result + '" />';
+            if (i === 0) div.innerHTML += '<div class="cover-tag">Portada</div>';
+            mainGrid.appendChild(div);
+          };
+          reader.readAsDataURL(file);
+        });
+      });
+    }
+
+    // ═══════ SCENE PHOTO PREVIEW ═══════
+    function previewScene(input) {
+      var container = input.parentElement;
+      if (input.files && input.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          // Remove existing preview
+          var existing = container.querySelector('img');
+          if (existing) existing.remove();
+          var img = document.createElement('img');
+          img.src = e.target.result;
+          container.appendChild(img);
+        };
+        reader.readAsDataURL(input.files[0]);
+      }
+    }
+
+    // ═══════ LOADING ═══════
+    function showLoading() {
+      var overlay = document.getElementById('loadingOverlay');
+      if (overlay) overlay.classList.add('active');
+
+      var msgs = [
+        'Generando descripción profesional...',
+        'Creando copy para Instagram...',
+        'Diseñando imagen de portada...',
+        'Preparando PDF / ficha técnica...',
+        'Generando guión del video...',
+        'Creando narración con IA...',
+        'Renderizando video...',
+        'Casi listo...'
+      ];
+      var idx = 0;
+      var textEl = document.getElementById('loadingText');
+      setInterval(function() {
+        idx++;
+        if (idx < msgs.length) textEl.textContent = msgs[idx];
+      }, 3000);
+    }
+
+    // ═══════ DRAG & DROP ═══════
+    var uploadZone = document.getElementById('mainUploadZone');
+    if (uploadZone) {
+      uploadZone.addEventListener('dragover', function(e) { e.preventDefault(); this.style.borderColor = 'var(--gold)'; });
+      uploadZone.addEventListener('dragleave', function() { this.style.borderColor = ''; });
+      uploadZone.addEventListener('drop', function(e) {
+        e.preventDefault(); this.style.borderColor = '';
+        if (e.dataTransfer.files.length) {
+          mainPhotos.files = e.dataTransfer.files;
+          mainPhotos.dispatchEvent(new Event('change'));
+        }
+      });
+    }
+
+    // Init progress bar
+    goToStep(1);
+  </script>
+</body>
+</html>

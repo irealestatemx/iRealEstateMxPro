@@ -95,6 +95,8 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 VIDEO_DIR = BASE_DIR / "static" / "videos"
 VIDEO_DIR.mkdir(parents=True, exist_ok=True)
 VIDEO_PROJECT_DIR = BASE_DIR / "video"
+AUDIO_DIR = BASE_DIR / "static" / "audio"
+AUDIO_DIR.mkdir(parents=True, exist_ok=True)
 
 # Tracking de renderizados de video en progreso
 video_jobs: Dict[str, dict] = {}
@@ -188,6 +190,108 @@ Instagram copy:"""
         temperature=0.8,
     )
     return response.choices[0].message.content.strip()
+
+
+# ─── Generación de guión para video ───
+
+SCENE_NAMES = ["fachada", "sala", "cocina", "recamara", "bano", "cierre"]
+SCENE_LABELS = {
+    "fachada": "Fachada",
+    "sala": "Sala / Estancia",
+    "cocina": "Cocina",
+    "recamara": "Recámara Principal",
+    "bano": "Baño / Espacios",
+    "cierre": "Cierre",
+}
+
+
+def generate_video_script(summary: str, video_tipo: str, voice_tones: list, voice_context: str) -> dict:
+    """Genera un guión por escenas para el video con OpenAI."""
+    tones_str = ", ".join(voice_tones) if voice_tones else "profesional"
+
+    if video_tipo == "reel":
+        duration_hint = "Cada escena debe tener 1-2 oraciones cortas (máximo 15 palabras por escena). Total: 15-25 segundos de narración."
+    else:
+        duration_hint = "Cada escena debe tener 2-3 oraciones descriptivas (máximo 30 palabras por escena). Total: 45-60 segundos de narración."
+
+    context_extra = f"\nContexto adicional del agente: {voice_context}" if voice_context else ""
+
+    prompt = f"""Eres un guionista de videos inmobiliarios en México. Genera un guión para un video de propiedad.
+
+Tono: {tones_str}
+{duration_hint}
+{context_extra}
+
+Datos de la propiedad:
+{summary}
+
+Genera EXACTAMENTE 6 escenas en formato JSON. Cada escena es un objeto con "scene" y "narration":
+1. fachada - Primera impresión de la propiedad desde afuera
+2. sala - Descripción de la sala/estancia principal
+3. cocina - Descripción de la cocina y equipamiento
+4. recamara - Descripción de la recámara principal
+5. bano - Descripción de baños u otros espacios destacados
+6. cierre - Llamada a la acción: urgencia, invitación a agendar cita
+
+Responde SOLO con el JSON array, sin markdown:
+[{{"scene":"fachada","narration":"texto..."}}, ...]"""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=600,
+            temperature=0.7,
+        )
+        raw = response.choices[0].message.content.strip()
+        # Limpiar posible markdown
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1] if "\n" in raw else raw[3:]
+            if raw.endswith("```"):
+                raw = raw[:-3]
+            raw = raw.strip()
+        scenes = json.loads(raw)
+        result = {}
+        for s in scenes:
+            result[s["scene"]] = s["narration"]
+        return result
+    except Exception as e:
+        print(f"[SCRIPT] Error generando guión: {e}")
+        return {
+            "fachada": "Descubre esta increíble propiedad.",
+            "sala": "Amplios espacios llenos de luz natural.",
+            "cocina": "Cocina moderna con acabados de primera.",
+            "recamara": "Recámara principal con espacio generoso.",
+            "bano": "Baños elegantes con detalles de calidad.",
+            "cierre": "No dejes pasar esta oportunidad. Agenda tu visita hoy.",
+        }
+
+
+def generate_tts_audio(text: str, voice: str = "nova", output_path: str = "") -> str:
+    """Genera audio de voz con OpenAI TTS. Retorna path del archivo MP3."""
+    if not output_path:
+        output_path = str(AUDIO_DIR / f"tts_{uuid.uuid4().hex[:8]}.mp3")
+
+    try:
+        response = client.audio.speech.create(
+            model="tts-1",
+            voice=voice,
+            input=text,
+            speed=1.0,
+        )
+        response.stream_to_file(output_path)
+        print(f"[TTS] Audio generado: {output_path} ({len(text)} chars)")
+        return output_path
+    except Exception as e:
+        print(f"[TTS] Error: {e}")
+        return ""
+
+
+def get_tts_voice(gender: str) -> str:
+    """Retorna la voz de OpenAI TTS según el género seleccionado."""
+    if gender == "masculine":
+        return "onyx"  # Voz masculina profunda
+    return "nova"  # Voz femenina cálida
 
 
 # ─── Generacion de PDF ───
@@ -660,6 +764,369 @@ def generate_instagram_image(data: dict) -> bytes:
     return buf.getvalue()
 
 
+def generate_instagram_story(data: dict) -> bytes:
+    """Genera imagen vertical 1080x1920 para Instagram Story."""
+    W, H = 1080, 1920
+    NAVY = (26, 60, 94)
+    GOLD = (201, 162, 39)
+    WHITE = (255, 255, 255)
+    RED = (192, 57, 43)
+
+    font_bold_path = _find_font(bold=True)
+    font_regular_path = _find_font(bold=False)
+    def lf(bold, size):
+        p = font_bold_path if bold else font_regular_path
+        return ImageFont.truetype(p, size) if p else ImageFont.load_default()
+
+    # Fondo con foto de portada
+    portada_url = data.get("foto_portada_url")
+    if portada_url:
+        portada_path = url_to_filepath(portada_url)
+        if portada_path.exists():
+            bg = Image.open(portada_path).convert("RGBA")
+        else:
+            bg = Image.new("RGBA", (W, H), NAVY)
+    else:
+        bg = Image.new("RGBA", (W, H), NAVY)
+
+    # Crop a 9:16 centrado
+    bw, bh = bg.size
+    target_r = W / H
+    current_r = bw / bh
+    if current_r > target_r:
+        new_w = int(bh * target_r)
+        left = (bw - new_w) // 2
+        bg = bg.crop((left, 0, left + new_w, bh))
+    else:
+        new_h = int(bw / target_r)
+        top = (bh - new_h) // 2
+        bg = bg.crop((0, top, bw, top + new_h))
+    bg = bg.resize((W, H), Image.LANCZOS)
+
+    # Gradiente oscuro
+    gradient = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    dg = ImageDraw.Draw(gradient)
+    for y in range(400):
+        alpha = int(200 * (1 - y / 400))
+        dg.line([(0, y), (W, y)], fill=(0, 0, 0, alpha))
+    for y in range(H):
+        if y > H - 800:
+            p = (y - (H - 800)) / 800
+            dg.line([(0, y), (W, y)], fill=(0, 0, 0, int(230 * p)))
+    bg = Image.alpha_composite(bg, gradient)
+
+    overlay = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(overlay)
+
+    # Barra dorada superior
+    draw.rectangle([0, 0, W, 8], fill=GOLD)
+
+    # Badge operación
+    operacion = data.get("operacion", "Venta")
+    badge_text = f"  EN {operacion.upper()}  "
+    f_badge = lf(True, 36)
+    bb = f_badge.getbbox(badge_text)
+    bw2 = bb[2] - bb[0] + 36
+    bh2 = bb[3] - bb[1] + 22
+    draw.rounded_rectangle([60, 70, 60 + bw2, 70 + bh2], radius=8, fill=RED)
+    draw.text((60 + 18, 70 + 8), badge_text, fill=WHITE, font=f_badge)
+
+    # Logo arriba derecha
+    logo_path = BASE_DIR / "static" / "img" / "logo-header.png"
+    if logo_path.exists():
+        logo = Image.open(logo_path).convert("RGBA")
+        lh = 55
+        lr = logo.width / logo.height
+        logo = logo.resize((int(lh * lr), lh), Image.LANCZOS)
+        overlay.paste(logo, (W - logo.width - 60, 65), logo)
+
+    # Zona inferior: datos
+    y = H - 650
+    draw.rectangle([60, y, W - 60, y + 4], fill=GOLD)
+    y += 30
+
+    # Tipo de propiedad
+    f_tipo = lf(True, 30)
+    tipo = data.get("tipo_propiedad", "")
+    draw.text((60, y), tipo.upper(), fill=GOLD, font=f_tipo)
+    y += 50
+
+    # Precio grande
+    f_price = lf(True, 82)
+    precio = data.get("precio_formateado", "")
+    draw.text((60, y), precio, fill=WHITE, font=f_price)
+    y += 110
+
+    # Ubicación
+    f_loc = lf(False, 34)
+    ubicacion = f"{data.get('direccion', '')}, {data.get('ciudad', '')}"
+    if len(ubicacion) > 45:
+        ubicacion = ubicacion[:42] + "..."
+    draw.text((60, y), ubicacion, fill=(255, 255, 255, 180), font=f_loc)
+    y += 60
+
+    # Specs
+    f_spec = lf(True, 32)
+    specs = []
+    if data.get("recamaras"): specs.append(f"{data['recamaras']} Rec")
+    if data.get("banos"): specs.append(f"{data['banos']} Baños")
+    if data.get("metros_construidos"): specs.append(f"{data['metros_construidos']} m²")
+    if data.get("estacionamientos"): specs.append(f"{data['estacionamientos']} Est")
+    if specs:
+        x = 60
+        for i, s in enumerate(specs):
+            draw.text((x, y), s, fill=WHITE, font=f_spec)
+            sw = f_spec.getbbox(s)[2] - f_spec.getbbox(s)[0]
+            x += sw + 20
+            if i < len(specs) - 1:
+                draw.rectangle([x, y + 4, x + 3, y + 32], fill=GOLD)
+                x += 23
+    y += 70
+
+    # Línea dorada
+    draw.rectangle([60, y, W - 60, y + 3], fill=GOLD)
+    y += 25
+
+    # Agente
+    f_agent = lf(True, 28)
+    f_phone = lf(False, 26)
+    agente = data.get("agente_nombre", "")
+    telefono = data.get("agente_telefono", "")
+    draw.text((60, y), agente, fill=WHITE, font=f_agent)
+    y += 40
+    draw.text((60, y), telefono, fill=GOLD, font=f_phone)
+    y += 50
+
+    # Swipe up hint
+    f_swipe = lf(True, 24)
+    swipe_text = "DESLIZA PARA MÁS INFO"
+    sw = f_swipe.getbbox(swipe_text)[2] - f_swipe.getbbox(swipe_text)[0]
+    draw.text(((W - sw) // 2, H - 100), swipe_text, fill=GOLD, font=f_swipe)
+    # Flecha
+    arrow_x = W // 2
+    draw.polygon([(arrow_x - 12, H - 55), (arrow_x + 12, H - 55), (arrow_x, H - 40)], fill=GOLD)
+
+    # Barra dorada inferior
+    draw.rectangle([0, H - 8, W, H], fill=GOLD)
+
+    final = Image.alpha_composite(bg, overlay).convert("RGB")
+    buf = io.BytesIO()
+    final.save(buf, format="JPEG", quality=95, optimize=True)
+    buf.seek(0)
+    return buf.getvalue()
+
+
+def generate_instagram_carousel(data: dict) -> list:
+    """Genera carrusel de 5-7 slides para Instagram (1080x1080 cada uno). Retorna lista de bytes."""
+    SIZE = 1080
+    NAVY = (26, 60, 94)
+    NAVY_DARK = (13, 31, 51)
+    GOLD = (201, 162, 39)
+    WHITE = (255, 255, 255)
+    RED = (192, 57, 43)
+
+    font_bold_path = _find_font(bold=True)
+    font_regular_path = _find_font(bold=False)
+    def lf(bold, size):
+        p = font_bold_path if bold else font_regular_path
+        return ImageFont.truetype(p, size) if p else ImageFont.load_default()
+
+    slides = []
+    portada_url = data.get("foto_portada_url")
+    fotos_extra = data.get("fotos_extra_urls", [])
+    all_fotos = []
+    if portada_url:
+        all_fotos.append(portada_url)
+    all_fotos.extend(fotos_extra)
+
+    operacion = data.get("operacion", "Venta")
+    precio = data.get("precio_formateado", "")
+    tipo = data.get("tipo_propiedad", "")
+    ubicacion = f"{data.get('direccion', '')}, {data.get('ciudad', '')}"
+    if len(ubicacion) > 40:
+        ubicacion = ubicacion[:37] + "..."
+
+    specs = []
+    if data.get("recamaras"): specs.append(("Recámaras", data["recamaras"]))
+    if data.get("banos"): specs.append(("Baños", data["banos"]))
+    if data.get("metros_construidos"): specs.append(("m² Const.", data["metros_construidos"]))
+    if data.get("metros_terreno"): specs.append(("m² Terreno", data["metros_terreno"]))
+    if data.get("estacionamientos"): specs.append(("Estac.", data["estacionamientos"]))
+
+    amenidades = data.get("amenidades", [])
+    agente = data.get("agente_nombre", "")
+    telefono = data.get("agente_telefono", "")
+    email = data.get("agente_email", "")
+    descripcion = data.get("descripcion_profesional", "")
+
+    def _load_bg(url):
+        if url:
+            fpath = url_to_filepath(url)
+            if fpath.exists():
+                img = Image.open(fpath).convert("RGBA")
+                w, h = img.size
+                side = min(w, h)
+                left = (w - side) // 2
+                top = (h - side) // 2
+                img = img.crop((left, top, left + side, top + side))
+                return img.resize((SIZE, SIZE), Image.LANCZOS)
+        return Image.new("RGBA", (SIZE, SIZE), NAVY)
+
+    def _add_gradient(img, top_a=150, bot_a=220):
+        g = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+        d = ImageDraw.Draw(g)
+        for y in range(300):
+            d.line([(0, y), (SIZE, y)], fill=(0, 0, 0, int(top_a * (1 - y / 300))))
+        for y in range(SIZE):
+            if y > SIZE - 450:
+                p = (y - (SIZE - 450)) / 450
+                d.line([(0, y), (SIZE, y)], fill=(0, 0, 0, int(bot_a * p)))
+        return Image.alpha_composite(img, g)
+
+    def _to_bytes(img):
+        buf = io.BytesIO()
+        img.convert("RGB").save(buf, format="JPEG", quality=95, optimize=True)
+        buf.seek(0)
+        return buf.getvalue()
+
+    # ── SLIDE 1: Portada (foto + precio + badge) ──
+    bg1 = _add_gradient(_load_bg(all_fotos[0] if all_fotos else None))
+    o1 = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+    d1 = ImageDraw.Draw(o1)
+    d1.rectangle([0, 0, SIZE, 8], fill=GOLD)
+    # Badge
+    f_badge = lf(True, 34)
+    bt = f"  EN {operacion.upper()}  "
+    bb = f_badge.getbbox(bt)
+    d1.rounded_rectangle([50, 50, 50 + bb[2] - bb[0] + 40, 50 + bb[3] - bb[1] + 24], radius=8, fill=RED)
+    d1.text((50 + 20, 50 + 10), bt, fill=WHITE, font=f_badge)
+    # Logo
+    logo_path = BASE_DIR / "static" / "img" / "logo-header.png"
+    if logo_path.exists():
+        logo = Image.open(logo_path).convert("RGBA")
+        logo = logo.resize((int(50 * logo.width / logo.height), 50), Image.LANCZOS)
+        o1.paste(logo, (SIZE - logo.width - 50, 45), logo)
+    # Precio
+    y = SIZE - 280
+    d1.rectangle([50, y, SIZE - 50, y + 4], fill=GOLD)
+    y += 25
+    d1.text((50, y), precio, fill=WHITE, font=lf(True, 72))
+    y += 95
+    d1.text((50, y), ubicacion, fill=(255, 255, 255, 180), font=lf(False, 30))
+    y += 50
+    d1.text((50, y), "DESLIZA →", fill=GOLD, font=lf(True, 28))
+    d1.rectangle([0, SIZE - 8, SIZE, SIZE], fill=GOLD)
+    slides.append(_to_bytes(Image.alpha_composite(bg1, o1)))
+
+    # ── SLIDE 2: Especificaciones ──
+    bg2 = Image.new("RGBA", (SIZE, SIZE), NAVY_DARK)
+    o2 = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+    d2 = ImageDraw.Draw(o2)
+    d2.rectangle([0, 0, SIZE, 8], fill=GOLD)
+    d2.text((50, 50), tipo.upper(), fill=GOLD, font=lf(True, 28))
+    d2.text((50, 100), "ESPECIFICACIONES", fill=WHITE, font=lf(True, 40))
+    d2.rectangle([50, 160, 200, 164], fill=GOLD)
+
+    if specs:
+        y2 = 210
+        for label, value in specs:
+            # Valor grande
+            d2.text((50, y2), str(value), fill=GOLD, font=lf(True, 72))
+            vw = lf(True, 72).getbbox(str(value))[2]
+            d2.text((50 + vw + 15, y2 + 30), label, fill=(255, 255, 255, 180), font=lf(False, 30))
+            y2 += 110
+            d2.rectangle([50, y2 - 15, SIZE - 50, y2 - 13], fill=(255, 255, 255, 30))
+
+    d2.rectangle([0, SIZE - 8, SIZE, SIZE], fill=GOLD)
+    slides.append(_to_bytes(Image.alpha_composite(bg2, o2)))
+
+    # ── SLIDES 3-5: Fotos extras con datos ──
+    for idx in range(1, min(len(all_fotos), 4)):
+        bg_n = _add_gradient(_load_bg(all_fotos[idx]), top_a=100, bot_a=180)
+        on = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+        dn = ImageDraw.Draw(on)
+        dn.rectangle([0, 0, SIZE, 6], fill=GOLD)
+        # Número de slide
+        dn.text((50, 50), f"{idx + 1}/{min(len(all_fotos) + 2, 7)}", fill=GOLD, font=lf(True, 24))
+        # Precio abajo
+        dn.rectangle([50, SIZE - 130, SIZE - 50, SIZE - 127], fill=GOLD)
+        dn.text((50, SIZE - 110), precio, fill=WHITE, font=lf(True, 48))
+        dn.rectangle([0, SIZE - 6, SIZE, SIZE], fill=GOLD)
+        slides.append(_to_bytes(Image.alpha_composite(bg_n, on)))
+
+    # ── SLIDE: Amenidades (si hay) ──
+    if amenidades:
+        bg_am = Image.new("RGBA", (SIZE, SIZE), NAVY_DARK)
+        oam = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+        dam = ImageDraw.Draw(oam)
+        dam.rectangle([0, 0, SIZE, 8], fill=GOLD)
+        dam.text((50, 50), "AMENIDADES", fill=GOLD, font=lf(True, 40))
+        dam.rectangle([50, 110, 200, 114], fill=GOLD)
+        ya = 150
+        f_am = lf(False, 30)
+        for i, am in enumerate(amenidades[:12]):
+            col = 0 if i % 2 == 0 else 1
+            row_y = ya + (i // 2) * 65
+            x_a = 70 + col * 480
+            dam.ellipse([x_a - 20, row_y + 8, x_a - 6, row_y + 22], fill=GOLD)
+            dam.text((x_a, row_y), am, fill=WHITE, font=f_am)
+        dam.rectangle([0, SIZE - 8, SIZE, SIZE], fill=GOLD)
+        slides.append(_to_bytes(Image.alpha_composite(bg_am, oam)))
+
+    # ── SLIDE FINAL: Contacto ──
+    bg_c = Image.new("RGBA", (SIZE, SIZE), NAVY)
+    oc = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+    dc = ImageDraw.Draw(oc)
+    dc.rectangle([0, 0, SIZE, 8], fill=GOLD)
+    dc.rectangle([0, SIZE - 8, SIZE, SIZE], fill=GOLD)
+
+    # Logo centrado
+    if logo_path.exists():
+        logo_c = Image.open(logo_path).convert("RGBA")
+        lch = 70
+        logo_c = logo_c.resize((int(lch * logo_c.width / logo_c.height), lch), Image.LANCZOS)
+        oc.paste(logo_c, ((SIZE - logo_c.width) // 2, 200), logo_c)
+
+    yc = 340
+    dc.rectangle([(SIZE - 250) // 2, yc, (SIZE + 250) // 2, yc + 3], fill=GOLD)
+    yc += 30
+    dc.text(((SIZE - lf(True, 24).getbbox("AGENDA TU VISITA")[2]) // 2, yc), "AGENDA TU VISITA", fill=GOLD, font=lf(True, 24))
+    yc += 60
+
+    # Nombre agente
+    f_name = lf(True, 44)
+    nw = f_name.getbbox(agente)[2] if agente else 0
+    dc.text(((SIZE - nw) // 2, yc), agente, fill=WHITE, font=f_name)
+    yc += 70
+
+    # Teléfono
+    f_ph = lf(True, 36)
+    pw = f_ph.getbbox(telefono)[2] if telefono else 0
+    dc.text(((SIZE - pw) // 2, yc), telefono, fill=GOLD, font=f_ph)
+    yc += 60
+
+    # Email
+    f_em = lf(False, 26)
+    ew = f_em.getbbox(email)[2] if email else 0
+    dc.text(((SIZE - ew) // 2, yc), email, fill=(255, 255, 255, 150), font=f_em)
+    yc += 80
+
+    # CTA
+    cta = "¡No dejes pasar esta oportunidad!"
+    f_cta = lf(True, 28)
+    cw = f_cta.getbbox(cta)[2]
+    # Rectángulo rojo CTA
+    dc.rounded_rectangle(
+        [(SIZE - cw - 60) // 2, yc, (SIZE + cw + 60) // 2, yc + 58],
+        radius=10, fill=RED,
+    )
+    dc.text(((SIZE - cw) // 2, yc + 14), cta, fill=WHITE, font=f_cta)
+
+    slides.append(_to_bytes(Image.alpha_composite(bg_c, oc)))
+
+    return slides
+
+
 # ─── Rutas ───
 
 # ─── Autenticacion ───
@@ -848,7 +1315,7 @@ async def index(request: Request):
     user = await require_auth(request)
     if not user:
         return RedirectResponse("/login", status_code=302)
-    return templates.TemplateResponse(request=request, name="index.html", context={"user": user})
+    return templates.TemplateResponse(request=request, name="wizard.html", context={"user": user})
 
 
 # ─── Panel de Usuarios (solo admin) ───
@@ -1753,7 +2220,37 @@ async def generate(
     agente_nombre: str = Form(...),
     agente_telefono: str = Form(...),
     agente_email: str = Form(...),
+    agente_instagram: Optional[str] = Form(None),
+    agente_inmobiliaria: Optional[str] = Form(None),
     fotos: List[UploadFile] = File(default=[]),
+    # ─── Nuevos campos del wizard ───
+    amenidades_custom: Optional[str] = Form(None),
+    video_tipo: Optional[str] = Form("reel"),
+    voice_over_enabled: Optional[str] = Form(None),
+    voice_gender: Optional[str] = Form("feminine"),
+    voice_context: Optional[str] = Form(None),
+    # Escenas del video (texto del guión)
+    scene_fachada_text: Optional[str] = Form(None),
+    scene_sala_text: Optional[str] = Form(None),
+    scene_cocina_text: Optional[str] = Form(None),
+    scene_recamara_text: Optional[str] = Form(None),
+    scene_bano_text: Optional[str] = Form(None),
+    scene_cierre_text: Optional[str] = Form(None),
+    # Fotos por escena
+    scene_fachada: Optional[UploadFile] = File(None),
+    scene_sala: Optional[UploadFile] = File(None),
+    scene_cocina: Optional[UploadFile] = File(None),
+    scene_recamara: Optional[UploadFile] = File(None),
+    scene_bano: Optional[UploadFile] = File(None),
+    scene_cierre: Optional[UploadFile] = File(None),
+    # Qué generar
+    gen_descripcion: Optional[str] = Form(None),
+    gen_instagram_copy: Optional[str] = Form(None),
+    gen_pdf: Optional[str] = Form(None),
+    gen_ig_post: Optional[str] = Form(None),
+    gen_ig_story: Optional[str] = Form(None),
+    gen_ig_carousel: Optional[str] = Form(None),
+    gen_video: Optional[str] = Form(None),
 ):
     # Auth check
     user = await require_auth(request)
@@ -1763,6 +2260,12 @@ async def generate(
     # Recoger amenidades desde el form (checkboxes)
     form_data = await request.form()
     amenidades = form_data.getlist("amenidades")
+    voice_tones = form_data.getlist("voice_tone")
+
+    # Agregar amenidades personalizadas (separadas por coma)
+    if amenidades_custom and amenidades_custom.strip():
+        custom_list = [a.strip() for a in amenidades_custom.split(",") if a.strip()]
+        amenidades = list(amenidades) + custom_list
 
     # Guardar fotos subidas
     session_id = str(uuid.uuid4())
@@ -1788,6 +2291,21 @@ async def generate(
         else:
             fotos_extra_urls.append(url)
 
+    # Guardar fotos de escenas
+    scene_photos = {}
+    scene_files = {
+        "fachada": scene_fachada, "sala": scene_sala, "cocina": scene_cocina,
+        "recamara": scene_recamara, "bano": scene_bano, "cierre": scene_cierre,
+    }
+    for scene_name, scene_file in scene_files.items():
+        if scene_file and scene_file.filename and scene_file.size > 0:
+            ext = Path(scene_file.filename).suffix.lower()
+            fname = f"scene_{scene_name}{ext}"
+            dest = session_upload_dir / fname
+            with open(dest, "wb") as buffer:
+                shutil.copyfileobj(scene_file.file, buffer)
+            scene_photos[scene_name] = f"/static/uploads/{session_id}/{fname}"
+
     data = {
         "tipo_propiedad": tipo_propiedad,
         "operacion": operacion,
@@ -1805,10 +2323,55 @@ async def generate(
     }
 
     summary = build_property_summary(data)
-    descripcion_profesional = generate_professional_description(summary)
-    instagram_copy = generate_instagram_copy(summary, tipo_propiedad, operacion, ciudad)
+
+    # ─── Generar textos con IA ───
+    descripcion_profesional = ""
+    instagram_copy = ""
+
+    if gen_descripcion:
+        descripcion_profesional = generate_professional_description(summary)
+    if gen_instagram_copy:
+        instagram_copy = generate_instagram_copy(summary, tipo_propiedad, operacion, ciudad)
 
     precio_formateado = format_price(float(precio.replace(",", "").replace("$", "").strip()))
+
+    # ─── Generar guión del video con IA ───
+    video_script = {}
+    audio_path = ""
+    vo_enabled = voice_over_enabled is not None
+
+    if gen_video:
+        # Guión: usar textos manuales si los puso, sino generar con IA
+        manual_scenes = {
+            "fachada": scene_fachada_text,
+            "sala": scene_sala_text,
+            "cocina": scene_cocina_text,
+            "recamara": scene_recamara_text,
+            "bano": scene_bano_text,
+            "cierre": scene_cierre_text,
+        }
+
+        # Verificar si hay textos manuales
+        has_manual = any(v and v.strip() for v in manual_scenes.values())
+
+        if has_manual:
+            # Usar textos manuales, rellenar vacíos con IA
+            ai_script = generate_video_script(summary, video_tipo or "reel", voice_tones, voice_context or "")
+            video_script = {}
+            for name in SCENE_NAMES:
+                manual = manual_scenes.get(name, "")
+                if manual and manual.strip():
+                    video_script[name] = manual.strip()
+                else:
+                    video_script[name] = ai_script.get(name, "")
+        else:
+            video_script = generate_video_script(summary, video_tipo or "reel", voice_tones, voice_context or "")
+
+        # ─── Generar Voice Over con OpenAI TTS ───
+        if vo_enabled and video_script:
+            full_narration = " ... ".join(video_script.get(s, "") for s in SCENE_NAMES if video_script.get(s))
+            voice = get_tts_voice(voice_gender or "feminine")
+            audio_path = generate_tts_audio(full_narration, voice)
 
     context = {
         "tipo_propiedad": tipo_propiedad,
@@ -1826,10 +2389,24 @@ async def generate(
         "agente_nombre": agente_nombre,
         "agente_telefono": agente_telefono,
         "agente_email": agente_email,
+        "agente_instagram": agente_instagram,
+        "agente_inmobiliaria": agente_inmobiliaria,
         "foto_portada_url": foto_portada_url,
         "fotos_extra_urls": fotos_extra_urls,
         "descripcion_profesional": descripcion_profesional,
         "instagram_copy": instagram_copy,
+        # Nuevos campos
+        "video_script": video_script,
+        "scene_photos": scene_photos,
+        "video_tipo": video_tipo,
+        "voice_over_enabled": vo_enabled,
+        "audio_path": audio_path,
+        "gen_video": gen_video is not None,
+        "gen_pdf": gen_pdf is not None,
+        "gen_ig_post": gen_ig_post is not None,
+        "gen_ig_story": gen_ig_story is not None,
+        "gen_ig_carousel": gen_ig_carousel is not None,
+        "session_id": session_id,
     }
 
     # ─── Guardar propiedad en base de datos ───
@@ -1846,6 +2423,55 @@ async def generate(
     except Exception as e:
         print(f"[DB] Error guardando propiedad: {e}")
         context["property_id"] = None
+
+    # ─── Iniciar renderizado de video en background ───
+    if gen_video and valid_fotos:
+        photo_paths = []
+        # Usar fotos de escena si las hay, sino fotos principales
+        for sn in SCENE_NAMES:
+            if sn in scene_photos:
+                fpath = url_to_filepath(scene_photos[sn])
+                if fpath.exists():
+                    photo_paths.append(str(fpath.resolve()))
+        if not photo_paths:
+            all_urls = [foto_portada_url] + fotos_extra_urls if foto_portada_url else fotos_extra_urls
+            for url in all_urls:
+                fpath = url_to_filepath(url)
+                if fpath.exists():
+                    photo_paths.append(str(fpath.resolve()))
+
+        if photo_paths:
+            job_id = str(uuid.uuid4())[:8]
+            tipo_clean = tipo_propiedad.lower().replace(" ", "_")
+            output_filename = f"reel_{tipo_clean}_{job_id}.mp4"
+            output_path = VIDEO_DIR / output_filename
+
+            video_jobs[job_id] = {
+                "status": "queued", "progress": 0,
+                "file": None, "error": None, "filename": output_filename,
+            }
+
+            video_data = {
+                "photos": photo_paths,
+                "operacion": operacion,
+                "precio_formateado": precio_formateado,
+                "direccion": direccion,
+                "ciudad": ciudad,
+                "estado": estado,
+                "recamaras": recamaras or "",
+                "banos": banos or "",
+                "metros_construidos": metros_construidos or "",
+                "estacionamientos": estacionamientos or "",
+                "tipoPropiedad": tipo_propiedad,
+                "agente_nombre": agente_nombre,
+                "agente_telefono": agente_telefono,
+                "agente_email": agente_email,
+                "audio_path": audio_path,
+            }
+
+            asyncio.create_task(render_video_task(job_id, video_data, output_path))
+            context["video_job_id"] = job_id
+            context["video_filename"] = output_filename
 
     return templates.TemplateResponse(request=request, name="result.html", context=context)
 
@@ -1946,6 +2572,116 @@ async def download_image(
     return StreamingResponse(
         io.BytesIO(img_bytes),
         media_type="image/jpeg",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.post("/download-story")
+async def download_story(
+    request: Request,
+    tipo_propiedad: str = Form(""),
+    operacion: str = Form(""),
+    direccion: str = Form(""),
+    ciudad: str = Form(""),
+    estado: str = Form(""),
+    precio_formateado: str = Form(""),
+    recamaras: Optional[str] = Form(None),
+    banos: Optional[str] = Form(None),
+    metros_construidos: Optional[str] = Form(None),
+    metros_terreno: Optional[str] = Form(None),
+    estacionamientos: Optional[str] = Form(None),
+    agente_nombre: str = Form(""),
+    agente_telefono: str = Form(""),
+    agente_email: str = Form(""),
+    foto_portada_url: Optional[str] = Form(None),
+):
+    data = {
+        "tipo_propiedad": tipo_propiedad,
+        "operacion": operacion,
+        "direccion": direccion,
+        "ciudad": ciudad,
+        "estado": estado,
+        "precio_formateado": precio_formateado,
+        "recamaras": recamaras,
+        "banos": banos,
+        "metros_construidos": metros_construidos,
+        "metros_terreno": metros_terreno,
+        "estacionamientos": estacionamientos,
+        "agente_nombre": agente_nombre,
+        "agente_telefono": agente_telefono,
+        "foto_portada_url": foto_portada_url,
+    }
+    img_bytes = generate_instagram_story(data)
+    tipo_clean = tipo_propiedad.lower().replace(" ", "_")
+    filename = f"story_{tipo_clean}_{ciudad.lower().replace(' ', '_')}.jpg"
+    return StreamingResponse(
+        io.BytesIO(img_bytes),
+        media_type="image/jpeg",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+@app.post("/download-carousel")
+async def download_carousel(
+    request: Request,
+    tipo_propiedad: str = Form(""),
+    operacion: str = Form(""),
+    direccion: str = Form(""),
+    ciudad: str = Form(""),
+    estado: str = Form(""),
+    precio_formateado: str = Form(""),
+    recamaras: Optional[str] = Form(None),
+    banos: Optional[str] = Form(None),
+    metros_construidos: Optional[str] = Form(None),
+    metros_terreno: Optional[str] = Form(None),
+    estacionamientos: Optional[str] = Form(None),
+    agente_nombre: str = Form(""),
+    agente_telefono: str = Form(""),
+    agente_email: str = Form(""),
+    foto_portada_url: Optional[str] = Form(None),
+    descripcion_profesional: Optional[str] = Form(None),
+):
+    form_data = await request.form()
+    fotos_extra_urls = form_data.getlist("fotos_extra_urls")
+    amenidades = form_data.getlist("amenidades")
+
+    data = {
+        "tipo_propiedad": tipo_propiedad,
+        "operacion": operacion,
+        "direccion": direccion,
+        "ciudad": ciudad,
+        "estado": estado,
+        "precio_formateado": precio_formateado,
+        "recamaras": recamaras,
+        "banos": banos,
+        "metros_construidos": metros_construidos,
+        "metros_terreno": metros_terreno,
+        "estacionamientos": estacionamientos,
+        "agente_nombre": agente_nombre,
+        "agente_telefono": agente_telefono,
+        "agente_email": agente_email,
+        "foto_portada_url": foto_portada_url,
+        "fotos_extra_urls": fotos_extra_urls,
+        "amenidades": amenidades,
+        "descripcion_profesional": descripcion_profesional or "",
+    }
+
+    slides_bytes = generate_instagram_carousel(data)
+
+    # Empaquetar slides en un ZIP
+    import zipfile
+    zip_buf = io.BytesIO()
+    with zipfile.ZipFile(zip_buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        for i, slide_bytes in enumerate(slides_bytes):
+            zf.writestr(f"slide_{i + 1:02d}.jpg", slide_bytes)
+
+    zip_buf.seek(0)
+    tipo_clean = tipo_propiedad.lower().replace(" ", "_")
+    filename = f"carousel_{tipo_clean}_{ciudad.lower().replace(' ', '_')}.zip"
+
+    return StreamingResponse(
+        zip_buf,
+        media_type="application/zip",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
 
@@ -2416,24 +3152,45 @@ def _make_kb_clip(photo_path: str, overlay: Image.Image, duration: float, direct
 
 
 def render_video_sync(data: dict, output_path: Path, job_id: str):
-    """Renderiza el reel MP4 con MoviePy + Pillow (puro Python)."""
-    from moviepy import ImageClip, concatenate_videoclips
+    """Renderiza el reel MP4 con MoviePy + Pillow. Soporta voice over con audio."""
+    from moviepy import ImageClip, concatenate_videoclips, AudioFileClip
     import numpy as np
 
     photos = data.get("photos", [])
+    audio_path = data.get("audio_path", "")
     scenes = []
+
+    # Si hay audio, calcular duración por escena basado en audio
+    audio_duration = 0
+    if audio_path and os.path.exists(audio_path):
+        try:
+            audio_clip = AudioFileClip(audio_path)
+            audio_duration = audio_clip.duration
+            audio_clip.close()
+        except Exception as e:
+            print(f"[VIDEO] Error leyendo audio: {e}")
+            audio_duration = 0
+
+    # Calcular duración por escena
+    n_scenes = max(len(photos), 1)
+    if audio_duration > 0:
+        # Distribuir audio entre las escenas + contacto
+        scene_dur = audio_duration / n_scenes
+        scene_dur = max(scene_dur, 3)  # mínimo 3 segundos
+    else:
+        scene_dur = SCENE_SECS
 
     # Escena 1: Cover — Ken Burns zoom IN
     if photos:
         ov_cover = _build_overlay_cover(data)
-        clip = _make_kb_clip(photos[0], ov_cover, COVER_SECS, "in")
+        clip = _make_kb_clip(photos[0], ov_cover, COVER_SECS if not audio_duration else scene_dur, "in")
         scenes.append(clip)
         video_jobs[job_id]["progress"] = 20
 
     # Escena 2: Specs — Ken Burns zoom OUT
     if len(photos) > 1:
         ov_specs = _build_overlay_specs(data)
-        clip = _make_kb_clip(photos[1], ov_specs, SCENE_SECS, "out")
+        clip = _make_kb_clip(photos[1], ov_specs, scene_dur, "out")
         scenes.append(clip)
         video_jobs[job_id]["progress"] = 35
 
@@ -2444,7 +3201,7 @@ def render_video_sync(data: dict, output_path: Path, job_id: str):
         if idx < len(photos):
             ov_detail = _build_overlay_detail(data)
             direction = "in" if i % 2 == 0 else "out"
-            clip = _make_kb_clip(photos[idx], ov_detail, SCENE_SECS, direction)
+            clip = _make_kb_clip(photos[idx], ov_detail, scene_dur, direction)
             scenes.append(clip)
         video_jobs[job_id]["progress"] = 35 + (i + 1) * 10
 
@@ -2454,15 +3211,33 @@ def render_video_sync(data: dict, output_path: Path, job_id: str):
     scenes.append(clip)
     video_jobs[job_id]["progress"] = 70
 
-    # Concatenar y exportar
+    # Concatenar escenas
     final = concatenate_videoclips(scenes, method="compose")
     video_jobs[job_id]["progress"] = 80
+
+    # Si hay audio, combinarlo con el video
+    has_audio = False
+    if audio_path and os.path.exists(audio_path):
+        try:
+            audio_clip = AudioFileClip(audio_path)
+            # Ajustar duración de audio al video o viceversa
+            if audio_clip.duration > final.duration:
+                try:
+                    audio_clip = audio_clip.subclipped(0, final.duration)
+                except AttributeError:
+                    audio_clip = audio_clip.subclip(0, final.duration)
+            final = final.with_audio(audio_clip)
+            has_audio = True
+            print(f"[VIDEO] Audio añadido: {audio_clip.duration:.1f}s")
+        except Exception as e:
+            print(f"[VIDEO] Error combinando audio: {e}")
 
     final.write_videofile(
         str(output_path),
         fps=FPS_VID,
         codec="libx264",
-        audio=False,
+        audio=has_audio,
+        audio_codec="aac" if has_audio else None,
         preset="fast",
         threads=2,
         logger=None,
