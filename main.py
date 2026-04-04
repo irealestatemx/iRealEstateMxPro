@@ -30,7 +30,7 @@ from database import (
     save_desarrollo, get_all_desarrollos, get_desarrollo_by_id,
     search_desarrollos, update_desarrollo,
     authenticate_user, get_user_by_email, get_user_by_id, get_all_users, create_user,
-    update_user, delete_user, seed_admin_user,
+    update_user, delete_user, delete_user_permanent, seed_admin_user,
     get_properties_by_user,
     get_user_by_prefijo, get_all_referidos,
     create_prospecto, get_all_prospectos, get_prospecto_by_id,
@@ -915,6 +915,17 @@ async def admin_toggle_user(request: Request, user_id: int):
     target = await get_user_by_id(user_id)
     if target and target["id"] != user["id"]:
         await update_user(user_id, {"activo": not target["activo"]})
+    return RedirectResponse("/admin/usuarios", status_code=302)
+
+
+@app.post("/admin/usuarios/{user_id}/eliminar")
+async def admin_delete_user(request: Request, user_id: int):
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    target = await get_user_by_id(user_id)
+    if target and target["id"] != user["id"]:
+        await delete_user_permanent(user_id)
     return RedirectResponse("/admin/usuarios", status_code=302)
 
 

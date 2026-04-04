@@ -97,6 +97,8 @@
     }
     .btn-toggle { background: #e2e8f0; color: #4a5568; }
     .btn-toggle:hover { background: #cbd5e0; }
+    .btn-delete { background: #e53e3e; color: #fff; }
+    .btn-delete:hover { background: #c53030; }
     .form-row {
       display: flex;
       gap: 12px;
@@ -239,6 +241,10 @@
                 <button type="submit" class="btn-sm btn-toggle">
                   {{ 'Desactivar' if u.activo else 'Activar' }}
                 </button>
+              </form>
+              <form method="post" action="/admin/usuarios/{{ u.id }}/eliminar" style="display:inline"
+                    onsubmit="return confirm('¿Eliminar permanentemente a {{ u.nombre }}? Los prospectos asociados se conservarán pero sin referido.')">
+                <button type="submit" class="btn-sm btn-delete">Eliminar</button>
               </form>
               {% else %}
               <span style="color:#a0aec0;font-size:12px">Tu cuenta</span>

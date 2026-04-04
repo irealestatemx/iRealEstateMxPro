@@ -473,6 +473,16 @@ async def delete_user(user_id: int):
     await database.execute(query=query, values={"id": user_id})
 
 
+async def delete_user_permanent(user_id: int):
+    """Elimina un usuario permanentemente. También limpia sus prospectos."""
+    # Desasociar prospectos del referido (poner referido_id = NULL)
+    query_prospectos = "UPDATE prospectos SET referido_id = NULL WHERE referido_id = :id"
+    await database.execute(query=query_prospectos, values={"id": user_id})
+    # Eliminar usuario
+    query = "DELETE FROM usuarios WHERE id = :id"
+    await database.execute(query=query, values={"id": user_id})
+
+
 async def count_users() -> int:
     """Cuenta usuarios activos."""
     query = "SELECT COUNT(*) as total FROM usuarios WHERE activo = TRUE"
