@@ -19,6 +19,19 @@
     .topbar-nav a:hover { color: #fff; }
     .topbar-nav a.active { color: #fff; border-bottom: 2px solid #c9a227; padding-bottom: 2px; }
     .topbar-user { color: #e2e8f0; font-size: 13px; }
+    .hamburger { display:none; background:none; border:none; cursor:pointer; padding:4px; }
+    .hamburger span { display:block; width:22px; height:2px; background:#c9a227; margin:5px 0; border-radius:2px; transition:all .25s; }
+    .hamburger.open span:nth-child(1) { transform:rotate(45deg) translate(5px,5px); }
+    .hamburger.open span:nth-child(2) { opacity:0; }
+    .hamburger.open span:nth-child(3) { transform:rotate(-45deg) translate(5px,-5px); }
+    @media(max-width:768px){
+      .hamburger { display:block; }
+      .topbar { flex-wrap:wrap; padding:12px 16px; }
+      .topbar-nav { display:none; width:100%; flex-direction:column; gap:0; padding-top:12px; border-top:1px solid rgba(255,255,255,.1); margin-top:12px; }
+      .topbar-nav.open { display:flex; }
+      .topbar-nav a, .topbar-nav span { padding:10px 0; font-size:15px; }
+      .topbar-nav a.active { border-bottom:none; border-left:3px solid #c9a227; padding-left:10px; }
+    }
     .container { max-width: 1200px; margin: 24px auto; padding: 0 20px; }
     .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
     .page-header h1 { font-size: 24px; color: #1a3c5e; }
@@ -90,6 +103,9 @@
 <body>
   <div class="topbar">
     <img src="/static/img/logo-header.png" alt="iRealEstateMx" class="topbar-logo" />
+    <button class="hamburger" onclick="this.classList.toggle('open');document.querySelector('.topbar-nav').classList.toggle('open');" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
     <div class="topbar-nav">
       <a href="/">Nueva Propiedad</a>
       <a href="/dashboard" class="active">Propiedades</a>

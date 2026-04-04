@@ -571,6 +571,18 @@ def generate_property_pdf(data: dict) -> bytes:
 
 # ─── Generacion de imagen Instagram ───
 
+
+def _open_image(path, mode="RGBA"):
+    """Abre una imagen corrigiendo la orientación EXIF (evita fotos acostadas)."""
+    from PIL import ImageOps
+    img = Image.open(path)
+    try:
+        img = ImageOps.exif_transpose(img)
+    except Exception:
+        pass
+    return img.convert(mode)
+
+
 def _find_font(bold: bool = False) -> str:
     """Busca una fuente TrueType disponible en el sistema."""
     candidates_bold = [
@@ -624,7 +636,7 @@ def generate_instagram_image(data: dict) -> bytes:
     if portada_url:
         portada_path = url_to_filepath(portada_url)
         if portada_path.exists():
-            bg = Image.open(portada_path).convert("RGBA")
+            bg = _open_image(portada_path, "RGBA")
         else:
             bg = Image.new("RGBA", (SIZE, SIZE), NAVY)
     else:
@@ -679,7 +691,7 @@ def generate_instagram_image(data: dict) -> bytes:
     # ── Logo iRealEstateMx (arriba derecha) ──
     logo_path = BASE_DIR / "static" / "img" / "logo-header.png"
     if logo_path.exists():
-        logo_img = Image.open(logo_path).convert("RGBA")
+        logo_img = _open_image(logo_path, "RGBA")
         # Escalar logo a altura ~50px manteniendo proporciones
         logo_h = 50
         logo_ratio = logo_img.width / logo_img.height
@@ -743,7 +755,7 @@ def generate_instagram_image(data: dict) -> bytes:
     # ── Logo completo inferior ──
     logo_full_path = BASE_DIR / "static" / "img" / "logo-full.png"
     if logo_full_path.exists():
-        logo_full = Image.open(logo_full_path).convert("RGBA")
+        logo_full = _open_image(logo_full_path, "RGBA")
         # Escalar a altura ~60px
         lf_h = 60
         lf_ratio = logo_full.width / logo_full.height
@@ -783,7 +795,7 @@ def generate_instagram_story(data: dict) -> bytes:
     if portada_url:
         portada_path = url_to_filepath(portada_url)
         if portada_path.exists():
-            bg = Image.open(portada_path).convert("RGBA")
+            bg = _open_image(portada_path, "RGBA")
         else:
             bg = Image.new("RGBA", (W, H), NAVY)
     else:
@@ -834,7 +846,7 @@ def generate_instagram_story(data: dict) -> bytes:
     # Logo arriba derecha
     logo_path = BASE_DIR / "static" / "img" / "logo-header.png"
     if logo_path.exists():
-        logo = Image.open(logo_path).convert("RGBA")
+        logo = _open_image(logo_path, "RGBA")
         lh = 55
         lr = logo.width / logo.height
         logo = logo.resize((int(lh * lr), lh), Image.LANCZOS)
@@ -963,7 +975,7 @@ def generate_instagram_carousel(data: dict) -> list:
         if url:
             fpath = url_to_filepath(url)
             if fpath.exists():
-                img = Image.open(fpath).convert("RGBA")
+                img = _open_image(fpath, "RGBA")
                 w, h = img.size
                 side = min(w, h)
                 left = (w - side) // 2
@@ -1003,7 +1015,7 @@ def generate_instagram_carousel(data: dict) -> list:
     # Logo
     logo_path = BASE_DIR / "static" / "img" / "logo-header.png"
     if logo_path.exists():
-        logo = Image.open(logo_path).convert("RGBA")
+        logo = _open_image(logo_path, "RGBA")
         logo = logo.resize((int(50 * logo.width / logo.height), 50), Image.LANCZOS)
         o1.paste(logo, (SIZE - logo.width - 50, 45), logo)
     # Precio
@@ -1082,7 +1094,7 @@ def generate_instagram_carousel(data: dict) -> list:
 
     # Logo centrado
     if logo_path.exists():
-        logo_c = Image.open(logo_path).convert("RGBA")
+        logo_c = _open_image(logo_path, "RGBA")
         lch = 70
         logo_c = logo_c.resize((int(lch * logo_c.width / logo_c.height), lch), Image.LANCZOS)
         oc.paste(logo_c, ((SIZE - logo_c.width) // 2, 200), logo_c)
@@ -2803,7 +2815,7 @@ def _pil_to_frame(img: Image.Image):
 
 def _load_and_crop_vertical(path: str) -> Image.Image:
     """Carga imagen y la recorta a 1080x1920 (9:16 centrado)."""
-    img = Image.open(path).convert("RGB")
+    img = _open_image(path, "RGB")
     w, h = img.size
     target_ratio = W_VID / H_VID  # 0.5625
     current_ratio = w / h
@@ -2876,7 +2888,7 @@ def _build_scene_cover(photo_path: str, data: dict) -> Image.Image:
     # Logo header top-right
     logo_path = BASE_DIR / "static" / "img" / "logo-header.png"
     if logo_path.exists():
-        logo = Image.open(logo_path).convert("RGBA")
+        logo = _open_image(logo_path, "RGBA")
         lh = 55
         lr = logo.width / logo.height
         logo = logo.resize((int(lh * lr), lh), Image.LANCZOS)
@@ -2988,7 +3000,7 @@ def _build_scene_contact(data: dict) -> Image.Image:
     logo_path = BASE_DIR / "static" / "img" / "logo-full.png"
     y_cursor = 500
     if logo_path.exists():
-        logo = Image.open(logo_path).convert("RGBA")
+        logo = _open_image(logo_path, "RGBA")
         lh = 220
         lr = logo.width / logo.height
         logo = logo.resize((int(lh * lr), lh), Image.LANCZOS)
@@ -3056,7 +3068,7 @@ def _build_overlay_cover(data: dict) -> Image.Image:
 
     logo_path = BASE_DIR / "static" / "img" / "logo-header.png"
     if logo_path.exists():
-        logo = Image.open(logo_path).convert("RGBA")
+        logo = _open_image(logo_path, "RGBA")
         lh = 55
         lr = logo.width / logo.height
         logo = logo.resize((int(lh * lr), lh), Image.LANCZOS)

@@ -5,8 +5,327 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>iRealEstateMxPro — Resultados</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/style.css" />
+  <style>
+    /* ── Tabs navigation ── */
+    .tabs-nav {
+      display: flex;
+      gap: 0;
+      background: #1a3c5e;
+      border-radius: 14px 14px 0 0;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .tabs-nav::-webkit-scrollbar { display: none; }
+    .tab-btn {
+      flex: 1;
+      min-width: 120px;
+      padding: 14px 18px;
+      background: transparent;
+      border: none;
+      color: rgba(255,255,255,.55);
+      font-family: 'Inter', sans-serif;
+      font-size: .82rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all .2s ease;
+      white-space: nowrap;
+      position: relative;
+    }
+    .tab-btn:hover { color: rgba(255,255,255,.85); background: rgba(255,255,255,.06); }
+    .tab-btn.active {
+      color: #c9a227;
+      background: rgba(201,162,39,.1);
+    }
+    .tab-btn.active::after {
+      content: '';
+      position: absolute;
+      bottom: 0; left: 20%; right: 20%;
+      height: 3px;
+      background: #c9a227;
+      border-radius: 3px 3px 0 0;
+    }
+    .tab-btn .tab-icon { font-size: 1.1rem; }
+
+    /* ── Tab content ── */
+    .tab-panel {
+      display: none;
+      background: #fff;
+      border-radius: 0 0 14px 14px;
+      padding: 28px;
+      box-shadow: 0 4px 20px rgba(0,0,0,.08);
+      animation: fadeIn .25s ease;
+    }
+    .tab-panel.active { display: block; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Text content cards ── */
+    .text-card {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 22px;
+      margin-bottom: 18px;
+      border: 1px solid #e9ecef;
+      position: relative;
+    }
+    .text-card-label {
+      font-size: .72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: #7a8a9e;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .text-card-body {
+      font-size: .92rem;
+      line-height: 1.75;
+      color: #343a40;
+      white-space: pre-wrap;
+    }
+    .text-card .btn-copy {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+    }
+
+    /* ── Instagram gradient header ── */
+    .ig-header {
+      background: linear-gradient(135deg, #833ab4 0%, #fd1d1d 50%, #fcb045 100%);
+      border-radius: 12px 12px 0 0;
+      padding: 3px;
+    }
+    .ig-header-inner {
+      background: #f8f9fa;
+      border-radius: 10px 10px 0 0;
+      padding: 14px 22px;
+    }
+    .ig-card {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #e9ecef;
+      margin-bottom: 18px;
+    }
+    .ig-card .text-card-body {
+      padding: 18px 22px;
+      border-radius: 0 0 12px 12px;
+    }
+
+    /* ── Content preview images ── */
+    .preview-frame {
+      display: flex;
+      justify-content: center;
+      padding: 20px;
+      background: #f0f2f5;
+      border-radius: 12px;
+      margin-bottom: 18px;
+    }
+    .preview-frame img, .preview-frame video {
+      max-height: 480px;
+      max-width: 100%;
+      border-radius: 10px;
+      box-shadow: 0 4px 16px rgba(0,0,0,.12);
+    }
+
+    /* ── Action dropdown ── */
+    .action-dropdown {
+      position: relative;
+      display: inline-block;
+    }
+    .action-dropdown-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 22px;
+      border-radius: 10px;
+      font-family: 'Inter', sans-serif;
+      font-size: .88rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: all .18s ease;
+    }
+    .action-dropdown-btn .arrow { font-size: .6rem; transition: transform .2s; }
+    .action-dropdown.open .arrow { transform: rotate(180deg); }
+    .action-dropdown-menu {
+      display: none;
+      position: absolute;
+      top: calc(100% + 6px);
+      left: 0;
+      min-width: 200px;
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.15);
+      z-index: 50;
+      overflow: hidden;
+      border: 1px solid #e9ecef;
+    }
+    .action-dropdown.open .action-dropdown-menu { display: block; }
+    .action-dropdown-menu a,
+    .action-dropdown-menu button {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      width: 100%;
+      padding: 12px 18px;
+      font-family: 'Inter', sans-serif;
+      font-size: .85rem;
+      font-weight: 500;
+      color: #343a40;
+      background: none;
+      border: none;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background .15s;
+    }
+    .action-dropdown-menu a:hover,
+    .action-dropdown-menu button:hover { background: #f8f9fa; }
+    .action-dropdown-menu .divider { height: 1px; background: #e9ecef; margin: 0; }
+
+    /* ── Button variants for dropdowns ── */
+    .btn-ig-action {
+      background: linear-gradient(135deg, #833ab4, #fd1d1d, #fcb045);
+      color: #fff;
+    }
+    .btn-ig-action:hover { opacity: .9; box-shadow: 0 4px 16px rgba(131,58,180,.3); }
+    .btn-story-action {
+      background: linear-gradient(135deg, #833ab4, #c13584, #e1306c);
+      color: #fff;
+    }
+    .btn-story-action:hover { opacity: .9; box-shadow: 0 4px 16px rgba(193,53,132,.3); }
+    .btn-carousel-action {
+      background: linear-gradient(135deg, #405de6, #833ab4, #c13584);
+      color: #fff;
+    }
+    .btn-carousel-action:hover { opacity: .9; box-shadow: 0 4px 16px rgba(64,93,230,.3); }
+
+    /* ── Carousel drag-and-drop ── */
+    .carousel-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .carousel-slide {
+      position: relative;
+      aspect-ratio: 1;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 2px solid #e9ecef;
+      cursor: grab;
+      transition: all .2s ease;
+      background: #f0f2f5;
+    }
+    .carousel-slide:active { cursor: grabbing; }
+    .carousel-slide.dragging {
+      opacity: .5;
+      border-color: #c9a227;
+      transform: scale(.95);
+    }
+    .carousel-slide.drag-over {
+      border-color: #c9a227;
+      box-shadow: 0 0 0 3px rgba(201,162,39,.2);
+    }
+    .carousel-slide img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+    .carousel-slide-num {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background: rgba(0,0,0,.65);
+      color: #fff;
+      font-size: .7rem;
+      font-weight: 700;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .carousel-slide-remove {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(192,57,43,.85);
+      color: #fff;
+      border: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      font-size: .75rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      transition: opacity .15s;
+    }
+    .carousel-slide:hover .carousel-slide-remove { opacity: 1; }
+    .carousel-hint {
+      font-size: .82rem;
+      color: #7a8a9e;
+      margin-bottom: 16px;
+    }
+
+    /* ── Video tab ── */
+    .video-info-banner {
+      background: linear-gradient(135deg, #1a3c5e, #0d1f33);
+      border-radius: 12px;
+      padding: 20px 24px;
+      color: #fff;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+    .video-info-banner .vib-icon { font-size: 2rem; }
+    .video-info-banner .vib-text h3 { font-size: 1rem; font-weight: 600; margin-bottom: 4px; }
+    .video-info-banner .vib-text p { font-size: .82rem; color: rgba(255,255,255,.65); }
+
+    .script-scene {
+      padding: 10px 0;
+      border-bottom: 1px solid #f1f3f5;
+    }
+    .script-scene:last-child { border-bottom: none; }
+    .script-scene strong { color: #c9a227; font-size: .82rem; text-transform: uppercase; }
+    .script-scene p { font-size: .88rem; color: #4a5568; margin-top: 4px; }
+
+    /* ── Actions bar at bottom of each tab ── */
+    .tab-actions {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      padding-top: 18px;
+      border-top: 1px solid #e9ecef;
+      margin-top: 18px;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .tab-btn { min-width: 90px; padding: 12px 12px; font-size: .75rem; }
+      .tab-btn .tab-icon { font-size: .95rem; }
+      .tab-panel { padding: 18px 14px; }
+      .carousel-grid { grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); }
+      .result-layout { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 480px) {
+      .tab-btn { min-width: 70px; padding: 10px 8px; font-size: .7rem; gap: 4px; }
+      .tab-btn .tab-label { display: none; }
+      .tab-btn .tab-icon { font-size: 1.2rem; }
+    }
+  </style>
 </head>
 <body>
   <header class="site-header">
@@ -15,6 +334,9 @@
         <img src="/static/img/logo-header.png" alt="iRealEstateMx" class="logo-img" />
       </div>
       <p class="header-tagline">Contenido generado con IA</p>
+      <div style="margin-left:auto;">
+        <a href="/" class="btn-secondary" style="font-size:.82rem;padding:7px 16px;color:#c9a227;border-color:#c9a227;">+ Nueva propiedad</a>
+      </div>
     </div>
   </header>
 
@@ -45,40 +367,35 @@
       <div class="property-card">
         <div class="property-type-badge">{{ tipo_propiedad }} en {{ operacion }}</div>
         <div class="property-price">{{ precio_formateado }}</div>
-        <p class="property-location">📍 {{ direccion }}, {{ ciudad }}, {{ estado }}</p>
+        <p class="property-location">{{ direccion }}, {{ ciudad }}, {{ estado }}</p>
 
         <div class="property-specs">
           {% if recamaras %}
           <div class="spec-item">
-            <span class="spec-icon">🛏</span>
             <span class="spec-value">{{ recamaras }}</span>
-            <span class="spec-label">Recámaras</span>
+            <span class="spec-label">Rec.</span>
           </div>
           {% endif %}
           {% if banos %}
           <div class="spec-item">
-            <span class="spec-icon">🚿</span>
             <span class="spec-value">{{ banos }}</span>
-            <span class="spec-label">Baños</span>
+            <span class="spec-label">Ba&ntilde;os</span>
           </div>
           {% endif %}
           {% if metros_construidos %}
           <div class="spec-item">
-            <span class="spec-icon">📐</span>
             <span class="spec-value">{{ metros_construidos }}</span>
-            <span class="spec-label">m² const.</span>
+            <span class="spec-label">m&sup2; const.</span>
           </div>
           {% endif %}
           {% if metros_terreno %}
           <div class="spec-item">
-            <span class="spec-icon">🗺️</span>
             <span class="spec-value">{{ metros_terreno }}</span>
-            <span class="spec-label">m² terreno</span>
+            <span class="spec-label">m&sup2; terreno</span>
           </div>
           {% endif %}
           {% if estacionamientos %}
           <div class="spec-item">
-            <span class="spec-icon">🚗</span>
             <span class="spec-value">{{ estacionamientos }}</span>
             <span class="spec-label">Cajones</span>
           </div>
@@ -101,50 +418,216 @@
         <div class="agent-avatar">{{ agente_nombre[0] | upper }}</div>
         <div class="agent-info">
           <p class="agent-name">{{ agente_nombre }}</p>
-          <p class="agent-contact">📞 {{ agente_telefono }}</p>
-          <p class="agent-contact">✉️ {{ agente_email }}</p>
+          <p class="agent-contact">{{ agente_telefono }}</p>
+          <p class="agent-contact">{{ agente_email }}</p>
         </div>
       </div>
     </aside>
 
-    <!-- Columna derecha: contenido generado -->
+    <!-- Columna derecha: contenido con tabs -->
     <div class="results-main">
 
       <div class="results-header">
-        <h1>Contenido generado <span class="success-badge">✓ Listo</span></h1>
-        <a href="/" class="btn-secondary">← Nueva propiedad</a>
+        <h1>Contenido generado <span class="success-badge">Listo</span></h1>
       </div>
 
-      <!-- Descripción profesional -->
-      <div class="result-card">
-        <div class="result-card-header">
-          <div class="result-card-title">
-            <span class="result-icon">📝</span>
-            <h2>Descripción profesional</h2>
+      <!-- ═══════ TABS NAVIGATION ═══════ -->
+      <div class="tabs-nav" id="tabsNav">
+        <button class="tab-btn active" data-tab="textos" type="button">
+          <span class="tab-icon">&#x1F4DD;</span>
+          <span class="tab-label">Textos</span>
+        </button>
+        <button class="tab-btn" data-tab="pdf" type="button">
+          <span class="tab-icon">&#x1F4C4;</span>
+          <span class="tab-label">PDF</span>
+        </button>
+        <button class="tab-btn" data-tab="post" type="button">
+          <span class="tab-icon">&#x1F4F8;</span>
+          <span class="tab-label">Post</span>
+        </button>
+        <button class="tab-btn" data-tab="story" type="button">
+          <span class="tab-icon">&#x1F4F2;</span>
+          <span class="tab-label">Story</span>
+        </button>
+        <button class="tab-btn" data-tab="carousel" type="button">
+          <span class="tab-icon">&#x1F3A0;</span>
+          <span class="tab-label">Carrusel</span>
+        </button>
+        <button class="tab-btn" data-tab="video" type="button">
+          <span class="tab-icon">&#x1F3AC;</span>
+          <span class="tab-label">Video</span>
+        </button>
+      </div>
+
+      <!-- ═══════ TAB: TEXTOS ═══════ -->
+      <div class="tab-panel active" id="tab-textos">
+        <!-- Descripcion profesional -->
+        <div class="text-card">
+          <div class="text-card-label">
+            <span>&#x1F4DD;</span> Descripci&oacute;n profesional
           </div>
-          <button class="btn-copy" onclick="copyToClipboard('desc-profesional', this)" data-copied="false">
-            <span class="copy-icon">📋</span> Copiar
+          <button class="btn-copy" onclick="copyToClipboard('desc-profesional', this)">&#x1F4CB; Copiar</button>
+          <div class="text-card-body" id="desc-profesional">{{ descripcion_profesional }}</div>
+        </div>
+
+        <!-- Instagram copy -->
+        <div class="ig-card">
+          <div class="ig-header"><div class="ig-header-inner">
+            <div class="text-card-label" style="margin-bottom:0;">
+              <span>&#x1F4F8;</span> Copy para Instagram
+              <button class="btn-copy" onclick="copyToClipboard('instagram-copy', this)" style="margin-left:auto;position:static;">&#x1F4CB; Copiar</button>
+            </div>
+          </div></div>
+          <div class="text-card-body" id="instagram-copy" style="padding:18px 22px;">{{ instagram_copy }}</div>
+        </div>
+      </div>
+
+      <!-- ═══════ TAB: PDF ═══════ -->
+      <div class="tab-panel" id="tab-pdf">
+        <div style="text-align:center;padding:40px 20px;">
+          <div style="font-size:3rem;margin-bottom:12px;">&#x1F4C4;</div>
+          <h3 style="color:#1a3c5e;margin-bottom:8px;">Ficha T&eacute;cnica PDF</h3>
+          <p style="color:#7a8a9e;font-size:.88rem;margin-bottom:24px;">
+            Genera un PDF profesional con foto de portada, descripci&oacute;n, amenidades, galer&iacute;a de fotos y especificaciones.
+          </p>
+          <button type="submit" form="pdfForm" class="btn-pdf" style="font-size:1rem;padding:14px 36px;">
+            &#x1F4E5; Descargar PDF
           </button>
         </div>
-        <div class="result-content" id="desc-profesional">{{ descripcion_profesional }}</div>
       </div>
 
-      <!-- Instagram copy -->
-      <div class="result-card result-card-instagram">
-        <div class="result-card-header">
-          <div class="result-card-title">
-            <span class="result-icon">📸</span>
-            <h2>Copy para Instagram</h2>
+      <!-- ═══════ TAB: POST INSTAGRAM ═══════ -->
+      <div class="tab-panel" id="tab-post">
+        <div class="preview-frame" id="postPreviewFrame">
+          <div style="text-align:center;color:#7a8a9e;padding:30px;">
+            <div style="font-size:2rem;margin-bottom:8px;">&#x1F4F8;</div>
+            <p>Haz clic en "Generar" para crear la imagen del post</p>
           </div>
-          <button class="btn-copy" onclick="copyToClipboard('instagram-copy', this)" data-copied="false">
-            <span class="copy-icon">📋</span> Copiar
-          </button>
         </div>
-        <div class="result-content instagram-text" id="instagram-copy">{{ instagram_copy }}</div>
+        <div class="tab-actions">
+          <div class="action-dropdown" id="postDropdown">
+            <button class="action-dropdown-btn btn-ig-action" type="button" onclick="toggleDropdown('postDropdown')">
+              &#x1F4F8; Post 1080&times;1080 <span class="arrow">&#x25BC;</span>
+            </button>
+            <div class="action-dropdown-menu">
+              <button type="button" onclick="generateAndPreview('post')">&#x1F4F7; Generar vista previa</button>
+              <div class="divider"></div>
+              <button type="submit" form="imgForm" onclick="closeAllDropdowns()">&#x2B07;&#xFE0F; Descargar imagen</button>
+              <div class="divider"></div>
+              <button type="button" onclick="publishToInstagram('post')">&#x1F680; Publicar en Instagram</button>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- Formulario oculto para generar PDF -->
-      <form id="pdfForm" action="/download-pdf" method="post">
+      <!-- ═══════ TAB: STORY ═══════ -->
+      <div class="tab-panel" id="tab-story">
+        <div class="preview-frame" id="storyPreviewFrame">
+          <div style="text-align:center;color:#7a8a9e;padding:30px;">
+            <div style="font-size:2rem;margin-bottom:8px;">&#x1F4F2;</div>
+            <p>Haz clic en "Generar" para crear la imagen del story</p>
+          </div>
+        </div>
+        <div class="tab-actions">
+          <div class="action-dropdown" id="storyDropdown">
+            <button class="action-dropdown-btn btn-story-action" type="button" onclick="toggleDropdown('storyDropdown')">
+              &#x1F4F2; Story 1080&times;1920 <span class="arrow">&#x25BC;</span>
+            </button>
+            <div class="action-dropdown-menu">
+              <button type="button" onclick="generateAndPreview('story')">&#x1F4F7; Generar vista previa</button>
+              <div class="divider"></div>
+              <button type="submit" form="storyForm" onclick="closeAllDropdowns()">&#x2B07;&#xFE0F; Descargar imagen</button>
+              <div class="divider"></div>
+              <button type="button" onclick="publishToInstagram('story')">&#x1F680; Publicar en Instagram</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════ TAB: CARRUSEL ═══════ -->
+      <div class="tab-panel" id="tab-carousel">
+        <p class="carousel-hint">
+          Arrastra las im&aacute;genes para reordenarlas (m&aacute;x. 7 slides). La primera imagen ser&aacute; la portada del carrusel.
+        </p>
+        <div class="carousel-grid" id="carouselGrid">
+          <!-- Se llenan din&aacute;micamente al generar -->
+        </div>
+        <div id="carouselEmpty" style="text-align:center;color:#7a8a9e;padding:30px;">
+          <div style="font-size:2rem;margin-bottom:8px;">&#x1F3A0;</div>
+          <p>Haz clic en "Generar" para crear las im&aacute;genes del carrusel</p>
+        </div>
+        <div class="tab-actions">
+          <div class="action-dropdown" id="carouselDropdown">
+            <button class="action-dropdown-btn btn-carousel-action" type="button" onclick="toggleDropdown('carouselDropdown')">
+              &#x1F3A0; Carrusel <span class="arrow">&#x25BC;</span>
+            </button>
+            <div class="action-dropdown-menu">
+              <button type="button" onclick="generateCarouselPreview()">&#x1F4F7; Generar vista previa</button>
+              <div class="divider"></div>
+              <button type="submit" form="carouselForm" onclick="closeAllDropdowns()">&#x2B07;&#xFE0F; Descargar ZIP</button>
+              <div class="divider"></div>
+              <button type="button" onclick="publishToInstagram('carousel')">&#x1F680; Publicar carrusel</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ═══════ TAB: VIDEO ═══════ -->
+      <div class="tab-panel" id="tab-video">
+        <div class="video-info-banner">
+          <div class="vib-icon">&#x1F3AC;</div>
+          <div class="vib-text">
+            <h3>Video {{ video_tipo|default('Reel') }} (1080&times;1920){% if voice_over_enabled %} + Voice Over{% endif %}</h3>
+            <p>Genera un reel vertical con fotos animadas, datos y contacto. Tarda 1-3 min.</p>
+          </div>
+        </div>
+
+        {% if video_script %}
+        <div class="text-card" style="margin-bottom:20px;">
+          <div class="text-card-label"><span>&#x1F4DC;</span> Gui&oacute;n generado</div>
+          {% for scene, text in video_script.items() %}
+          <div class="script-scene">
+            <strong>{{ scene|upper }}</strong>
+            <p>{{ text }}</p>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Progress bar -->
+        <div id="videoProgress" style="{% if video_job_id %}display:block{% else %}display:none{% endif %};margin-bottom:20px;">
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" id="videoProgressBar" style="width:5%"></div>
+          </div>
+          <p class="progress-text" id="videoProgressText">{% if video_job_id %}Renderizando video{% if voice_over_enabled %} con narraci&oacute;n{% endif %}...{% else %}Preparando...{% endif %}</p>
+        </div>
+
+        <!-- Video result -->
+        <div id="videoResult" style="display:none;">
+          <div class="preview-frame">
+            <video id="videoPreview" controls width="300" style="border-radius:10px;"></video>
+          </div>
+        </div>
+
+        <div class="tab-actions">
+          {% if video_job_id %}
+          <span class="btn-video" id="generateVideoBtn" style="cursor:default;opacity:.7;">
+            &#x23F3; Renderizando...
+          </span>
+          <p style="font-size:.82rem;color:#7a8a9e;margin:auto 0;">Mientras se renderiza, puedes descargar o publicar el resto del contenido.</p>
+          {% else %}
+          <button type="button" class="btn-video" id="generateVideoBtn" onclick="generateVideo()">
+            &#x1F3AC; Generar Video
+          </button>
+          {% endif %}
+          <a id="videoDownloadLink" class="btn-video-download" href="#" download style="display:none;">
+            &#x2B07;&#xFE0F; Descargar .mp4
+          </a>
+        </div>
+      </div>
+
+      <!-- ═══════ HIDDEN FORMS ═══════ -->
+      <form id="pdfForm" action="/download-pdf" method="post" style="display:none;">
         <input type="hidden" name="tipo_propiedad" value="{{ tipo_propiedad }}" />
         <input type="hidden" name="operacion" value="{{ operacion }}" />
         <input type="hidden" name="direccion" value="{{ direccion }}" />
@@ -171,8 +654,7 @@
         <input type="hidden" name="descripcion_profesional" value="{{ descripcion_profesional }}" />
       </form>
 
-      <!-- Formulario oculto para generar imagen Instagram -->
-      <form id="imgForm" action="/download-image" method="post">
+      <form id="imgForm" action="/download-image" method="post" style="display:none;">
         <input type="hidden" name="tipo_propiedad" value="{{ tipo_propiedad }}" />
         <input type="hidden" name="operacion" value="{{ operacion }}" />
         <input type="hidden" name="direccion" value="{{ direccion }}" />
@@ -189,79 +671,6 @@
         {% endif %}
       </form>
 
-      <!-- Video reel -->
-      <div class="result-card result-card-video" id="videoSection">
-        <div class="result-card-header" style="background: linear-gradient(135deg, #1a3c5e, #0d1f33);">
-          <div class="result-card-title">
-            <span class="result-icon">🎬</span>
-            <h2 style="color:#fff;">Video {{ video_tipo|default('Reel') }} (1080x1920){% if voice_over_enabled %} + Voice Over{% endif %}</h2>
-          </div>
-          {% if video_job_id %}
-          <span class="btn-video" id="generateVideoBtn" style="cursor:default;">
-            <span>⏳</span> Renderizando...
-          </span>
-          {% else %}
-          <button type="button" class="btn-video" id="generateVideoBtn" onclick="generateVideo()">
-            <span>🎬</span> Generar Video
-          </button>
-          {% endif %}
-        </div>
-        <div class="result-content" id="videoContent">
-          {% if video_script %}
-          <p style="font-size:13px;color:#7a8a9e;margin-bottom:12px;font-weight:600;">Guión generado:</p>
-          {% for scene, text in video_script.items() %}
-          <p style="font-size:12px;margin-bottom:6px;"><strong style="color:#c9a227;">{{ scene|upper }}:</strong> {{ text }}</p>
-          {% endfor %}
-          <hr style="border:none;border-top:1px solid #e9ecef;margin:14px 0;" />
-          {% endif %}
-
-          {% if not video_job_id %}
-          <p class="video-hint">Genera un reel vertical con fotos animadas, datos de la propiedad y contacto del agente. Tarda 1-3 minutos en renderizarse.</p>
-          {% endif %}
-
-          <!-- Barra de progreso -->
-          <div class="video-progress" id="videoProgress" style="{% if video_job_id %}display:block{% else %}display:none{% endif %};">
-            <div class="progress-bar-bg">
-              <div class="progress-bar-fill" id="videoProgressBar" style="width:5%"></div>
-            </div>
-            <p class="progress-text" id="videoProgressText">{% if video_job_id %}Renderizando video con{% if voice_over_enabled %} narración{% endif %}...{% else %}Preparando...{% endif %}</p>
-          </div>
-
-          <!-- Resultado del video (oculto por defecto) -->
-          <div class="video-result" id="videoResult" style="display:none;">
-            <video id="videoPreview" controls width="280" style="border-radius:10px; margin-top:12px;"></video>
-            <a id="videoDownloadLink" class="btn-video-download" href="#" download>
-              <span>⬇️</span> Descargar Video .mp4
-            </a>
-          </div>
-        </div>
-      </div>
-
-      <!-- Formulario oculto para video -->
-      <form id="videoForm" style="display:none;">
-        <input type="hidden" name="tipo_propiedad" value="{{ tipo_propiedad }}" />
-        <input type="hidden" name="operacion" value="{{ operacion }}" />
-        <input type="hidden" name="direccion" value="{{ direccion }}" />
-        <input type="hidden" name="ciudad" value="{{ ciudad }}" />
-        <input type="hidden" name="estado" value="{{ estado }}" />
-        <input type="hidden" name="precio_formateado" value="{{ precio_formateado }}" />
-        <input type="hidden" name="recamaras" value="{{ recamaras or '' }}" />
-        <input type="hidden" name="banos" value="{{ banos or '' }}" />
-        <input type="hidden" name="metros_construidos" value="{{ metros_construidos or '' }}" />
-        <input type="hidden" name="metros_terreno" value="{{ metros_terreno or '' }}" />
-        <input type="hidden" name="estacionamientos" value="{{ estacionamientos or '' }}" />
-        <input type="hidden" name="agente_nombre" value="{{ agente_nombre }}" />
-        <input type="hidden" name="agente_telefono" value="{{ agente_telefono }}" />
-        <input type="hidden" name="agente_email" value="{{ agente_email }}" />
-        {% if foto_portada_url %}
-        <input type="hidden" name="foto_portada_url" value="{{ foto_portada_url }}" />
-        {% endif %}
-        {% for url in fotos_extra_urls %}
-        <input type="hidden" name="fotos_extra_urls" value="{{ url }}" />
-        {% endfor %}
-      </form>
-
-      <!-- Formulario Story -->
       <form id="storyForm" action="/download-story" method="post" style="display:none;">
         <input type="hidden" name="tipo_propiedad" value="{{ tipo_propiedad }}" />
         <input type="hidden" name="operacion" value="{{ operacion }}" />
@@ -282,7 +691,6 @@
         {% endif %}
       </form>
 
-      <!-- Formulario Carrusel -->
       <form id="carouselForm" action="/download-carousel" method="post" style="display:none;">
         <input type="hidden" name="tipo_propiedad" value="{{ tipo_propiedad }}" />
         <input type="hidden" name="operacion" value="{{ operacion }}" />
@@ -310,28 +718,30 @@
         {% endfor %}
       </form>
 
-      <div class="action-row" style="flex-wrap:wrap;">
-        <button type="button" class="btn-publish-ig" id="publishIgBtn" onclick="publishToInstagram()">
-          <span>🚀</span> Publicar en Instagram
-        </button>
-        <button type="submit" form="imgForm" class="btn-instagram-dl">
-          <span>📸</span> Imagen Post 1080×1080
-        </button>
-        <button type="submit" form="storyForm" class="btn-instagram-dl" style="background:linear-gradient(135deg, #833ab4, #c13584, #e1306c);">
-          <span>📲</span> Story 1080×1920
-        </button>
-        <button type="submit" form="carouselForm" class="btn-instagram-dl" style="background:linear-gradient(135deg, #405de6, #833ab4, #c13584);">
-          <span>🎠</span> Carrusel (ZIP)
-        </button>
-        <button type="submit" form="pdfForm" class="btn-pdf">
-          <span>📄</span> Descargar PDF
-        </button>
-        <a href="/" class="btn-primary">
-          <span>✨</span> Generar otra propiedad
-        </a>
-      </div>
+      <form id="videoForm" style="display:none;">
+        <input type="hidden" name="tipo_propiedad" value="{{ tipo_propiedad }}" />
+        <input type="hidden" name="operacion" value="{{ operacion }}" />
+        <input type="hidden" name="direccion" value="{{ direccion }}" />
+        <input type="hidden" name="ciudad" value="{{ ciudad }}" />
+        <input type="hidden" name="estado" value="{{ estado }}" />
+        <input type="hidden" name="precio_formateado" value="{{ precio_formateado }}" />
+        <input type="hidden" name="recamaras" value="{{ recamaras or '' }}" />
+        <input type="hidden" name="banos" value="{{ banos or '' }}" />
+        <input type="hidden" name="metros_construidos" value="{{ metros_construidos or '' }}" />
+        <input type="hidden" name="metros_terreno" value="{{ metros_terreno or '' }}" />
+        <input type="hidden" name="estacionamientos" value="{{ estacionamientos or '' }}" />
+        <input type="hidden" name="agente_nombre" value="{{ agente_nombre }}" />
+        <input type="hidden" name="agente_telefono" value="{{ agente_telefono }}" />
+        <input type="hidden" name="agente_email" value="{{ agente_email }}" />
+        {% if foto_portada_url %}
+        <input type="hidden" name="foto_portada_url" value="{{ foto_portada_url }}" />
+        {% endif %}
+        {% for url in fotos_extra_urls %}
+        <input type="hidden" name="fotos_extra_urls" value="{{ url }}" />
+        {% endfor %}
+      </form>
 
-      <!-- Toast de notificacion -->
+      <!-- Toast -->
       <div class="toast" id="toast">
         <span class="toast-icon" id="toastIcon"></span>
         <span class="toast-msg" id="toastMsg"></span>
@@ -341,27 +751,204 @@
   </main>
 
   <footer class="site-footer">
-    <p>iRealEstateMxPro — Herramienta para agentes inmobiliarios en México</p>
+    <p>iRealEstateMxPro — Herramienta para agentes inmobiliarios en M&eacute;xico</p>
   </footer>
 
   <script src="/static/js/app.js"></script>
-  {% if video_job_id %}
   <script>
-    // Auto-iniciar polling del video que ya está renderizando
-    (function() {
-      var jobId = "{{ video_job_id }}";
-      var progressDiv = document.getElementById('videoProgress');
-      var progressBar = document.getElementById('videoProgressBar');
-      var progressText = document.getElementById('videoProgressText');
-      var resultDiv = document.getElementById('videoResult');
-      var videoPreview = document.getElementById('videoPreview');
-      var downloadLink = document.getElementById('videoDownloadLink');
-      var btn = document.getElementById('generateVideoBtn');
+  /* ── Tab switching ── */
+  document.querySelectorAll('.tab-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.tab-btn').forEach(function(b) { b.classList.remove('active'); });
+      document.querySelectorAll('.tab-panel').forEach(function(p) { p.classList.remove('active'); });
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
 
-      var poll = setInterval(async function() {
-        try {
-          var resp = await fetch('/video-status/' + jobId);
-          var data = await resp.json();
+  /* ── Dropdowns ── */
+  function toggleDropdown(id) {
+    var dd = document.getElementById(id);
+    var wasOpen = dd.classList.contains('open');
+    closeAllDropdowns();
+    if (!wasOpen) dd.classList.add('open');
+  }
+  function closeAllDropdowns() {
+    document.querySelectorAll('.action-dropdown').forEach(function(d) { d.classList.remove('open'); });
+  }
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.action-dropdown')) closeAllDropdowns();
+  });
+
+  /* ── Generate preview for post/story via AJAX ── */
+  function generateAndPreview(type) {
+    closeAllDropdowns();
+    var formId = type === 'post' ? 'imgForm' : 'storyForm';
+    var frameId = type === 'post' ? 'postPreviewFrame' : 'storyPreviewFrame';
+    var frame = document.getElementById(frameId);
+    frame.innerHTML = '<div style="text-align:center;padding:30px;color:#7a8a9e;"><div class="spinner"></div><p>Generando imagen...</p></div>';
+
+    var formData = new FormData(document.getElementById(formId));
+    var url = type === 'post' ? '/download-image' : '/download-story';
+
+    fetch(url, { method: 'POST', body: formData })
+      .then(function(r) { return r.blob(); })
+      .then(function(blob) {
+        var imgUrl = URL.createObjectURL(blob);
+        frame.innerHTML = '<img src="' + imgUrl + '" alt="Preview ' + type + '" />';
+      })
+      .catch(function() {
+        frame.innerHTML = '<div style="text-align:center;padding:30px;color:#c0392b;">Error al generar la imagen</div>';
+      });
+  }
+
+  /* ── Generate carousel preview via AJAX ── */
+  function generateCarouselPreview() {
+    closeAllDropdowns();
+    var grid = document.getElementById('carouselGrid');
+    var empty = document.getElementById('carouselEmpty');
+    empty.innerHTML = '<div class="spinner"></div><p style="color:#7a8a9e;">Generando slides del carrusel...</p>';
+    grid.innerHTML = '';
+
+    var formData = new FormData(document.getElementById('carouselForm'));
+    fetch('/download-carousel', { method: 'POST', body: formData })
+      .then(function(r) { return r.blob(); })
+      .then(function(zipBlob) {
+        // We get a ZIP; for preview we use individual slide endpoints
+        // Instead, submit to a preview endpoint or just show a success message
+        empty.style.display = 'none';
+        // For now, show the photos as carousel placeholders from the original images
+        var urls = [];
+        {% if foto_portada_url %}urls.push("{{ foto_portada_url }}");{% endif %}
+        {% for url in fotos_extra_urls %}urls.push("{{ url }}");{% endfor %}
+        urls.slice(0, 7).forEach(function(url, i) {
+          var slide = document.createElement('div');
+          slide.className = 'carousel-slide';
+          slide.draggable = true;
+          slide.dataset.index = i;
+          slide.innerHTML = '<span class="carousel-slide-num">' + (i + 1) + '</span>' +
+            '<img src="' + url + '" alt="Slide ' + (i + 1) + '" />' +
+            '<button class="carousel-slide-remove" onclick="removeSlide(this)" type="button">&times;</button>';
+          grid.appendChild(slide);
+        });
+        initCarouselDragDrop();
+        if (typeof showToast === 'function') showToast('Carrusel descargado como ZIP', true);
+      })
+      .catch(function() {
+        empty.innerHTML = '<div style="color:#c0392b;">Error al generar el carrusel</div>';
+      });
+  }
+
+  /* ── Carousel drag and drop ── */
+  var dragSrcEl = null;
+  function initCarouselDragDrop() {
+    var slides = document.querySelectorAll('.carousel-slide');
+    slides.forEach(function(slide) {
+      slide.addEventListener('dragstart', function(e) {
+        dragSrcEl = this;
+        this.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', this.dataset.index);
+      });
+      slide.addEventListener('dragend', function() {
+        this.classList.remove('dragging');
+        document.querySelectorAll('.carousel-slide').forEach(function(s) { s.classList.remove('drag-over'); });
+      });
+      slide.addEventListener('dragover', function(e) {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
+        this.classList.add('drag-over');
+      });
+      slide.addEventListener('dragleave', function() {
+        this.classList.remove('drag-over');
+      });
+      slide.addEventListener('drop', function(e) {
+        e.preventDefault();
+        this.classList.remove('drag-over');
+        if (dragSrcEl !== this) {
+          var grid = document.getElementById('carouselGrid');
+          var allSlides = Array.from(grid.children);
+          var fromIdx = allSlides.indexOf(dragSrcEl);
+          var toIdx = allSlides.indexOf(this);
+          if (fromIdx < toIdx) {
+            grid.insertBefore(dragSrcEl, this.nextSibling);
+          } else {
+            grid.insertBefore(dragSrcEl, this);
+          }
+          // Re-number
+          Array.from(grid.children).forEach(function(s, i) {
+            s.querySelector('.carousel-slide-num').textContent = i + 1;
+            s.dataset.index = i;
+          });
+        }
+      });
+    });
+  }
+
+  function removeSlide(btn) {
+    var slide = btn.closest('.carousel-slide');
+    slide.remove();
+    // Re-number remaining
+    var grid = document.getElementById('carouselGrid');
+    Array.from(grid.children).forEach(function(s, i) {
+      s.querySelector('.carousel-slide-num').textContent = i + 1;
+      s.dataset.index = i;
+    });
+    if (grid.children.length === 0) {
+      document.getElementById('carouselEmpty').style.display = 'block';
+    }
+  }
+
+  /* ── Publish to Instagram (placeholder) ── */
+  function publishToInstagram(type) {
+    closeAllDropdowns();
+    if (typeof showToast === 'function') {
+      showToast('Publicaci\u00f3n en Instagram: pr\u00f3ximamente', false);
+    }
+  }
+
+  /* ── Video generation (reuses existing logic) ── */
+  function generateVideo() {
+    var btn = document.getElementById('generateVideoBtn');
+    btn.disabled = true;
+    btn.innerHTML = '&#x23F3; Generando...';
+
+    var progressDiv = document.getElementById('videoProgress');
+    var progressBar = document.getElementById('videoProgressBar');
+    var progressText = document.getElementById('videoProgressText');
+    progressDiv.style.display = 'block';
+    progressBar.style.width = '5%';
+    progressText.textContent = 'Enviando solicitud...';
+
+    var formData = new FormData(document.getElementById('videoForm'));
+    fetch('/generate-video', { method: 'POST', body: formData })
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.job_id) {
+          pollVideoStatus(data.job_id);
+        } else {
+          progressText.textContent = 'Error: ' + (data.error || 'desconocido');
+          btn.innerHTML = '&#x274C; Error';
+        }
+      })
+      .catch(function() {
+        progressText.textContent = 'Error de red';
+        btn.innerHTML = '&#x274C; Error';
+      });
+  }
+
+  function pollVideoStatus(jobId) {
+    var progressBar = document.getElementById('videoProgressBar');
+    var progressText = document.getElementById('videoProgressText');
+    var resultDiv = document.getElementById('videoResult');
+    var videoPreview = document.getElementById('videoPreview');
+    var downloadLink = document.getElementById('videoDownloadLink');
+    var btn = document.getElementById('generateVideoBtn');
+
+    var poll = setInterval(function() {
+      fetch('/video-status/' + jobId)
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
           if (data.status === 'rendering' || data.status === 'queued') {
             var pct = data.progress || 0;
             progressBar.style.width = pct + '%';
@@ -370,20 +957,49 @@
             clearInterval(poll);
             progressBar.style.width = '100%';
             progressText.textContent = 'Video listo';
-            resultDiv.style.display = 'flex';
+            resultDiv.style.display = 'block';
             videoPreview.src = data.download_url;
             downloadLink.href = '/download-video/' + jobId;
-            if (btn) btn.innerHTML = '<span>✅</span> Video generado';
+            downloadLink.style.display = 'inline-flex';
+            if (btn) btn.innerHTML = '&#x2705; Video generado';
             if (typeof showToast === 'function') showToast('Video generado exitosamente', true);
           } else if (data.status === 'error') {
             clearInterval(poll);
             progressText.textContent = 'Error: ' + (data.error || 'desconocido');
-            if (btn) { btn.innerHTML = '<span>❌</span> Error'; }
+            if (btn) btn.innerHTML = '&#x274C; Error';
           }
-        } catch(e) {}
-      }, 2500);
-    })();
-  </script>
+        })
+        .catch(function() {});
+    }, 2500);
+  }
+
+  {% if video_job_id %}
+  /* Auto-start polling for in-progress video */
+  pollVideoStatus("{{ video_job_id }}");
   {% endif %}
+
+  /* ── Load carousel images on page load ── */
+  (function() {
+    var urls = [];
+    {% if foto_portada_url %}urls.push("{{ foto_portada_url }}");{% endif %}
+    {% for url in fotos_extra_urls %}urls.push("{{ url }}");{% endfor %}
+    if (urls.length > 0) {
+      var grid = document.getElementById('carouselGrid');
+      var empty = document.getElementById('carouselEmpty');
+      empty.style.display = 'none';
+      urls.slice(0, 7).forEach(function(url, i) {
+        var slide = document.createElement('div');
+        slide.className = 'carousel-slide';
+        slide.draggable = true;
+        slide.dataset.index = i;
+        slide.innerHTML = '<span class="carousel-slide-num">' + (i + 1) + '</span>' +
+          '<img src="' + url + '" alt="Slide ' + (i + 1) + '" />' +
+          '<button class="carousel-slide-remove" onclick="removeSlide(this)" type="button">&times;</button>';
+        grid.appendChild(slide);
+      });
+      initCarouselDragDrop();
+    }
+  })();
+  </script>
 </body>
 </html>
