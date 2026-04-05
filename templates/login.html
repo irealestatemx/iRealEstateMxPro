@@ -10,16 +10,17 @@
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Inter', sans-serif;
-      background: linear-gradient(135deg, #0d1f33 0%, #1a3c5e 50%, #0d1f33 100%);
+      background: #0a0a0a;
       min-height: 100vh;
       display: flex;
       align-items: center;
       justify-content: center;
     }
     .login-container {
-      background: #fff;
+      background: #1a1a1a;
+      border: 1px solid rgba(201,162,39,.15);
       border-radius: 16px;
-      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
       width: 100%;
       max-width: 420px;
       padding: 48px 40px;
@@ -32,12 +33,12 @@
     .login-title {
       font-size: 22px;
       font-weight: 700;
-      color: #1a3c5e;
+      color: #c9a227;
       margin-bottom: 4px;
     }
     .login-subtitle {
       font-size: 14px;
-      color: #7a8a9e;
+      color: rgba(255,255,255,.45);
       margin-bottom: 32px;
     }
     .form-group {
@@ -48,26 +49,28 @@
       display: block;
       font-size: 13px;
       font-weight: 600;
-      color: #1a3c5e;
+      color: rgba(255,255,255,.5);
       margin-bottom: 6px;
     }
     .form-group input {
       width: 100%;
       padding: 12px 16px;
-      border: 2px solid #e2e8f0;
+      border: 1px solid rgba(201,162,39,.2);
       border-radius: 10px;
       font-size: 15px;
       font-family: 'Inter', sans-serif;
       transition: border-color 0.2s;
       outline: none;
+      background: #111;
+      color: #e0e0e0;
     }
     .form-group input:focus {
       border-color: #c9a227;
     }
     .error-msg {
-      background: #fef2f2;
-      border: 1px solid #fecaca;
-      color: #dc2626;
+      background: rgba(192,57,43,.15);
+      border: 1px solid rgba(192,57,43,.3);
+      color: #e74c3c;
       padding: 10px 14px;
       border-radius: 8px;
       font-size: 13px;
@@ -77,7 +80,7 @@
       width: 100%;
       padding: 14px;
       background: linear-gradient(135deg, #c9a227, #d4af37);
-      color: #1a3c5e;
+      color: #0a0a0a;
       border: none;
       border-radius: 10px;
       font-size: 16px;
@@ -93,7 +96,7 @@
     .login-footer {
       margin-top: 24px;
       font-size: 12px;
-      color: #a0aec0;
+      color: rgba(255,255,255,.25);
     }
   </style>
 </head>

@@ -5,20 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>iRealEstateMxPro — Mis Prospectos</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: #f0f2f5; min-height: 100vh; }
+    body { font-family: 'Inter', sans-serif; background: #0d0d0d; color: #e0e0e0; min-height: 100vh; }
     .topbar {
-      background: #1a3c5e; padding: 16px 32px;
+      background: #111; border-bottom: 1px solid rgba(201,162,39,.15); padding: 16px 32px;
       display: flex; align-items: center; justify-content: space-between;
     }
     .topbar-logo { height: 36px; }
     .topbar-nav { display: flex; gap: 16px; align-items: center; }
-    .topbar-nav a { color: #c9a227; text-decoration: none; font-size: 14px; font-weight: 500; }
-    .topbar-nav a:hover { color: #fff; }
-    .topbar-nav a.active { color: #fff; border-bottom: 2px solid #c9a227; padding-bottom: 2px; }
-    .topbar-user { color: #e2e8f0; font-size: 13px; }
+    .topbar-nav a { color: rgba(255,255,255,.6); text-decoration: none; font-size: 14px; font-weight: 500; transition: color .2s; }
+    .topbar-nav a:hover { color: #c9a227; }
+    .topbar-nav a.active { color: #c9a227; border-bottom: 2px solid #c9a227; padding-bottom: 2px; }
+    .topbar-user { color: rgba(255,255,255,.4); font-size: 13px; }
     .hamburger { display:none; background:none; border:none; cursor:pointer; padding:4px; }
     .hamburger span { display:block; width:22px; height:2px; background:#c9a227; margin:5px 0; border-radius:2px; transition:all .25s; }
     .hamburger.open span:nth-child(1) { transform:rotate(45deg) translate(5px,5px); }
@@ -34,43 +34,43 @@
     }
     .container { max-width: 1000px; margin: 24px auto; padding: 0 20px; }
     .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
-    .page-header h1 { font-size: 24px; color: #1a3c5e; }
+    .page-header h1 { font-size: 24px; color: #c9a227; font-family: 'Playfair Display', serif; }
     .stats-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
     .stat-card {
-      background: #fff; border-radius: 10px; padding: 16px 24px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.06); flex: 1; min-width: 120px;
+      background: #1a1a1a; border: 1px solid rgba(201,162,39,.15); border-radius: 10px; padding: 16px 24px;
+      flex: 1; min-width: 120px;
     }
-    .stat-card .num { font-size: 28px; font-weight: 700; color: #1a3c5e; }
-    .stat-card .lbl { font-size: 12px; color: #7a8a9e; margin-top: 2px; }
+    .stat-card .num { font-size: 28px; font-weight: 700; color: #c9a227; }
+    .stat-card .lbl { font-size: 12px; color: rgba(255,255,255,.4); margin-top: 2px; }
     .card {
-      background: #fff; border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08); padding: 24px; margin-bottom: 24px;
+      background: #1a1a1a; border: 1px solid rgba(201,162,39,.1); border-radius: 12px;
+      padding: 24px; margin-bottom: 24px;
     }
     table { width: 100%; border-collapse: collapse; }
     th {
       text-align: left; font-size: 12px; font-weight: 600;
-      color: #7a8a9e; text-transform: uppercase;
-      padding: 8px 12px; border-bottom: 2px solid #e2e8f0;
+      color: rgba(255,255,255,.4); text-transform: uppercase;
+      padding: 8px 12px; border-bottom: 1px solid rgba(201,162,39,.15);
     }
     td {
       padding: 12px; font-size: 14px;
-      border-bottom: 1px solid #f0f2f5; color: #2d3748;
+      border-bottom: 1px solid rgba(255,255,255,.05); color: #e0e0e0;
     }
     .badge {
       display: inline-block; padding: 3px 10px; border-radius: 20px;
       font-size: 11px; font-weight: 600;
     }
-    .badge-nuevo { background: #bee3f8; color: #2a4365; }
-    .badge-contactado { background: #fefcbf; color: #744210; }
-    .badge-cita_agendada { background: #c6f6d5; color: #22543d; }
-    .badge-cita_asistio { background: #b2f5ea; color: #234e52; }
-    .badge-en_negociacion { background: #e9d8fd; color: #553c9a; }
-    .badge-venta_cerrada { background: #c9a227; color: #1a3c5e; }
-    .badge-perdido { background: #fed7d7; color: #9b2c2c; }
+    .badge-nuevo { background: rgba(42,67,101,.3); color: #63b3ed; }
+    .badge-contactado { background: rgba(116,66,16,.3); color: #ecc94b; }
+    .badge-cita_agendada { background: rgba(34,84,61,.3); color: #68d391; }
+    .badge-cita_asistio { background: rgba(35,78,82,.3); color: #4fd1c5; }
+    .badge-en_negociacion { background: rgba(85,60,154,.3); color: #b794f4; }
+    .badge-venta_cerrada { background: rgba(201,162,39,.2); color: #c9a227; }
+    .badge-perdido { background: rgba(192,57,43,.2); color: #e74c3c; }
     .empty-state {
-      text-align: center; padding: 60px 20px; color: #a0aec0;
+      text-align: center; padding: 60px 20px; color: rgba(255,255,255,.35);
     }
-    .empty-state h2 { font-size: 20px; margin-bottom: 8px; color: #7a8a9e; }
+    .empty-state h2 { font-size: 20px; margin-bottom: 8px; color: rgba(255,255,255,.5); }
     .estado-label {
       font-size: 11px; text-transform: capitalize;
     }

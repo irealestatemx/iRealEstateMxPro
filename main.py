@@ -274,13 +274,13 @@ def generate_tts_audio(text: str, voice: str = "nova", output_path: str = "") ->
 
     try:
         response = client.audio.speech.create(
-            model="tts-1",
+            model="tts-1-hd",
             voice=voice,
             input=text,
-            speed=1.0,
+            speed=0.95,
         )
         response.stream_to_file(output_path)
-        print(f"[TTS] Audio generado: {output_path} ({len(text)} chars)")
+        print(f"[TTS] Audio generado: {output_path} ({len(text)} chars, voz={voice})")
         return output_path
     except Exception as e:
         print(f"[TTS] Error: {e}")
@@ -288,10 +288,10 @@ def generate_tts_audio(text: str, voice: str = "nova", output_path: str = "") ->
 
 
 def get_tts_voice(gender: str) -> str:
-    """Retorna la voz de OpenAI TTS según el género seleccionado."""
+    """Retorna la voz de OpenAI TTS segun el genero. Todas leen español correctamente."""
     if gender == "masculine":
-        return "onyx"  # Voz masculina profunda
-    return "nova"  # Voz femenina cálida
+        return "alloy"   # Voz masculina natural, buen español
+    return "nova"        # Voz femenina calida, buen español
 
 
 # ─── Generacion de PDF ───
@@ -376,61 +376,71 @@ def generate_property_pdf(data: dict) -> bytes:
 
     s = pdf._safe  # shortcut
 
+    portada_url = data.get("foto_portada_url")
+    fotos_extra = data.get("fotos_extra_urls", [])
+    if isinstance(fotos_extra, str):
+        import json as _j
+        try:
+            fotos_extra = _j.loads(fotos_extra)
+        except Exception:
+            fotos_extra = []
+
+    amenidades = data.get("amenidades", [])
+    if isinstance(amenidades, str):
+        import json as _j
+        try:
+            amenidades = _j.loads(amenidades)
+        except Exception:
+            amenidades = []
+
     # ══════════════════════════════════════
-    # PAGINA 1 — Portada + datos principales
+    # PAGINA 1 — Portada hero con foto grande
     # ══════════════════════════════════════
     pdf.add_page()
 
-    # ── Badge tipo + operacion ──
-    badge_text = s(f"  {data['tipo_propiedad']} en {data['operacion']}  ")
-    pdf.set_font("Helvetica", "B", 10)
-    pdf.set_fill_color(*PropertyPDF.NAVY)
-    pdf.set_text_color(*PropertyPDF.WHITE)
-    badge_w = pdf.get_string_width(badge_text) + 8
-    pdf.cell(badge_w, 7, badge_text, ln=False, fill=True)
-    pdf.ln(10)
-
-    # ── Precio ──
-    pdf.set_font("Helvetica", "B", 22)
-    pdf.set_text_color(*PropertyPDF.NAVY)
-    pdf.cell(0, 12, s(data.get("precio_formateado", "")), ln=True)
-
-    # ── Ubicacion ──
-    pdf.set_font("Helvetica", "", 10)
-    pdf.set_text_color(*PropertyPDF.GRAY_TEXT)
-    ubicacion = f"{data.get('direccion', '')}, {data.get('ciudad', '')}, {data.get('estado', '')}"
-    pdf.cell(0, 6, s(ubicacion), ln=True)
-    pdf.ln(4)
-
-    # ── Foto de portada ──
-    portada_url = data.get("foto_portada_url")
+    # Foto de portada grande
     if portada_url:
         portada_path = url_to_filepath(portada_url)
         if portada_path.exists():
             try:
-                pdf.image(str(portada_path), x=10, w=190)
-                pdf.ln(4)
+                pdf.image(str(portada_path), x=10, w=190, h=120)
             except Exception:
-                pass
+                pdf.set_fill_color(220, 220, 220)
+                pdf.rect(10, pdf.get_y(), 190, 120, "F")
+            pdf.ln(124)
+        else:
+            pdf.ln(8)
+    else:
+        pdf.ln(8)
 
-    # ── Fotos extras (miniaturas en fila) ──
-    fotos_extra = data.get("fotos_extra_urls", [])
-    if fotos_extra:
-        x_start = 10
-        thumb_w = 35
-        gap = 3
-        x = x_start
-        for url in fotos_extra[:4]:
-            fpath = url_to_filepath(url)
-            if fpath.exists():
-                try:
-                    pdf.image(str(fpath), x=x, y=pdf.get_y(), w=thumb_w, h=thumb_w * 0.75)
-                    x += thumb_w + gap
-                except Exception:
-                    pass
-        pdf.ln(thumb_w * 0.75 + 4)
+    # Badge operacion
+    operacion = data.get("operacion", "Venta")
+    badge_text = s(f"  {operacion.upper()}  ")
+    pdf.set_font("Helvetica", "B", 9)
+    pdf.set_fill_color(192, 57, 43) if "venta" in operacion.lower() else pdf.set_fill_color(26, 60, 94)
+    pdf.set_text_color(*PropertyPDF.WHITE)
+    badge_w = pdf.get_string_width(badge_text) + 6
+    pdf.cell(badge_w, 6, badge_text, fill=True)
+    pdf.ln(10)
 
-    # ── Caracteristicas (grid visual) ──
+    # Precio grande
+    pdf.set_font("Helvetica", "B", 26)
+    pdf.set_text_color(*PropertyPDF.NAVY)
+    pdf.cell(0, 14, s(data.get("precio_formateado", "")), ln=True)
+
+    # Ubicacion
+    pdf.set_font("Helvetica", "", 11)
+    pdf.set_text_color(*PropertyPDF.GRAY_TEXT)
+    ubicacion = f"{data.get('direccion', '')}, {data.get('ciudad', '')}, {data.get('estado', '')}"
+    pdf.cell(0, 7, s(ubicacion), ln=True)
+    pdf.ln(6)
+
+    # ── Linea dorada separadora ──
+    pdf.set_fill_color(*PropertyPDF.GOLD)
+    pdf.rect(10, pdf.get_y(), 190, 0.8, "F")
+    pdf.ln(6)
+
+    # ── Caracteristicas en grid elegante ──
     specs = []
     if data.get("recamaras"):
         specs.append(("Recamaras", str(data["recamaras"])))
@@ -441,35 +451,55 @@ def generate_property_pdf(data: dict) -> bytes:
     if data.get("metros_terreno"):
         specs.append(("m2 Terreno", str(data["metros_terreno"])))
     if data.get("estacionamientos"):
-        specs.append(("Estacionam.", str(data["estacionamientos"])))
+        specs.append(("Estacionamientos", str(data["estacionamientos"])))
 
     if specs:
-        # Verificar si hay espacio suficiente, si no, nueva pagina
-        if pdf.get_y() > 245:
-            pdf.add_page()
-
-        pdf.section_title("Caracteristicas")
-        col_w = 190 / min(len(specs), 5)
-        pdf.set_fill_color(*PropertyPDF.GRAY_LIGHT)
+        col_count = min(len(specs), 5)
+        col_w = 190 / col_count
         row_y = pdf.get_y()
-        pdf.rect(10, row_y, 190, 18, "F")
 
+        # Fondo gris claro
+        pdf.set_fill_color(*PropertyPDF.GRAY_LIGHT)
+        pdf.rect(10, row_y, 190, 22, "F")
+
+        # Lineas verticales separadoras
+        pdf.set_draw_color(220, 220, 220)
+        for i in range(1, col_count):
+            x_line = 10 + col_w * i
+            pdf.line(x_line, row_y + 3, x_line, row_y + 19)
+
+        # Valores
+        pdf.set_xy(10, row_y + 2)
         for label, value in specs:
-            pdf.set_font("Helvetica", "B", 14)
+            pdf.set_font("Helvetica", "B", 16)
             pdf.set_text_color(*PropertyPDF.NAVY)
             pdf.cell(col_w, 10, s(value), align="C")
         pdf.ln()
+        # Labels
         pdf.set_x(10)
         for label, value in specs:
             pdf.set_font("Helvetica", "", 7)
             pdf.set_text_color(*PropertyPDF.GRAY_TEXT)
             pdf.cell(col_w, 6, s(label), align="C")
-        pdf.ln(10)
+        pdf.set_y(row_y + 26)
+
+    # ══════════════════════════════════════
+    # PAGINA 2 — Descripcion
+    # ══════════════════════════════════════
+    descripcion = data.get("descripcion_profesional", "")
+    if descripcion:
+        if pdf.get_y() > 220:
+            pdf.add_page()
+
+        pdf.section_title("Descripcion")
+        pdf.set_font("Helvetica", "", 10)
+        pdf.set_text_color(*PropertyPDF.DARK)
+        pdf.multi_cell(190, 5.5, s(descripcion))
+        pdf.ln(8)
 
     # ── Amenidades ──
-    amenidades = data.get("amenidades", [])
     if amenidades:
-        if pdf.get_y() > 255:
+        if pdf.get_y() > 240:
             pdf.add_page()
 
         pdf.section_title("Amenidades")
@@ -479,92 +509,118 @@ def generate_property_pdf(data: dict) -> bytes:
         x = 10
         y = pdf.get_y()
         for a in amenidades:
+            if not isinstance(a, str):
+                a = str(a)
             tag_text = s(f"  {a}  ")
             tag_w = pdf.get_string_width(tag_text) + 4
             if x + tag_w > 200:
                 x = 10
-                y += 8
+                y += 9
                 pdf.set_y(y)
             pdf.set_xy(x, y)
             pdf.set_fill_color(*PropertyPDF.GRAY_LIGHT)
             pdf.set_draw_color(200, 200, 200)
-            pdf.cell(tag_w, 6.5, tag_text, border=1, fill=True, align="C")
+            pdf.cell(tag_w, 7, tag_text, border=1, fill=True, align="C")
             x += tag_w + 3
-        pdf.ln(12)
+        pdf.ln(14)
 
     # ══════════════════════════════════════
-    # PAGINA 2 — Descripcion + Agente
-    # ══════════════════════════════════════
-    descripcion = data.get("descripcion_profesional", "")
-    if descripcion:
-        if pdf.get_y() > 200:
-            pdf.add_page()
-
-        pdf.section_title("Descripcion de la propiedad")
-        pdf.set_font("Helvetica", "", 9)
-        pdf.set_text_color(*PropertyPDF.DARK)
-        pdf.multi_cell(190, 5, s(descripcion))
-        pdf.ln(6)
-
-    # ── Datos de contacto del agente ──
-    if pdf.get_y() > 245:
-        pdf.add_page()
-
-    pdf.section_title("Agente de contacto")
-    pdf.set_fill_color(*PropertyPDF.GRAY_LIGHT)
-    box_y = pdf.get_y()
-    pdf.rect(10, box_y, 190, 22, "F")
-
-    # Avatar
-    pdf.set_fill_color(*PropertyPDF.NAVY)
-    pdf.rect(14, box_y + 3, 16, 16, "F")
-    nombre = data.get("agente_nombre", "")
-    initial = s(nombre[0].upper()) if nombre else "A"
-    pdf.set_font("Helvetica", "B", 12)
-    pdf.set_text_color(*PropertyPDF.WHITE)
-    pdf.set_xy(14, box_y + 7)
-    pdf.cell(16, 8, initial, align="C")
-
-    pdf.set_xy(34, box_y + 3)
-    pdf.set_font("Helvetica", "B", 10)
-    pdf.set_text_color(*PropertyPDF.NAVY)
-    pdf.cell(80, 6, s(nombre))
-
-    pdf.set_xy(34, box_y + 9)
-    pdf.set_font("Helvetica", "", 8)
-    pdf.set_text_color(*PropertyPDF.GRAY_TEXT)
-    pdf.cell(80, 5, s(f"Tel: {data.get('agente_telefono', '')}"))
-
-    pdf.set_xy(34, box_y + 14)
-    pdf.cell(80, 5, s(f"Email: {data.get('agente_email', '')}"))
-
-    pdf.ln(28)
-
-    # ══════════════════════════════════════
-    # PAGINAS EXTRA — Cada foto en grande
+    # GALERIA — Todas las fotos en una pagina
     # ══════════════════════════════════════
     all_photo_urls = []
     if portada_url:
         all_photo_urls.append(portada_url)
     all_photo_urls.extend(fotos_extra)
 
-    if len(all_photo_urls) > 1:
+    if all_photo_urls:
+        pdf.add_page()
+        pdf.section_title(f"Galeria de fotos ({len(all_photo_urls)})")
+
+        # Grid de 2 columnas
+        col_w = 92
+        col_h = 68
+        gap_x = 6
+        gap_y = 6
+        x_start = 10
+        y_start = pdf.get_y()
+        col = 0
+        row_top = y_start
+
         for i, url in enumerate(all_photo_urls):
             fpath = url_to_filepath(url)
             if not fpath.exists():
                 continue
-            try:
-                pdf.add_page()
-                label = "Foto de portada" if i == 0 else f"Foto {i + 1} de {len(all_photo_urls)}"
-                pdf.section_title(label)
+            x = x_start + col * (col_w + gap_x)
+            y = row_top
 
-                # Calcular tamano maximo que cabe en la pagina
-                # Espacio disponible: ancho 190mm, alto ~220mm (despues de header + titulo)
-                avail_w = 190
-                avail_h = 220
-                pdf.image(str(fpath), x=10, y=pdf.get_y(), w=avail_w, h=0)
+            # Verificar espacio en pagina
+            if y + col_h > 265:
+                pdf.add_page()
+                pdf.section_title("Galeria (continuacion)")
+                row_top = pdf.get_y()
+                y = row_top
+                col = 0
+                x = x_start
+
+            try:
+                pdf.image(str(fpath), x=x, y=y, w=col_w, h=col_h)
             except Exception:
                 pass
+
+            col += 1
+            if col >= 2:
+                col = 0
+                row_top += col_h + gap_y
+
+        if col == 1:
+            row_top += col_h + gap_y
+        pdf.set_y(row_top)
+
+    # ══════════════════════════════════════
+    # AGENTE DE CONTACTO
+    # ══════════════════════════════════════
+    if pdf.get_y() > 240:
+        pdf.add_page()
+
+    pdf.ln(4)
+    pdf.section_title("Agente de contacto")
+
+    # Tarjeta de contacto con fondo
+    pdf.set_fill_color(*PropertyPDF.GRAY_LIGHT)
+    box_y = pdf.get_y()
+    pdf.rect(10, box_y, 190, 24, "F")
+
+    # Linea dorada izquierda
+    pdf.set_fill_color(*PropertyPDF.GOLD)
+    pdf.rect(10, box_y, 2, 24, "F")
+
+    # Avatar circular
+    pdf.set_fill_color(*PropertyPDF.NAVY)
+    pdf.rect(16, box_y + 4, 16, 16, "F")
+    nombre = data.get("agente_nombre", "")
+    initial = s(nombre[0].upper()) if nombre else "A"
+    pdf.set_font("Helvetica", "B", 12)
+    pdf.set_text_color(*PropertyPDF.WHITE)
+    pdf.set_xy(16, box_y + 8)
+    pdf.cell(16, 8, initial, align="C")
+
+    # Datos
+    pdf.set_xy(36, box_y + 4)
+    pdf.set_font("Helvetica", "B", 11)
+    pdf.set_text_color(*PropertyPDF.NAVY)
+    pdf.cell(80, 6, s(nombre))
+
+    pdf.set_xy(36, box_y + 10)
+    pdf.set_font("Helvetica", "", 9)
+    pdf.set_text_color(*PropertyPDF.GRAY_TEXT)
+    tel = data.get("agente_telefono", "")
+    email = data.get("agente_email", "")
+    pdf.cell(80, 5, s(f"Tel: {tel}"))
+
+    pdf.set_xy(36, box_y + 16)
+    pdf.cell(80, 5, s(f"Email: {email}"))
+
+    pdf.ln(30)
 
     return pdf.output()
 

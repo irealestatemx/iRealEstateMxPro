@@ -5,20 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>iRealEstateMxPro — Mis Propiedades</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: #f0f2f5; min-height: 100vh; }
+    body { font-family: 'Inter', sans-serif; background: #0d0d0d; color: #e0e0e0; min-height: 100vh; }
     .topbar {
-      background: #1a3c5e; padding: 16px 32px;
+      background: #111; border-bottom: 1px solid rgba(201,162,39,.15); padding: 16px 32px;
       display: flex; align-items: center; justify-content: space-between;
     }
     .topbar-logo { height: 36px; }
     .topbar-nav { display: flex; gap: 16px; align-items: center; }
-    .topbar-nav a { color: #c9a227; text-decoration: none; font-size: 14px; font-weight: 500; }
-    .topbar-nav a:hover { color: #fff; }
-    .topbar-nav a.active { color: #fff; border-bottom: 2px solid #c9a227; padding-bottom: 2px; }
-    .topbar-user { color: #e2e8f0; font-size: 13px; }
+    .topbar-nav a { color: rgba(255,255,255,.6); text-decoration: none; font-size: 14px; font-weight: 500; transition: color .2s; }
+    .topbar-nav a:hover { color: #c9a227; }
+    .topbar-nav a.active { color: #c9a227; border-bottom: 2px solid #c9a227; padding-bottom: 2px; }
+    .topbar-user { color: rgba(255,255,255,.4); font-size: 13px; }
     .hamburger { display:none; background:none; border:none; cursor:pointer; padding:4px; }
     .hamburger span { display:block; width:22px; height:2px; background:#c9a227; margin:5px 0; border-radius:2px; transition:all .25s; }
     .hamburger.open span:nth-child(1) { transform:rotate(45deg) translate(5px,5px); }
@@ -34,7 +34,7 @@
     }
     .container { max-width: 1200px; margin: 24px auto; padding: 0 20px; }
     .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
-    .page-header h1 { font-size: 24px; color: #1a3c5e; }
+    .page-header h1 { font-size: 24px; color: #c9a227; font-family: 'Playfair Display', serif; }
     .filter-bar { display: flex; gap: 10px; align-items: center; }
     .filter-bar select {
       padding: 8px 14px; border: 2px solid #e2e8f0; border-radius: 8px;
@@ -42,62 +42,63 @@
     }
     .stats-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
     .stat-card {
-      background: #fff; border-radius: 10px; padding: 16px 24px;
-      box-shadow: 0 2px 6px rgba(0,0,0,0.06); flex: 1; min-width: 140px;
+      background: #1a1a1a; border: 1px solid rgba(201,162,39,.15); border-radius: 10px; padding: 16px 24px;
+      flex: 1; min-width: 140px;
     }
-    .stat-card .num { font-size: 28px; font-weight: 700; color: #1a3c5e; }
-    .stat-card .lbl { font-size: 12px; color: #7a8a9e; margin-top: 2px; }
+    .stat-card .num { font-size: 28px; font-weight: 700; color: #c9a227; }
+    .stat-card .lbl { font-size: 12px; color: rgba(255,255,255,.4); margin-top: 2px; }
     .props-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
     .prop-card {
-      background: #fff; border-radius: 12px; overflow: hidden;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08); transition: transform 0.15s;
+      background: #1a1a1a; border: 1px solid rgba(201,162,39,.1); border-radius: 12px; overflow: hidden;
+      transition: transform 0.15s, border-color .2s;
     }
-    .prop-card:hover { transform: translateY(-2px); }
+    .prop-card:hover { transform: translateY(-2px); border-color: rgba(201,162,39,.3); }
     .prop-card-img {
-      width: 100%; height: 200px; object-fit: cover; background: #e2e8f0;
+      width: 100%; height: 200px; object-fit: cover; background: #222;
     }
     .prop-card-body { padding: 16px; }
     .prop-card-type {
       display: inline-block; font-size: 11px; font-weight: 600;
       padding: 3px 10px; border-radius: 20px;
-      background: #1a3c5e; color: #c9a227; text-transform: uppercase;
+      background: rgba(201,162,39,.15); color: #c9a227; text-transform: uppercase;
     }
     .prop-card-op {
       display: inline-block; font-size: 11px; font-weight: 600;
       padding: 3px 10px; border-radius: 20px; margin-left: 6px;
     }
-    .op-venta { background: #c6f6d5; color: #22543d; }
-    .op-renta { background: #bee3f8; color: #2a4365; }
-    .prop-card-price { font-size: 22px; font-weight: 700; color: #1a3c5e; margin: 8px 0 4px; }
-    .prop-card-loc { font-size: 13px; color: #7a8a9e; margin-bottom: 8px; }
-    .prop-card-specs { display: flex; gap: 12px; font-size: 12px; color: #4a5568; margin-bottom: 10px; }
-    .prop-card-specs span { background: #f7fafc; padding: 3px 8px; border-radius: 6px; }
-    .prop-card-agent { font-size: 12px; color: #a0aec0; border-top: 1px solid #f0f2f5; padding-top: 8px; margin-top: 8px; }
+    .op-venta { background: rgba(34,84,61,.3); color: #68d391; }
+    .op-renta { background: rgba(42,67,101,.3); color: #63b3ed; }
+    .prop-card-price { font-size: 22px; font-weight: 700; color: #fff; margin: 8px 0 4px; }
+    .prop-card-loc { font-size: 13px; color: rgba(255,255,255,.45); margin-bottom: 8px; }
+    .prop-card-specs { display: flex; gap: 12px; font-size: 12px; color: rgba(255,255,255,.5); margin-bottom: 10px; }
+    .prop-card-specs span { background: rgba(255,255,255,.06); padding: 3px 8px; border-radius: 6px; }
+    .prop-card-agent { font-size: 12px; color: rgba(255,255,255,.35); border-top: 1px solid rgba(255,255,255,.08); padding-top: 8px; margin-top: 8px; }
     .prop-card-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 12px; }
     .btn-sm {
       padding: 6px 12px; border: none; border-radius: 6px;
       font-size: 11px; font-weight: 600; cursor: pointer;
       font-family: 'Inter', sans-serif; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
     }
-    .btn-edit { background: #c9a227; color: #1a3c5e; }
+    .btn-edit { background: #c9a227; color: #0d0d0d; }
     .btn-edit:hover { background: #d4af37; }
-    .btn-pdf { background: #e53e3e; color: #fff; }
-    .btn-img { background: #805ad5; color: #fff; }
-    .btn-video { background: #2b6cb0; color: #fff; }
-    .btn-toggle-off { background: #fed7d7; color: #9b2c2c; }
-    .btn-toggle-on { background: #c6f6d5; color: #22543d; }
+    .btn-pdf { background: #c0392b; color: #fff; }
+    .btn-img { background: #1a3c5e; color: #c9a227; }
+    .btn-video { background: #1a3c5e; color: #fff; }
+    .btn-toggle-off { background: rgba(192,57,43,.2); color: #e74c3c; }
+    .btn-toggle-on { background: rgba(39,174,96,.2); color: #2ecc71; }
     .badge-inactive {
       display: inline-block; font-size: 10px; font-weight: 600;
       padding: 2px 8px; border-radius: 10px;
-      background: #fed7d7; color: #9b2c2c; margin-left: 6px;
+      background: rgba(192,57,43,.2); color: #e74c3c; margin-left: 6px;
     }
     .empty-state {
-      text-align: center; padding: 80px 20px; color: #a0aec0;
+      text-align: center; padding: 80px 20px; color: rgba(255,255,255,.35);
     }
-    .empty-state h2 { font-size: 20px; margin-bottom: 8px; color: #7a8a9e; }
+    .empty-state h2 { font-size: 20px; margin-bottom: 8px; color: rgba(255,255,255,.5); }
     .empty-state a { color: #c9a227; text-decoration: none; font-weight: 600; }
-    .btn-delete { background: #e53e3e; color: #fff; }
-    .btn-delete:hover { background: #c53030; }
+    .btn-delete { background: #c0392b; color: #fff; }
+    .btn-delete:hover { background: #e74c3c; }
+    .filter-bar select { background: #1a1a1a; color: #e0e0e0; border-color: rgba(201,162,39,.2); }
   </style>
 </head>
 <body>

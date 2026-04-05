@@ -5,34 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>iRealEstateMxPro — Usuarios</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Inter', sans-serif;
-      background: #f0f2f5;
-      min-height: 100vh;
-    }
+    body { font-family: 'Inter', sans-serif; background: #0d0d0d; color: #e0e0e0; min-height: 100vh; }
     .topbar {
-      background: #1a3c5e;
-      padding: 16px 32px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
+      background: #111; border-bottom: 1px solid rgba(201,162,39,.15);
+      padding: 16px 32px; display: flex; align-items: center; justify-content: space-between;
     }
     .topbar-logo { height: 36px; }
     .topbar-nav { display: flex; gap: 16px; align-items: center; }
-    .topbar-nav a {
-      color: #c9a227;
-      text-decoration: none;
-      font-size: 14px;
-      font-weight: 500;
-    }
-    .topbar-nav a:hover { color: #fff; }
-    .topbar-user {
-      color: #e2e8f0;
-      font-size: 13px;
-    }
+    .topbar-nav a { color: rgba(255,255,255,.6); text-decoration: none; font-size: 14px; font-weight: 500; transition: color .2s; }
+    .topbar-nav a:hover { color: #c9a227; }
+    .topbar-nav a.active { color: #c9a227; }
+    .topbar-user { color: rgba(255,255,255,.4); font-size: 13px; }
     .hamburger { display:none; background:none; border:none; cursor:pointer; padding:4px; }
     .hamburger span { display:block; width:22px; height:2px; background:#c9a227; margin:5px 0; border-radius:2px; transition:all .25s; }
     .hamburger.open span:nth-child(1) { transform:rotate(45deg) translate(5px,5px); }
@@ -44,114 +30,53 @@
       .topbar-nav { display:none; width:100%; flex-direction:column; gap:0; padding-top:12px; border-top:1px solid rgba(255,255,255,.1); margin-top:12px; }
       .topbar-nav.open { display:flex; }
       .topbar-nav a, .topbar-nav span { padding:10px 0; font-size:15px; }
-      .topbar-nav a.active { border-bottom:none; border-left:3px solid #c9a227; padding-left:10px; }
+      .topbar-nav a.active { border-left:3px solid #c9a227; padding-left:10px; }
     }
-    .container {
-      max-width: 900px;
-      margin: 32px auto;
-      padding: 0 20px;
-    }
-    h1 {
-      font-size: 24px;
-      color: #1a3c5e;
-      margin-bottom: 24px;
-    }
+    .container { max-width: 900px; margin: 32px auto; padding: 0 20px; }
+    h1 { font-size: 24px; color: #c9a227; font-family: 'Playfair Display', serif; margin-bottom: 24px; }
     .card {
-      background: #fff;
-      border-radius: 12px;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-      padding: 28px;
-      margin-bottom: 24px;
+      background: #1a1a1a; border: 1px solid rgba(201,162,39,.1);
+      border-radius: 12px; padding: 28px; margin-bottom: 24px;
     }
-    .card h2 {
-      font-size: 18px;
-      color: #1a3c5e;
-      margin-bottom: 16px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
+    .card h2 { font-size: 18px; color: #c9a227; margin-bottom: 16px; }
+    table { width: 100%; border-collapse: collapse; }
     th {
-      text-align: left;
-      font-size: 12px;
-      font-weight: 600;
-      color: #7a8a9e;
-      text-transform: uppercase;
-      padding: 8px 12px;
-      border-bottom: 2px solid #e2e8f0;
+      text-align: left; font-size: 12px; font-weight: 600;
+      color: rgba(255,255,255,.4); text-transform: uppercase;
+      padding: 8px 12px; border-bottom: 1px solid rgba(201,162,39,.15);
     }
     td {
-      padding: 12px;
-      font-size: 14px;
-      border-bottom: 1px solid #f0f2f5;
-      color: #2d3748;
+      padding: 12px; font-size: 14px;
+      border-bottom: 1px solid rgba(255,255,255,.05); color: #e0e0e0;
     }
-    .badge {
-      display: inline-block;
-      padding: 3px 10px;
-      border-radius: 20px;
-      font-size: 11px;
-      font-weight: 600;
-    }
-    .badge-admin { background: #c9a227; color: #1a3c5e; }
-    .badge-agente { background: #e2e8f0; color: #4a5568; }
-    .badge-referido { background: #c6f6d5; color: #276749; }
-    .badge-activo { background: #c6f6d5; color: #22543d; }
-    .badge-inactivo { background: #fed7d7; color: #9b2c2c; }
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
+    .badge-admin { background: rgba(201,162,39,.2); color: #c9a227; }
+    .badge-agente { background: rgba(255,255,255,.08); color: rgba(255,255,255,.6); }
+    .badge-referido { background: rgba(39,174,96,.2); color: #2ecc71; }
+    .badge-activo { background: rgba(39,174,96,.2); color: #2ecc71; }
+    .badge-inactivo { background: rgba(192,57,43,.2); color: #e74c3c; }
     .btn-sm {
-      padding: 6px 14px;
-      border: none;
-      border-radius: 6px;
-      font-size: 12px;
-      font-weight: 600;
-      cursor: pointer;
-      font-family: 'Inter', sans-serif;
+      padding: 6px 14px; border: none; border-radius: 6px;
+      font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;
     }
-    .btn-toggle { background: #e2e8f0; color: #4a5568; }
-    .btn-toggle:hover { background: #cbd5e0; }
-    .btn-delete { background: #e53e3e; color: #fff; }
-    .btn-delete:hover { background: #c53030; }
-    .form-row {
-      display: flex;
-      gap: 12px;
-      flex-wrap: wrap;
-      align-items: end;
-    }
-    .form-row .fg {
-      flex: 1;
-      min-width: 140px;
-    }
-    .form-row label {
-      display: block;
-      font-size: 12px;
-      font-weight: 600;
-      color: #4a5568;
-      margin-bottom: 4px;
-    }
+    .btn-toggle { background: rgba(255,255,255,.08); color: rgba(255,255,255,.6); }
+    .btn-toggle:hover { background: rgba(255,255,255,.15); }
+    .btn-delete { background: #c0392b; color: #fff; }
+    .btn-delete:hover { background: #e74c3c; }
+    .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
+    .form-row .fg { flex: 1; min-width: 140px; }
+    .form-row label { display: block; font-size: 12px; font-weight: 600; color: rgba(255,255,255,.5); margin-bottom: 4px; }
     .form-row input, .form-row select {
-      width: 100%;
-      padding: 10px 12px;
-      border: 2px solid #e2e8f0;
-      border-radius: 8px;
-      font-size: 14px;
-      font-family: 'Inter', sans-serif;
+      width: 100%; padding: 10px 12px; border: 1px solid rgba(201,162,39,.2);
+      border-radius: 8px; font-size: 14px; font-family: 'Inter', sans-serif;
+      background: #111; color: #e0e0e0;
     }
-    .form-row input:focus, .form-row select:focus {
-      border-color: #c9a227;
-      outline: none;
-    }
+    .form-row input:focus, .form-row select:focus { border-color: #c9a227; outline: none; }
     .btn-add {
-      padding: 10px 24px;
-      background: linear-gradient(135deg, #c9a227, #d4af37);
-      color: #1a3c5e;
-      border: none;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 700;
-      cursor: pointer;
-      font-family: 'Inter', sans-serif;
-      white-space: nowrap;
+      padding: 10px 24px; background: linear-gradient(135deg, #c9a227, #d4af37);
+      color: #0d0d0d; border: none; border-radius: 8px;
+      font-size: 14px; font-weight: 700; cursor: pointer;
+      font-family: 'Inter', sans-serif; white-space: nowrap;
     }
     .btn-add:hover { box-shadow: 0 2px 10px rgba(201,162,39,0.4); }
   </style>
@@ -177,10 +102,10 @@
 
     <!-- Credenciales del usuario recién creado -->
     {% if created %}
-    <div class="card" id="credencialesCard" style="border: 2px solid #c9a227; background: #fffdf5;">
-      <h2 style="color:#22543d;">✅ Usuario creado exitosamente</h2>
-      <p style="font-size:13px;color:#4a5568;margin-bottom:12px;">Copia estas credenciales y compártelas. <strong>La contraseña no se puede recuperar después.</strong></p>
-      <div style="background:#f7fafc;border-radius:8px;padding:16px;font-family:monospace;font-size:14px;line-height:2;border:1px solid #e2e8f0;">
+    <div class="card" id="credencialesCard" style="border: 2px solid #c9a227; background: #111;">
+      <h2 style="color:#2ecc71;">Usuario creado exitosamente</h2>
+      <p style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:12px;">Copia estas credenciales y compartelas. <strong style="color:#c9a227;">La contrasena no se puede recuperar despues.</strong></p>
+      <div style="background:#0d0d0d;border-radius:8px;padding:16px;font-family:monospace;font-size:14px;line-height:2;border:1px solid rgba(201,162,39,.2);color:#e0e0e0;">
         <div><strong>Nombre:</strong> {{ c_nombre }}</div>
         <div><strong>Email:</strong> {{ c_email }}</div>
         <div><strong>Contraseña:</strong> {{ c_password }}</div>

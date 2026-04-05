@@ -198,6 +198,20 @@ async def save_property(data: dict) -> int:
     return row_id
 
 
+def _normalize_prop(d: dict) -> dict:
+    """Asegura que los campos JSONB sean listas Python (no strings JSON)."""
+    for key in ("amenidades", "fotos_extra_urls"):
+        val = d.get(key)
+        if val is None:
+            d[key] = []
+        elif isinstance(val, str):
+            try:
+                d[key] = json.loads(val)
+            except (json.JSONDecodeError, TypeError):
+                d[key] = []
+    return d
+
+
 async def get_properties_by_user(user_id: int, limit: int = 50, offset: int = 0):
     """Lista propiedades de un usuario especifico."""
     query = """
@@ -205,7 +219,7 @@ async def get_properties_by_user(user_id: int, limit: int = 50, offset: int = 0)
     ORDER BY created_at DESC LIMIT :limit OFFSET :offset
     """
     rows = await database.fetch_all(query=query, values={"user_id": user_id, "limit": limit, "offset": offset})
-    return [dict(r._mapping) for r in rows]
+    return [_normalize_prop(dict(r._mapping)) for r in rows]
 
 
 async def get_all_properties(active_only: bool = True, limit: int = 50, offset: int = 0):
@@ -217,21 +231,21 @@ async def get_all_properties(active_only: bool = True, limit: int = 50, offset: 
     LIMIT :limit OFFSET :offset
     """
     rows = await database.fetch_all(query=query, values={"limit": limit, "offset": offset})
-    return [dict(r._mapping) for r in rows]
+    return [_normalize_prop(dict(r._mapping)) for r in rows]
 
 
 async def get_property_by_id(prop_id: int):
     """Obtiene una propiedad por ID."""
     query = "SELECT * FROM propiedades WHERE id = :id"
     row = await database.fetch_one(query=query, values={"id": prop_id})
-    return dict(row._mapping) if row else None
+    return _normalize_prop(dict(row._mapping)) if row else None
 
 
 async def get_property_by_session(session_id: str):
     """Obtiene una propiedad por session_id."""
     query = "SELECT * FROM propiedades WHERE session_id = :session_id"
     row = await database.fetch_one(query=query, values={"session_id": session_id})
-    return dict(row._mapping) if row else None
+    return _normalize_prop(dict(row._mapping)) if row else None
 
 
 async def search_properties(ciudad: str = None, operacion: str = None,
