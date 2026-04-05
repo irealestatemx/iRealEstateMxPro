@@ -487,9 +487,24 @@
         <div style="text-align:center;padding:40px 20px;">
           <div style="font-size:3rem;margin-bottom:12px;">&#x1F4C4;</div>
           <h3 style="color:#1a3c5e;margin-bottom:8px;">Ficha T&eacute;cnica PDF</h3>
-          <p style="color:#7a8a9e;font-size:.88rem;margin-bottom:24px;">
+          <p style="color:#7a8a9e;font-size:.88rem;margin-bottom:16px;">
             Genera un PDF profesional con foto de portada, descripci&oacute;n, amenidades, galer&iacute;a de fotos y especificaciones.
           </p>
+
+          <!-- Hero photo upload -->
+          <div style="max-width:480px;margin:0 auto 24px;text-align:left;background:#f0f4f8;border:2px dashed #c9d6e3;border-radius:12px;padding:20px;">
+            <p style="font-size:.82rem;font-weight:600;color:#1a3c5e;margin-bottom:4px;">Foto panor&aacute;mica para el PDF (opcional)</p>
+            <p style="font-size:.75rem;color:#7a8a9e;margin-bottom:12px;">
+              Sube una foto horizontal (aprox. 1600&times;700 px) para la cabecera del PDF.
+              Si no subes una, se recortar&aacute; la portada autom&aacute;ticamente.
+            </p>
+            <input type="file" form="pdfForm" name="foto_hero_pdf_upload" id="pdfHeroUpload" accept="image/*"
+              style="font-size:.82rem;color:#1a3c5e;" />
+            <div id="pdfHeroPreview" style="display:none;margin-top:10px;">
+              <img id="pdfHeroPreviewImg" style="width:100%;max-height:140px;object-fit:cover;border-radius:8px;border:2px solid #c9a227;" />
+            </div>
+          </div>
+
           <button type="submit" form="pdfForm" class="btn-pdf" style="font-size:1rem;padding:14px 36px;">
             &#x1F4E5; Descargar PDF
           </button>
@@ -627,7 +642,7 @@
       </div>
 
       <!-- ═══════ HIDDEN FORMS ═══════ -->
-      <form id="pdfForm" action="/download-pdf" method="post" style="display:none;">
+      <form id="pdfForm" action="/download-pdf" method="post" enctype="multipart/form-data" style="display:none;">
         <input type="hidden" name="tipo_propiedad" value="{{ tipo_propiedad }}" />
         <input type="hidden" name="operacion" value="{{ operacion }}" />
         <input type="hidden" name="direccion" value="{{ direccion }}" />
@@ -644,6 +659,9 @@
         <input type="hidden" name="agente_email" value="{{ agente_email }}" />
         {% if foto_portada_url %}
         <input type="hidden" name="foto_portada_url" value="{{ foto_portada_url }}" />
+        {% endif %}
+        {% if foto_hero_pdf_url %}
+        <input type="hidden" name="foto_hero_pdf_url" value="{{ foto_hero_pdf_url }}" />
         {% endif %}
         {% for url in fotos_extra_urls %}
         <input type="hidden" name="fotos_extra_urls" value="{{ url }}" />
@@ -765,6 +783,22 @@
       document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     });
   });
+
+  /* ── PDF hero photo preview ── */
+  var pdfHeroUpload = document.getElementById('pdfHeroUpload');
+  if (pdfHeroUpload) {
+    pdfHeroUpload.addEventListener('change', function() {
+      var preview = document.getElementById('pdfHeroPreview');
+      var img = document.getElementById('pdfHeroPreviewImg');
+      if (this.files && this.files[0]) {
+        var reader = new FileReader();
+        reader.onload = function(e) { img.src = e.target.result; preview.style.display = 'block'; };
+        reader.readAsDataURL(this.files[0]);
+      } else {
+        preview.style.display = 'none';
+      }
+    });
+  }
 
   /* ── Dropdowns ── */
   function toggleDropdown(id) {

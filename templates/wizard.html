@@ -365,8 +365,12 @@
     .photo-thumb {
       aspect-ratio: 1; border-radius: 8px; overflow: hidden;
       border: 2px solid var(--gray-700); position: relative;
+      cursor: grab; transition: all .2s;
     }
-    .photo-thumb img { width: 100%; height: 100%; object-fit: cover; }
+    .photo-thumb:active { cursor: grabbing; }
+    .photo-thumb.dragging { opacity: .4; transform: scale(.92); }
+    .photo-thumb.drag-over { border-color: var(--gold); box-shadow: 0 0 0 3px rgba(201,162,39,.25); }
+    .photo-thumb img { width: 100%; height: 100%; object-fit: cover; pointer-events: none; }
     .photo-thumb.cover { border-color: var(--gold); }
     .photo-thumb .cover-tag {
       position: absolute; bottom: 0; left: 0; right: 0;
@@ -374,6 +378,29 @@
       font-size: 9px; font-weight: 800; text-align: center;
       padding: 2px 0; text-transform: uppercase;
     }
+    .photo-thumb .photo-num {
+      position: absolute; top: 4px; left: 4px;
+      background: rgba(0,0,0,.7); color: #fff;
+      font-size: 10px; font-weight: 700; width: 20px; height: 20px;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    }
+    .photo-thumb .photo-remove {
+      position: absolute; top: 4px; right: 4px;
+      background: rgba(192,57,43,.85); color: #fff; border: none;
+      width: 20px; height: 20px; border-radius: 50%; font-size: 12px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      opacity: 0; transition: opacity .15s;
+    }
+    .photo-thumb:hover .photo-remove { opacity: 1; }
+    .photo-thumb .set-cover-btn {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      background: rgba(0,0,0,.7); color: var(--gold);
+      font-size: 9px; font-weight: 700; text-align: center;
+      padding: 3px 0; cursor: pointer; text-transform: uppercase;
+      opacity: 0; transition: opacity .15s;
+    }
+    .photo-thumb:hover .set-cover-btn { opacity: 1; }
+    .photo-thumb.cover .set-cover-btn { display: none; }
 
     /* ── CONTENT OPTIONS (Step 6) ── */
     .content-option {
@@ -781,14 +808,32 @@
         <p class="step-subtitle">Sube las fotos por escena para el video y las publicaciones</p>
 
         <div class="wz-card">
-          <h3>Fotos principales (la primera será la portada)</h3>
+          <h3>Fotos principales (arrastra para reordenar, ★ = portada)</h3>
           <div class="upload-zone" id="mainUploadZone">
             <input type="file" name="fotos" id="mainPhotos" accept="image/*" multiple required />
             <div class="uz-icon">📷</div>
             <div class="uz-text">Arrastra fotos aquí o <strong style="color:var(--gold)">haz clic para seleccionar</strong></div>
-            <div class="uz-hint">JPG, PNG, WEBP — primera foto = portada</div>
+            <div class="uz-hint">JPG, PNG, WEBP — arrastra para reordenar, haz clic en ★ para elegir portada</div>
           </div>
           <div class="photo-grid" id="mainPhotoGrid"></div>
+        </div>
+
+        <div class="wz-card">
+          <h3>Foto panor&aacute;mica para PDF (opcional)</h3>
+          <p style="font-size:12px;color:var(--gray-500);margin-bottom:12px;">
+            Sube una foto horizontal/panor&aacute;mica (aprox. 1600&times;700 px) que se usar&aacute; como imagen principal en la ficha t&eacute;cnica PDF.
+            Si no subes una, se usar&aacute; la foto de portada recortada autom&aacute;ticamente.
+          </p>
+          <div class="upload-zone" style="min-height:100px;">
+            <input type="file" name="foto_hero_pdf" id="fotoHeroPdf" accept="image/*" />
+            <div class="uz-icon">🖼️</div>
+            <div class="uz-text">Arrastra o <strong style="color:var(--gold)">selecciona</strong> foto panor&aacute;mica</div>
+            <div class="uz-hint">Recomendado: 1600&times;700 px o ratio 2:1 horizontal</div>
+          </div>
+          <div id="heroPreview" style="margin-top:10px;display:none;">
+            <img id="heroPreviewImg" style="width:100%;max-height:200px;object-fit:cover;border-radius:8px;border:2px solid var(--gold);" />
+            <button type="button" onclick="removeHeroPhoto()" style="margin-top:6px;background:rgba(192,57,43,.85);color:#fff;border:none;padding:4px 12px;border-radius:6px;font-size:12px;cursor:pointer;">Eliminar</button>
+          </div>
         </div>
 
         <div class="wz-card">
@@ -1129,25 +1174,162 @@
       });
     }
 
-    // ═══════ PHOTO PREVIEW ═══════
+    // ═══════ PHOTO REORDER + SET COVER ═══════
     var mainPhotos = document.getElementById('mainPhotos');
     var mainGrid = document.getElementById('mainPhotoGrid');
+    var photoFiles = [];   // {file, dataUrl}
+    var coverIndex = 0;
+    var dragSrcIdx = null;
+
+    function renderPhotoGrid() {
+      mainGrid.innerHTML = '';
+      photoFiles.forEach(function(item, i) {
+        var div = document.createElement('div');
+        div.className = 'photo-thumb' + (i === coverIndex ? ' cover' : '');
+        div.draggable = true;
+        div.dataset.idx = i;
+
+        div.innerHTML =
+          '<img src="' + item.dataUrl + '" />' +
+          '<span class="photo-num">' + (i + 1) + '</span>' +
+          '<button type="button" class="photo-remove" title="Eliminar">&times;</button>' +
+          (i === coverIndex
+            ? '<div class="cover-tag">Portada</div>'
+            : '<div class="set-cover-btn" title="Hacer portada">★ Portada</div>');
+
+        // Drag events
+        div.addEventListener('dragstart', function(e) {
+          dragSrcIdx = +this.dataset.idx;
+          this.classList.add('dragging');
+          e.dataTransfer.effectAllowed = 'move';
+        });
+        div.addEventListener('dragend', function() {
+          this.classList.remove('dragging');
+          dragSrcIdx = null;
+          mainGrid.querySelectorAll('.photo-thumb').forEach(function(el) { el.classList.remove('drag-over'); });
+        });
+        div.addEventListener('dragover', function(e) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          this.classList.add('drag-over');
+        });
+        div.addEventListener('dragleave', function() { this.classList.remove('drag-over'); });
+        div.addEventListener('drop', function(e) {
+          e.preventDefault();
+          this.classList.remove('drag-over');
+          var targetIdx = +this.dataset.idx;
+          if (dragSrcIdx === null || dragSrcIdx === targetIdx) return;
+          // Reorder array
+          var moved = photoFiles.splice(dragSrcIdx, 1)[0];
+          photoFiles.splice(targetIdx, 0, moved);
+          // Adjust coverIndex after move
+          if (dragSrcIdx === coverIndex) {
+            coverIndex = targetIdx;
+          } else if (dragSrcIdx < coverIndex && targetIdx >= coverIndex) {
+            coverIndex--;
+          } else if (dragSrcIdx > coverIndex && targetIdx <= coverIndex) {
+            coverIndex++;
+          }
+          renderPhotoGrid();
+        });
+
+        // Remove button
+        div.querySelector('.photo-remove').addEventListener('click', function(e) {
+          e.stopPropagation();
+          photoFiles.splice(i, 1);
+          if (photoFiles.length === 0) { coverIndex = 0; }
+          else if (i < coverIndex) { coverIndex--; }
+          else if (i === coverIndex) { coverIndex = 0; }
+          renderPhotoGrid();
+          syncFileInput();
+        });
+
+        // Set cover button
+        var coverBtn = div.querySelector('.set-cover-btn');
+        if (coverBtn) {
+          coverBtn.addEventListener('click', function(e) {
+            e.stopPropagation();
+            coverIndex = i;
+            renderPhotoGrid();
+          });
+        }
+
+        mainGrid.appendChild(div);
+      });
+    }
+
+    function syncFileInput() {
+      // Rebuild file input with cover photo first, then rest in order
+      try {
+        var dt = new DataTransfer();
+        if (photoFiles.length > 0) {
+          dt.items.add(photoFiles[coverIndex].file);
+          photoFiles.forEach(function(item, i) {
+            if (i !== coverIndex) dt.items.add(item.file);
+          });
+        }
+        mainPhotos.files = dt.files;
+      } catch(e) { /* DataTransfer not supported in older browsers */ }
+    }
+
+    function addPhotos(files) {
+      Array.from(files).forEach(function(file) {
+        if (!file.type.startsWith('image/')) return;
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          photoFiles.push({ file: file, dataUrl: e.target.result });
+          renderPhotoGrid();
+          syncFileInput();
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
     if (mainPhotos) {
       mainPhotos.addEventListener('change', function() {
-        mainGrid.innerHTML = '';
-        Array.from(this.files).forEach(function(file, i) {
-          if (!file.type.startsWith('image/')) return;
+        if (this.files.length) {
+          addPhotos(this.files);
+          // Clear native input so re-selecting same files works
+          try { this.value = ''; } catch(e) {}
+        }
+      });
+      // Remove required since we manage files via JS array
+      mainPhotos.removeAttribute('required');
+    }
+
+    // Sync before form submit — ensure cover is first + validate
+    var wizardForm = document.querySelector('form');
+    if (wizardForm) {
+      wizardForm.addEventListener('submit', function(e) {
+        if (photoFiles.length === 0) {
+          e.preventDefault();
+          alert('Por favor sube al menos una foto de la propiedad.');
+          return false;
+        }
+        syncFileInput();
+      });
+    }
+
+    // ═══════ HERO PDF PHOTO PREVIEW ═══════
+    var heroPdfInput = document.getElementById('fotoHeroPdf');
+    var heroPreview = document.getElementById('heroPreview');
+    var heroPreviewImg = document.getElementById('heroPreviewImg');
+    if (heroPdfInput) {
+      heroPdfInput.addEventListener('change', function() {
+        if (this.files && this.files[0]) {
           var reader = new FileReader();
           reader.onload = function(e) {
-            var div = document.createElement('div');
-            div.className = 'photo-thumb' + (i === 0 ? ' cover' : '');
-            div.innerHTML = '<img src="' + e.target.result + '" />';
-            if (i === 0) div.innerHTML += '<div class="cover-tag">Portada</div>';
-            mainGrid.appendChild(div);
+            heroPreviewImg.src = e.target.result;
+            heroPreview.style.display = 'block';
           };
-          reader.readAsDataURL(file);
-        });
+          reader.readAsDataURL(this.files[0]);
+        }
       });
+    }
+    function removeHeroPhoto() {
+      if (heroPdfInput) { try { heroPdfInput.value = ''; } catch(e) {} }
+      heroPreview.style.display = 'none';
+      heroPreviewImg.src = '';
     }
 
     // ═══════ SCENE PHOTO PREVIEW ═══════
@@ -1190,7 +1372,7 @@
       }, 3000);
     }
 
-    // ═══════ DRAG & DROP ═══════
+    // ═══════ DRAG & DROP (upload zone) ═══════
     var uploadZone = document.getElementById('mainUploadZone');
     if (uploadZone) {
       uploadZone.addEventListener('dragover', function(e) { e.preventDefault(); this.style.borderColor = 'var(--gold)'; });
@@ -1198,8 +1380,7 @@
       uploadZone.addEventListener('drop', function(e) {
         e.preventDefault(); this.style.borderColor = '';
         if (e.dataTransfer.files.length) {
-          mainPhotos.files = e.dataTransfer.files;
-          mainPhotos.dispatchEvent(new Event('change'));
+          addPhotos(e.dataTransfer.files);
         }
       });
     }

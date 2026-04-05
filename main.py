@@ -398,18 +398,47 @@ def generate_property_pdf(data: dict) -> bytes:
     # ══════════════════════════════════════
     pdf.add_page()
 
-    # Foto de portada grande
-    if portada_url:
-        portada_path = url_to_filepath(portada_url)
-        if portada_path.exists():
+    # Determinar qué imagen usar como hero (panorámica > portada)
+    hero_path = data.get("hero_pdf_path")
+    if not hero_path and portada_url:
+        p = url_to_filepath(portada_url)
+        if p.exists():
+            hero_path = str(p)
+
+    hero_w, hero_h = 190, 120  # mm en el PDF
+
+    if hero_path and Path(hero_path).exists():
+        try:
+            # Recortar al ratio correcto (190:120 ≈ 1.58:1) para evitar estiramiento
+            img = _open_image(hero_path, "RGB")
+            target_ratio = hero_w / hero_h  # ~1.583
+            img_w, img_h = img.size
+            img_ratio = img_w / img_h
+
+            if img_ratio > target_ratio:
+                # Imagen más ancha: recortar lados
+                new_w = int(img_h * target_ratio)
+                offset = (img_w - new_w) // 2
+                img = img.crop((offset, 0, offset + new_w, img_h))
+            elif img_ratio < target_ratio:
+                # Imagen más alta: recortar arriba/abajo
+                new_h = int(img_w / target_ratio)
+                offset = (img_h - new_h) // 2
+                img = img.crop((0, offset, img_w, offset + new_h))
+
+            # Guardar versión recortada en temporal
+            import tempfile
+            tmp = tempfile.NamedTemporaryFile(suffix=".jpg", delete=False)
+            img.save(tmp.name, "JPEG", quality=92)
+            pdf.image(tmp.name, x=10, w=hero_w, h=hero_h)
             try:
-                pdf.image(str(portada_path), x=10, w=190, h=120)
+                os.unlink(tmp.name)
             except Exception:
-                pdf.set_fill_color(220, 220, 220)
-                pdf.rect(10, pdf.get_y(), 190, 120, "F")
-            pdf.ln(124)
-        else:
-            pdf.ln(8)
+                pass
+        except Exception:
+            pdf.set_fill_color(220, 220, 220)
+            pdf.rect(10, pdf.get_y(), hero_w, hero_h, "F")
+        pdf.ln(124)
     else:
         pdf.ln(8)
 
@@ -2305,6 +2334,7 @@ async def generate(
     scene_bano_text: Optional[str] = Form(None),
     scene_cierre_text: Optional[str] = Form(None),
     # Fotos por escena
+    foto_hero_pdf: Optional[UploadFile] = File(None),
     scene_fachada: Optional[UploadFile] = File(None),
     scene_sala: Optional[UploadFile] = File(None),
     scene_cocina: Optional[UploadFile] = File(None),
@@ -2358,6 +2388,17 @@ async def generate(
             foto_portada_url = url
         else:
             fotos_extra_urls.append(url)
+
+    # Guardar foto hero panorámica para PDF (opcional)
+    foto_hero_pdf_url = None
+    if foto_hero_pdf and foto_hero_pdf.filename and foto_hero_pdf.size > 0:
+        ext = Path(foto_hero_pdf.filename).suffix.lower()
+        if ext in {".jpg", ".jpeg", ".png", ".webp"}:
+            fname = f"hero_pdf{ext}"
+            dest = session_upload_dir / fname
+            with open(dest, "wb") as buffer:
+                shutil.copyfileobj(foto_hero_pdf.file, buffer)
+            foto_hero_pdf_url = f"/static/uploads/{session_id}/{fname}"
 
     # Guardar fotos de escenas
     scene_photos = {}
@@ -2460,6 +2501,7 @@ async def generate(
         "agente_instagram": agente_instagram,
         "agente_inmobiliaria": agente_inmobiliaria,
         "foto_portada_url": foto_portada_url,
+        "foto_hero_pdf_url": foto_hero_pdf_url,
         "fotos_extra_urls": fotos_extra_urls,
         "descripcion_profesional": descripcion_profesional,
         "instagram_copy": instagram_copy,
@@ -2562,11 +2604,30 @@ async def download_pdf(
     agente_telefono: str = Form(""),
     agente_email: str = Form(""),
     foto_portada_url: Optional[str] = Form(None),
+    foto_hero_pdf_url: Optional[str] = Form(None),
     descripcion_profesional: str = Form(""),
+    foto_hero_pdf_upload: Optional[UploadFile] = File(None),
 ):
     form_data = await request.form()
     amenidades = form_data.getlist("amenidades")
     fotos_extra_urls = form_data.getlist("fotos_extra_urls")
+
+    # Si subieron una foto hero nueva, guardarla temporalmente
+    hero_pdf_path = None
+    if foto_hero_pdf_upload and foto_hero_pdf_upload.filename and foto_hero_pdf_upload.size > 0:
+        ext = Path(foto_hero_pdf_upload.filename).suffix.lower()
+        if ext in {".jpg", ".jpeg", ".png", ".webp"}:
+            tmp_dir = UPLOAD_DIR / "tmp_hero"
+            tmp_dir.mkdir(parents=True, exist_ok=True)
+            tmp_file = tmp_dir / f"hero_{uuid.uuid4().hex[:8]}{ext}"
+            with open(tmp_file, "wb") as buffer:
+                shutil.copyfileobj(foto_hero_pdf_upload.file, buffer)
+            hero_pdf_path = str(tmp_file)
+    elif foto_hero_pdf_url:
+        # Usar la foto hero que ya se subió en el wizard
+        p = url_to_filepath(foto_hero_pdf_url)
+        if p.exists():
+            hero_pdf_path = str(p)
 
     data = {
         "tipo_propiedad": tipo_propiedad,
@@ -2587,6 +2648,7 @@ async def download_pdf(
         "foto_portada_url": foto_portada_url,
         "fotos_extra_urls": fotos_extra_urls,
         "descripcion_profesional": descripcion_profesional,
+        "hero_pdf_path": hero_pdf_path,
     }
 
     pdf_bytes = generate_property_pdf(data)
