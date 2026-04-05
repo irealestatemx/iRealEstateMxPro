@@ -10,3 +10,4 @@ venv/
 *.egg-info/
 video/node_modules/
 video/dist/
+CLAUDE.md
