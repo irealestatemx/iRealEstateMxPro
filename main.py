@@ -1360,12 +1360,18 @@ async def enviar_whatsapp_n8n(tipo: str, destinatario: dict, metadata: dict):
         except KeyError:
             pass
 
+    telefono = destinatario.get("telefono", "")
+    if not telefono:
+        print(f"[WHATSAPP] Usuario {destinatario.get('nombre', '')} sin teléfono. Tipo: {tipo}")
+        return False
+
     payload = {
         "tipo": tipo,
         "destinatario_nombre": destinatario.get("nombre", ""),
         "destinatario_email": destinatario.get("email", ""),
+        "destinatario_telefono": telefono,
         "mensaje": mensaje,
-        "metadata": metadata,
+        "metadata": {**metadata, "telefono_destino": telefono},
     }
 
     try:
@@ -1593,6 +1599,7 @@ async def admin_create_user(
     nombre: str = Form(...),
     rol: str = Form("agente"),
     prefijo_whatsapp: str = Form(""),
+    telefono: str = Form(""),
 ):
     user = await require_auth(request)
     if not user or user["rol"] != "admin":
@@ -1600,8 +1607,13 @@ async def admin_create_user(
     error_msg = ""
     try:
         user_id = await create_user(email, password, nombre, rol)
+        updates = {}
         if prefijo_whatsapp.strip():
-            await update_user(user_id, {"prefijo_whatsapp": prefijo_whatsapp.strip().upper()})
+            updates["prefijo_whatsapp"] = prefijo_whatsapp.strip().upper()
+        if telefono.strip():
+            updates["telefono"] = telefono.strip()
+        if updates:
+            await update_user(user_id, updates)
         # Redirigir con credenciales visibles una sola vez
         from urllib.parse import urlencode
         params = urlencode({

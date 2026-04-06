@@ -149,6 +149,10 @@
             <label>Prefijo WA</label>
             <input type="text" name="prefijo_whatsapp" placeholder="Ej: N" maxlength="5" style="text-transform:uppercase" />
           </div>
+          <div class="fg" style="max-width:160px">
+            <label>Teléfono</label>
+            <input type="text" name="telefono" placeholder="Ej: 524771234567" maxlength="20" />
+          </div>
           <button type="submit" class="btn-add">Agregar</button>
         </div>
       </form>
@@ -164,6 +168,7 @@
             <th>Email</th>
             <th>Rol</th>
             <th>Prefijo</th>
+            <th>Teléfono</th>
             <th>Estado</th>
             <th>Acciones</th>
           </tr>
@@ -175,6 +180,7 @@
             <td>{{ u.email }}</td>
             <td><span class="badge badge-{{ u.rol }}">{{ u.rol }}</span></td>
             <td>{{ u.prefijo_whatsapp or '—' }}</td>
+            <td>{{ u.telefono or '—' }}</td>
             <td><span class="badge {{ 'badge-activo' if u.activo else 'badge-inactivo' }}">{{ 'Activo' if u.activo else 'Inactivo' }}</span></td>
             <td>
               {% if u.id != user.id %}

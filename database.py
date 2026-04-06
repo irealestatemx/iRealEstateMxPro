@@ -165,6 +165,7 @@ MIGRATIONS = [
     "ALTER TABLE documentos ADD COLUMN IF NOT EXISTS rol_documento VARCHAR(20) DEFAULT 'vendedor';",
     "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS comprador_id INTEGER REFERENCES usuarios(id);",
     "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS tipo_compra VARCHAR(50);",
+    "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS telefono VARCHAR(20);",
 ]
 
 
@@ -527,7 +528,7 @@ async def create_user(email: str, password: str, nombre: str, rol: str = "agente
 
 async def get_user_by_email(email: str):
     """Obtiene un usuario por email (sin verificar contraseña)."""
-    query = "SELECT id, email, nombre, rol, prefijo_whatsapp, activo, created_at FROM usuarios WHERE email = :email"
+    query = "SELECT id, email, nombre, rol, prefijo_whatsapp, telefono, activo, created_at FROM usuarios WHERE email = :email"
     row = await database.fetch_one(query=query, values={"email": email.lower().strip()})
     if not row:
         return None
@@ -548,14 +549,14 @@ async def authenticate_user(email: str, password: str):
 
 async def get_user_by_id(user_id: int):
     """Obtiene usuario por ID."""
-    query = "SELECT id, email, nombre, rol, prefijo_whatsapp, activo, created_at FROM usuarios WHERE id = :id"
+    query = "SELECT id, email, nombre, rol, prefijo_whatsapp, telefono, activo, created_at FROM usuarios WHERE id = :id"
     row = await database.fetch_one(query=query, values={"id": user_id})
     return dict(row._mapping) if row else None
 
 
 async def get_all_users():
     """Lista todos los usuarios."""
-    query = "SELECT id, email, nombre, rol, prefijo_whatsapp, activo, created_at FROM usuarios ORDER BY created_at DESC"
+    query = "SELECT id, email, nombre, rol, prefijo_whatsapp, telefono, activo, created_at FROM usuarios ORDER BY created_at DESC"
     rows = await database.fetch_all(query=query)
     return [dict(r._mapping) for r in rows]
 
