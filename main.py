@@ -820,6 +820,8 @@ def generate_instagram_image(data: dict) -> bytes:
         specs_parts.append(f"{data['banos']} Banos")
     if data.get("metros_construidos"):
         specs_parts.append(f"{data['metros_construidos']} m2")
+    if data.get("metros_terreno"):
+        specs_parts.append(f"{data['metros_terreno']} m2 Ter")
     if data.get("estacionamientos"):
         specs_parts.append(f"{data['estacionamientos']} Est")
 
@@ -974,6 +976,7 @@ def generate_instagram_story(data: dict) -> bytes:
     if data.get("recamaras"): specs.append(f"{data['recamaras']} Rec")
     if data.get("banos"): specs.append(f"{data['banos']} Baños")
     if data.get("metros_construidos"): specs.append(f"{data['metros_construidos']} m²")
+    if data.get("metros_terreno"): specs.append(f"{data['metros_terreno']} m² Ter")
     if data.get("estacionamientos"): specs.append(f"{data['estacionamientos']} Est")
     if specs:
         x = 60
@@ -2042,6 +2045,21 @@ ESTADO_ORDEN = {"atorado": 0, "listo_para_cerrar": 1, "casi_listo": 2, "en_proce
 PRIORIDAD_ORDEN = {"alta": 0, "alta_cierre": 1, "media": 2, "normal": 3, "baja": 4, "ninguna": 5}
 
 
+def _dias_desde(fecha):
+    """Calcula días transcurridos desde una fecha. Retorna None si no hay fecha."""
+    if not fecha:
+        return None
+    from datetime import datetime, timezone
+    if isinstance(fecha, str):
+        try:
+            fecha = datetime.fromisoformat(fecha)
+        except (ValueError, TypeError):
+            return None
+    if fecha.tzinfo is None:
+        fecha = fecha.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - fecha).days
+
+
 def calcular_estado_propiedad(docs_subidos, docs_rechazados, total_obligatorios):
     """Calcula el estado de avance de una propiedad."""
     if docs_rechazados > 0:
@@ -2301,6 +2319,7 @@ async def dashboard_asesor(request: Request):
             "motivo": motivo,
             "mensaje_sugerido": mensaje,
             "ultimo_movimiento": str(p["ultimo_movimiento"])[:16] if p["ultimo_movimiento"] else "Sin actividad",
+            "dias_inactivo": _dias_desde(p["ultimo_movimiento"]),
             "comprador_id": p.get("comprador_id"),
             "comprador_nombre": p.get("comprador_nombre") or "",
             "tipo_compra": p.get("tipo_compra") or "",
@@ -3411,6 +3430,7 @@ async def generate(
                 "recamaras": recamaras or "",
                 "banos": banos or "",
                 "metros_construidos": metros_construidos or "",
+                "metros_terreno": metros_terreno or "",
                 "estacionamientos": estacionamientos or "",
                 "tipoPropiedad": tipo_propiedad,
                 "agente_nombre": agente_nombre,
@@ -3894,6 +3914,7 @@ def _build_scene_specs(photo_path: str, data: dict) -> Image.Image:
     if data.get("recamaras"): specs.append(("Rec", data["recamaras"]))
     if data.get("banos"): specs.append(("Banos", data["banos"]))
     if data.get("metros_construidos"): specs.append(("m2", data["metros_construidos"]))
+    if data.get("metros_terreno"): specs.append(("m2 Ter", data["metros_terreno"]))
     if data.get("estacionamientos"): specs.append(("Est", data["estacionamientos"]))
 
     if specs:
@@ -4068,6 +4089,7 @@ def _build_overlay_specs(data: dict) -> Image.Image:
     if data.get("recamaras"): specs.append(("Rec", data["recamaras"]))
     if data.get("banos"): specs.append(("Banos", data["banos"]))
     if data.get("metros_construidos"): specs.append(("m2", data["metros_construidos"]))
+    if data.get("metros_terreno"): specs.append(("m2 Ter", data["metros_terreno"]))
     if data.get("estacionamientos"): specs.append(("Est", data["estacionamientos"]))
 
     if specs:

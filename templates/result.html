@@ -933,12 +933,31 @@
     }
   }
 
-  /* ── Publish to Instagram (placeholder) ── */
+  /* ── Publish to Instagram ── */
   function publishToInstagram(type) {
     closeAllDropdowns();
-    if (typeof showToast === 'function') {
-      showToast('Publicaci\u00f3n en Instagram: pr\u00f3ximamente', false);
-    }
+    var formId = type === 'post' ? 'imgForm' : (type === 'story' ? 'storyForm' : 'carouselForm');
+    var srcForm = document.getElementById(formId);
+    if (!srcForm) return;
+
+    var fd = new FormData(srcForm);
+    fd.append('instagram_copy', document.getElementById('instagram-copy') ? document.getElementById('instagram-copy').innerText : '');
+    fd.append('session_id', '{{ session_id }}');
+
+    showToast('Publicando en Instagram...', false);
+
+    fetch('/publish-instagram', { method: 'POST', body: fd })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.success) {
+        showToast(data.message || 'Publicado exitosamente', false);
+      } else {
+        showToast('Error: ' + (data.error || 'No se pudo publicar'), false);
+      }
+    })
+    .catch(function() {
+      showToast('Error de conexi\u00f3n al publicar', false);
+    });
   }
 
   /* ── Video generation (reuses existing logic) ── */
