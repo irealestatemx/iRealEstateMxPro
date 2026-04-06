@@ -138,6 +138,18 @@ CREATE TABLE IF NOT EXISTS notificaciones (
 );
 """
 
+CREATE_SEGUIMIENTOS = """
+CREATE TABLE IF NOT EXISTS seguimiento_mensajes (
+    id              SERIAL PRIMARY KEY,
+    comprador_id    INTEGER REFERENCES usuarios(id),
+    propiedad_id    INTEGER REFERENCES propiedades(id) ON DELETE CASCADE,
+    agente_id       INTEGER REFERENCES usuarios(id),
+    mensaje         TEXT NOT NULL,
+    modo            VARCHAR(20) DEFAULT 'seguimiento',
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+"""
+
 CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_propiedades_ciudad ON propiedades(ciudad);",
     "CREATE INDEX IF NOT EXISTS idx_propiedades_operacion ON propiedades(operacion);",
@@ -178,6 +190,7 @@ async def init_db():
     await database.execute(CREATE_PROSPECTOS)
     await database.execute(CREATE_DOCUMENTOS)
     await database.execute(CREATE_NOTIFICACIONES)
+    await database.execute(CREATE_SEGUIMIENTOS)
     for idx in CREATE_INDEXES:
         await database.execute(idx)
     for mig in MIGRATIONS:
@@ -273,8 +286,10 @@ async def get_propiedades_seguimiento(agente_id: int = None):
         values["agente_id"] = agente_id
     query = f"""
     SELECT p.id, p.tipo_propiedad, p.operacion, p.direccion, p.ciudad, p.estado,
-           p.precio_formateado, p.foto_portada_url, p.vendedor_id, p.user_id,
+           p.precio_formateado, p.foto_portada_url, p.vendedor_id, p.comprador_id, p.user_id,
+           p.tipo_compra,
            u_v.nombre as vendedor_nombre, u_v.email as vendedor_email,
+           u_c.nombre as comprador_nombre, u_c.email as comprador_email,
            COUNT(d.id) as docs_subidos,
            COUNT(CASE WHEN d.estado = 'aprobado' THEN 1 END) as docs_aprobados,
            COUNT(CASE WHEN d.estado = 'rechazado' THEN 1 END) as docs_rechazados,
@@ -282,9 +297,10 @@ async def get_propiedades_seguimiento(agente_id: int = None):
            MAX(d.created_at) as ultimo_movimiento
     FROM propiedades p
     LEFT JOIN usuarios u_v ON p.vendedor_id = u_v.id
+    LEFT JOIN usuarios u_c ON p.comprador_id = u_c.id
     LEFT JOIN documentos d ON d.propiedad_id = p.id AND d.categoria = 'vendedor'
     {where}
-    GROUP BY p.id, u_v.nombre, u_v.email
+    GROUP BY p.id, u_v.nombre, u_v.email, u_c.nombre, u_c.email
     ORDER BY p.created_at DESC
     """
     rows = await database.fetch_all(query=query, values=values)
@@ -309,6 +325,43 @@ async def get_properties_by_comprador(comprador_id: int):
     """
     rows = await database.fetch_all(query=query, values={"comprador_id": comprador_id})
     return [_normalize_prop(dict(r._mapping)) for r in rows]
+
+
+async def guardar_seguimiento(comprador_id: int, propiedad_id: int, agente_id: int, mensaje: str, modo: str = "seguimiento"):
+    """Guarda registro de mensaje de seguimiento enviado."""
+    query = """
+    INSERT INTO seguimiento_mensajes (comprador_id, propiedad_id, agente_id, mensaje, modo)
+    VALUES (:comprador_id, :propiedad_id, :agente_id, :mensaje, :modo)
+    RETURNING id
+    """
+    return await database.execute(query=query, values={
+        "comprador_id": comprador_id,
+        "propiedad_id": propiedad_id,
+        "agente_id": agente_id,
+        "mensaje": mensaje,
+        "modo": modo,
+    })
+
+
+async def get_ultimo_seguimiento_por_propiedad(propiedad_ids: list):
+    """Retorna el último seguimiento para cada propiedad. Recibe lista de IDs."""
+    if not propiedad_ids:
+        return {}
+    placeholders = ", ".join(f":id{i}" for i in range(len(propiedad_ids)))
+    query = f"""
+    SELECT DISTINCT ON (propiedad_id)
+        propiedad_id, mensaje, modo, created_at
+    FROM seguimiento_mensajes
+    WHERE propiedad_id IN ({placeholders})
+    ORDER BY propiedad_id, created_at DESC
+    """
+    values = {f"id{i}": pid for i, pid in enumerate(propiedad_ids)}
+    rows = await database.fetch_all(query=query, values=values)
+    result = {}
+    for r in rows:
+        d = dict(r._mapping)
+        result[d["propiedad_id"]] = d
+    return result
 
 
 async def set_tipo_compra(propiedad_id: int, tipo_compra: str):
@@ -384,7 +437,8 @@ async def update_property(prop_id: int, updates: dict):
         "amenidades", "descripcion_agente", "descripcion_profesional",
         "instagram_copy", "agente_nombre", "agente_telefono", "agente_email",
         "foto_portada_url", "fotos_extra_urls",
-        "publicada_instagram", "publicada_web", "activa"
+        "publicada_instagram", "publicada_web", "activa",
+        "vendedor_id", "comprador_id",
     }
     fields = {k: v for k, v in updates.items() if k in allowed}
     if not fields:
@@ -561,9 +615,16 @@ async def get_all_users():
     return [dict(r._mapping) for r in rows]
 
 
+async def get_users_by_rol(rol: str):
+    """Lista usuarios activos de un rol específico."""
+    query = "SELECT id, nombre, email, telefono FROM usuarios WHERE rol = :rol AND activo = TRUE ORDER BY nombre"
+    rows = await database.fetch_all(query=query, values={"rol": rol})
+    return [dict(r._mapping) for r in rows]
+
+
 async def update_user(user_id: int, updates: dict):
     """Actualiza un usuario."""
-    allowed = {"nombre", "email", "rol", "activo", "prefijo_whatsapp"}
+    allowed = {"nombre", "email", "rol", "activo", "prefijo_whatsapp", "telefono"}
     fields = {k: v for k, v in updates.items() if k in allowed}
     if "password" in updates and updates["password"]:
         fields["password"] = bcrypt.hash(updates["password"])

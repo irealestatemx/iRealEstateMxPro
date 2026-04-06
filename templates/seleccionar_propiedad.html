@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iRealEstateMxPro — Seleccionar Propiedad</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #0d0d0d; color: #e0e0e0; min-height: 100vh; }
+    .topbar {
+      background: #111; border-bottom: 1px solid rgba(201,162,39,.15); padding: 16px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar-logo { height: 36px; }
+    .topbar-nav { display: flex; gap: 16px; align-items: center; }
+    .topbar-nav a { color: rgba(255,255,255,.6); text-decoration: none; font-size: 14px; font-weight: 500; transition: color .2s; }
+    .topbar-nav a:hover { color: #c9a227; }
+    .topbar-user { color: rgba(255,255,255,.4); font-size: 13px; }
+    .hamburger { display:none; background:none; border:none; cursor:pointer; padding:4px; }
+    .hamburger span { display:block; width:22px; height:2px; background:#c9a227; margin:5px 0; border-radius:2px; transition:all .25s; }
+    .hamburger.open span:nth-child(1) { transform:rotate(45deg) translate(5px,5px); }
+    .hamburger.open span:nth-child(2) { opacity:0; }
+    .hamburger.open span:nth-child(3) { transform:rotate(-45deg) translate(5px,-5px); }
+    @media(max-width:768px){
+      .hamburger { display:block; }
+      .topbar { flex-wrap:wrap; padding:12px 16px; }
+      .topbar-nav { display:none; width:100%; flex-direction:column; gap:0; padding-top:12px; border-top:1px solid rgba(255,255,255,.1); margin-top:12px; }
+      .topbar-nav.open { display:flex; }
+      .topbar-nav a, .topbar-nav span { padding:10px 0; font-size:15px; }
+    }
+    .container { max-width: 900px; margin: 24px auto; padding: 0 20px; }
+    h1 { font-size: 22px; color: #c9a227; font-family: 'Playfair Display', serif; margin-bottom: 8px; }
+    .subtitle { font-size: 14px; color: rgba(255,255,255,.45); margin-bottom: 24px; }
+
+    /* Steps */
+    .steps {
+      display: flex; gap: 0; margin-bottom: 28px;
+    }
+    .step {
+      flex: 1; text-align: center; padding: 12px 8px; position: relative;
+      font-size: 13px; font-weight: 600; color: rgba(255,255,255,.3);
+      border-bottom: 3px solid rgba(255,255,255,.08);
+    }
+    .step.active { color: #c9a227; border-bottom-color: #c9a227; }
+    .step.done { color: #68d391; border-bottom-color: #68d391; }
+    .step-num {
+      display: inline-block; width: 24px; height: 24px; line-height: 24px;
+      border-radius: 50%; font-size: 12px; margin-right: 6px;
+      background: rgba(255,255,255,.08); color: rgba(255,255,255,.3);
+    }
+    .step.active .step-num { background: rgba(201,162,39,.2); color: #c9a227; }
+    .step.done .step-num { background: rgba(104,211,145,.2); color: #68d391; }
+
+    /* Selector agente */
+    .agente-select {
+      width: 100%; padding: 12px 16px; border: 1px solid rgba(201,162,39,.2);
+      border-radius: 10px; font-size: 14px; background: #1a1a1a; color: #e0e0e0;
+      font-family: 'Inter', sans-serif; cursor: pointer;
+    }
+    .agente-select:focus { border-color: #c9a227; outline: none; }
+
+    /* Grid propiedades */
+    .props-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 16px;
+      margin-top: 20px;
+    }
+    .prop-card {
+      background: #1a1a1a; border: 2px solid rgba(255,255,255,.08); border-radius: 12px;
+      overflow: hidden; cursor: pointer; transition: all .2s;
+    }
+    .prop-card:hover { border-color: rgba(201,162,39,.4); transform: translateY(-2px); }
+    .prop-card img {
+      width: 100%; height: 180px; object-fit: cover; display: block;
+    }
+    .prop-card .no-img {
+      width: 100%; height: 180px; background: #222; display: flex;
+      align-items: center; justify-content: center; color: #555; font-size: 13px;
+    }
+    .prop-card-body { padding: 14px 16px; }
+    .prop-card-body h3 { font-size: 15px; color: #fff; margin-bottom: 4px; }
+    .prop-card-body .price { font-size: 18px; font-weight: 700; color: #c9a227; margin-bottom: 6px; }
+    .prop-card-body .loc { font-size: 12px; color: rgba(255,255,255,.4); margin-bottom: 8px; }
+    .prop-card-body .specs {
+      display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; color: rgba(255,255,255,.5);
+    }
+    .prop-card-body .specs span {
+      background: rgba(255,255,255,.06); padding: 3px 8px; border-radius: 6px;
+    }
+    .btn-select {
+      display: block; width: 100%; padding: 10px; background: rgba(201,162,39,.1);
+      color: #c9a227; border: none; border-top: 1px solid rgba(201,162,39,.1);
+      font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;
+      transition: background .2s;
+    }
+    .btn-select:hover { background: rgba(201,162,39,.2); }
+
+    .empty-msg {
+      text-align: center; padding: 48px 20px; color: rgba(255,255,255,.35);
+      background: #1a1a1a; border-radius: 12px; border: 1px solid rgba(255,255,255,.06);
+    }
+    .empty-msg p { font-size: 14px; margin-bottom: 4px; }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <img src="/static/img/logo-header.png" alt="iRealEstateMx" class="topbar-logo" />
+    <button class="hamburger" onclick="this.classList.toggle('open');document.querySelector('.topbar-nav').classList.toggle('open');" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="topbar-nav">
+      <span class="topbar-user">{{ user.nombre }} ({{ user.rol }})</span>
+      <a href="/logout">Salir</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <h1>Bienvenido, {{ user.nombre }}</h1>
+    <p class="subtitle">Selecciona tu agente y la propiedad que te corresponde para comenzar.</p>
+
+    <!-- Pasos -->
+    <div class="steps">
+      <div class="step {{ 'done' if agente_id else 'active' }}">
+        <span class="step-num">1</span> Elige tu agente
+      </div>
+      <div class="step {{ 'active' if agente_id else '' }}">
+        <span class="step-num">2</span> Selecciona tu propiedad
+      </div>
+    </div>
+
+    <!-- Paso 1: Seleccionar agente -->
+    <form method="get" action="/seleccionar-propiedad" id="formAgente">
+      <label style="font-size:13px;font-weight:600;color:rgba(255,255,255,.5);display:block;margin-bottom:6px;">Tu agente</label>
+      <select name="agente_id" class="agente-select" onchange="document.getElementById('formAgente').submit();">
+        <option value="">— Selecciona tu agente —</option>
+        {% for a in agentes %}
+        <option value="{{ a.id }}" {{ 'selected' if agente_id == a.id }}>{{ a.nombre }}</option>
+        {% endfor %}
+      </select>
+    </form>
+
+    <!-- Paso 2: Propiedades del agente -->
+    {% if agente_id %}
+      {% if propiedades | length > 0 %}
+      <div class="props-grid">
+        {% for p in propiedades %}
+        <div class="prop-card">
+          {% if p.foto_portada_url %}
+          <img src="{{ p.foto_portada_url }}" alt="Foto" />
+          {% else %}
+          <div class="no-img">Sin foto</div>
+          {% endif %}
+          <div class="prop-card-body">
+            <h3>{{ p.tipo_propiedad }} en {{ p.operacion }}</h3>
+            <div class="price">{{ p.precio_formateado }}</div>
+            <div class="loc">{{ p.direccion }}, {{ p.ciudad }}</div>
+            <div class="specs">
+              {% if p.recamaras %}<span>{{ p.recamaras }} Rec</span>{% endif %}
+              {% if p.banos %}<span>{{ p.banos }} Ba&ntilde;os</span>{% endif %}
+              {% if p.metros_construidos %}<span>{{ p.metros_construidos }} m&sup2;</span>{% endif %}
+              {% if p.estacionamientos %}<span>{{ p.estacionamientos }} Est</span>{% endif %}
+            </div>
+          </div>
+          <form method="post" action="/seleccionar-propiedad" onsubmit="return confirm('¿Confirmas que esta es tu propiedad?');">
+            <input type="hidden" name="propiedad_id" value="{{ p.id }}" />
+            <button type="submit" class="btn-select">Esta es mi propiedad</button>
+          </form>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-msg" style="margin-top:20px;">
+        <p>No hay propiedades disponibles con este agente.</p>
+        <p style="font-size:12px;color:rgba(255,255,255,.25);">Contacta a tu agente para que registre tu propiedad en la plataforma.</p>
+      </div>
+      {% endif %}
+    {% endif %}
+  </div>
+</body>
+</html>

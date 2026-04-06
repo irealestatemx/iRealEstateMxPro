@@ -179,6 +179,42 @@
         </div>
       </form>
     </div>
+
+    <!-- ═══ Asignación de vendedor y comprador ═══ -->
+    <div class="card">
+      <h2 style="font-size:18px;color:#c9a227;margin-bottom:16px;font-family:'Playfair Display',serif;">Asignar clientes</h2>
+      <form method="post" action="/dashboard/editar/{{ prop.id }}/asignar">
+        <div class="form-grid">
+          <div class="form-group">
+            <label>Vendedor asignado</label>
+            <select name="vendedor_id" style="width:100%;padding:10px 14px;border:1px solid rgba(201,162,39,.2);border-radius:8px;font-size:14px;background:#111;color:#e0e0e0;font-family:'Inter',sans-serif;">
+              <option value="">— Sin asignar —</option>
+              {% for v in vendedores %}
+              <option value="{{ v.id }}" {{ 'selected' if prop.vendedor_id == v.id }}>{{ v.nombre }} ({{ v.email }})</option>
+              {% endfor %}
+            </select>
+            {% if prop.vendedor_id %}
+            <p style="font-size:11px;color:#68d391;margin-top:4px;">Vendedor asignado — puede subir documentos</p>
+            {% endif %}
+          </div>
+          <div class="form-group">
+            <label>Comprador asignado</label>
+            <select name="comprador_id" style="width:100%;padding:10px 14px;border:1px solid rgba(201,162,39,.2);border-radius:8px;font-size:14px;background:#111;color:#e0e0e0;font-family:'Inter',sans-serif;">
+              <option value="">— Sin asignar —</option>
+              {% for c in compradores %}
+              <option value="{{ c.id }}" {{ 'selected' if prop.comprador_id == c.id }}>{{ c.nombre }} ({{ c.email }})</option>
+              {% endfor %}
+            </select>
+            {% if prop.comprador_id %}
+            <p style="font-size:11px;color:#68d391;margin-top:4px;">Comprador asignado — puede subir documentos</p>
+            {% endif %}
+          </div>
+        </div>
+        <div class="btn-row" style="margin-top:4px;">
+          <button type="submit" class="btn-save" style="padding:10px 24px;font-size:13px;">Guardar asignación</button>
+        </div>
+      </form>
+    </div>
   </div>
 </body>
 </html>

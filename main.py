@@ -30,7 +30,7 @@ from database import (
     save_desarrollo, get_all_desarrollos, get_desarrollo_by_id,
     search_desarrollos, update_desarrollo,
     authenticate_user, get_user_by_email, get_user_by_id, get_all_users, create_user,
-    update_user, delete_user, delete_user_permanent, seed_admin_user,
+    update_user, delete_user, delete_user_permanent, seed_admin_user, get_users_by_rol,
     get_properties_by_user,
     get_user_by_prefijo, get_all_referidos,
     create_prospecto, get_all_prospectos, get_prospecto_by_id,
@@ -38,6 +38,7 @@ from database import (
     save_documento, get_documentos_by_propiedad, update_documento_estado,
     get_properties_by_vendedor, get_properties_by_comprador,
     get_propiedades_seguimiento, set_tipo_compra,
+    guardar_seguimiento, get_ultimo_seguimiento_por_propiedad,
     crear_notificacion, get_notificaciones, marcar_notificacion_leida,
     contar_notificaciones_no_leidas, get_propiedades_con_docs_pendientes,
 )
@@ -1704,9 +1705,14 @@ async def edit_property_page(request: Request, prop_id: int):
     if user["rol"] != "admin" and prop.get("user_id") != user["id"]:
         return RedirectResponse("/dashboard", status_code=302)
 
+    vendedores = await get_users_by_rol("vendedor")
+    compradores = await get_users_by_rol("comprador")
+
     return templates.TemplateResponse(request=request, name="edit_property.html", context={
         "user": user,
         "prop": prop,
+        "vendedores": vendedores,
+        "compradores": compradores,
     })
 
 
@@ -1757,6 +1763,37 @@ async def edit_property_submit(
     }
     await update_property(prop_id, updates)
     return RedirectResponse("/dashboard", status_code=302)
+
+
+@app.post("/dashboard/editar/{prop_id}/asignar")
+async def asignar_vendedor_comprador(
+    request: Request,
+    prop_id: int,
+    vendedor_id: Optional[str] = Form(None),
+    comprador_id: Optional[str] = Form(None),
+):
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    prop = await get_property_by_id(prop_id)
+    if not prop:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    # Seguridad: solo el dueño de la propiedad o admin
+    if user["rol"] != "admin" and prop.get("user_id") != user["id"]:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    updates = {}
+    if vendedor_id is not None:
+        updates["vendedor_id"] = int(vendedor_id) if vendedor_id else None
+    if comprador_id is not None:
+        updates["comprador_id"] = int(comprador_id) if comprador_id else None
+
+    if updates:
+        await update_property(prop_id, updates)
+
+    return RedirectResponse(f"/dashboard/editar/{prop_id}", status_code=302)
 
 
 @app.post("/dashboard/toggle/{prop_id}")
@@ -2044,6 +2081,152 @@ def generar_mensaje_seguimiento(estado, nombre, propiedad):
     return mensajes.get(estado, "")
 
 
+def generar_mensaje_comprador(nombre, tipo_compra, porcentaje, dias_sin_actividad):
+    """Genera mensaje de seguimiento para comprador basado en su avance."""
+    nombre = nombre or "cliente"
+    tipo = tipo_compra or "tu crédito"
+
+    if porcentaje >= 100:
+        msg = (
+            f"Hola {nombre}, ya tenemos todo listo para avanzar con la firma de tu propiedad. "
+            f"¿Te parece si coordinamos fecha para notaría esta semana?"
+        )
+    elif porcentaje > 80:
+        msg = (
+            f"Hola {nombre}, estamos muy cerca de finalizar tu proceso. "
+            f"Solo faltan algunos detalles para poder avanzar a la siguiente etapa. "
+            f"¿Te parece si lo vemos hoy?"
+        )
+    elif porcentaje >= 30:
+        msg = (
+            f"Hola {nombre}, vas muy bien con tu proceso. "
+            f"Estamos avanzando correctamente, solo faltan algunos documentos para continuar. "
+            f"¿Te parece si lo revisamos hoy?"
+        )
+    else:
+        msg = (
+            f"Hola {nombre}, estoy dando seguimiento a tu proceso de compra. "
+            f"Para poder avanzar necesitamos completar tus documentos. "
+            f"¿Te apoyo con alguno?"
+        )
+
+    if dias_sin_actividad > 3:
+        msg += " Noté que no hemos tenido avances recientes, no quiero que pierdas esta oportunidad."
+
+    return msg
+
+
+def generar_mensaje_recuperar(nombre):
+    """Genera mensaje agresivo para recuperar cliente atorado."""
+    nombre = nombre or "cliente"
+    return (
+        f"Hola {nombre}, no quiero que pierdas esta oportunidad. "
+        f"Tu proceso está detenido y podemos retomarlo de inmediato. "
+        f"¿Te apoyo para avanzar hoy?"
+    )
+
+
+@app.get("/api/mensaje-seguimiento/{comprador_id}")
+async def mensaje_seguimiento_comprador(request: Request, comprador_id: int, modo: str = "seguimiento"):
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"error": "No autenticado"}, status_code=401)
+    if user["rol"] not in ("admin", "agente"):
+        return JSONResponse({"error": "Sin permisos"}, status_code=403)
+
+    comprador = await get_user_by_id(comprador_id)
+    if not comprador or comprador["rol"] != "comprador":
+        return JSONResponse({"error": "Comprador no encontrado"}, status_code=404)
+
+    props = await get_properties_by_comprador(comprador_id)
+    if not props:
+        return JSONResponse({"mensaje": f"Hola {comprador['nombre']}, estoy dando seguimiento a tu proceso de compra. ¿Cómo vas?"})
+
+    # Tomar la primera propiedad asignada
+    prop = props[0]
+
+    # Seguridad: solo el agente dueño de la propiedad o admin
+    if user["rol"] != "admin" and prop.get("user_id") != user["id"]:
+        return JSONResponse({"error": "Sin permisos sobre esta propiedad"}, status_code=403)
+
+    # Calcular avance
+    tipo_compra = prop.get("tipo_compra", "")
+    checklist = get_docs_comprador(tipo_compra) if tipo_compra else []
+    total_oblig = sum(1 for d in checklist if d["obligatorio"])
+
+    docs = await get_documentos_by_propiedad(prop["id"])
+    docs_comprador = {d["tipo_documento"]: d for d in docs if d.get("categoria") == "comprador"}
+    subidos_oblig = sum(1 for d in checklist if d["obligatorio"] and d["tipo"] in docs_comprador)
+    porcentaje = round(subidos_oblig / total_oblig * 100) if total_oblig > 0 else 0
+
+    # Calcular días sin actividad
+    from datetime import datetime, timezone
+    docs_comprador_list = [d for d in docs if d.get("categoria") == "comprador"]
+    if docs_comprador_list:
+        fechas = []
+        for d in docs_comprador_list:
+            ca = d.get("created_at")
+            if ca:
+                if isinstance(ca, str):
+                    try:
+                        ca = datetime.fromisoformat(ca)
+                    except (ValueError, TypeError):
+                        continue
+                if ca.tzinfo is None:
+                    ca = ca.replace(tzinfo=timezone.utc)
+                fechas.append(ca)
+        if fechas:
+            ultima = max(fechas)
+            ahora = datetime.now(timezone.utc)
+            dias_sin_actividad = (ahora - ultima).days
+        else:
+            dias_sin_actividad = 999
+    else:
+        dias_sin_actividad = 999
+
+    if modo == "recuperar":
+        mensaje = generar_mensaje_recuperar(comprador["nombre"])
+    else:
+        mensaje = generar_mensaje_comprador(
+            nombre=comprador["nombre"],
+            tipo_compra=tipo_compra,
+            porcentaje=porcentaje,
+            dias_sin_actividad=dias_sin_actividad,
+        )
+
+    return JSONResponse({
+        "mensaje": mensaje,
+        "comprador": comprador["nombre"],
+        "comprador_id": comprador_id,
+        "propiedad_id": prop["id"],
+        "tipo_compra": tipo_compra or "Sin seleccionar",
+        "porcentaje": porcentaje,
+        "dias_sin_actividad": dias_sin_actividad if dias_sin_actividad < 999 else None,
+        "modo": modo,
+    })
+
+
+@app.post("/api/mensaje-seguimiento/registrar")
+async def registrar_seguimiento(request: Request):
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"error": "No autenticado"}, status_code=401)
+    if user["rol"] not in ("admin", "agente"):
+        return JSONResponse({"error": "Sin permisos"}, status_code=403)
+
+    body = await request.json()
+    comprador_id = body.get("comprador_id")
+    propiedad_id = body.get("propiedad_id")
+    mensaje = body.get("mensaje", "")
+    modo = body.get("modo", "seguimiento")
+
+    if not comprador_id or not propiedad_id or not mensaje:
+        return JSONResponse({"error": "Datos incompletos"}, status_code=400)
+
+    await guardar_seguimiento(comprador_id, propiedad_id, user["id"], mensaje, modo)
+    return JSONResponse({"ok": True})
+
+
 @app.get("/dashboard-asesor", response_class=HTMLResponse)
 async def dashboard_asesor(request: Request):
     user = await require_auth(request)
@@ -2057,6 +2240,10 @@ async def dashboard_asesor(request: Request):
     props_raw = await get_propiedades_seguimiento(agente_id=agente_id)
 
     total_obligatorios = sum(1 for d in DOCS_VENDEDOR_LIST if d["obligatorio"])
+
+    # Obtener últimos seguimientos de compradores
+    prop_ids = [p["id"] for p in props_raw]
+    seguimientos = await get_ultimo_seguimiento_por_propiedad(prop_ids)
 
     propiedades = []
     contadores = {"sin_iniciar": 0, "en_proceso": 0, "casi_listo": 0, "atorado": 0, "completo": 0}
@@ -2106,7 +2293,34 @@ async def dashboard_asesor(request: Request):
             "motivo": motivo,
             "mensaje_sugerido": mensaje,
             "ultimo_movimiento": str(p["ultimo_movimiento"])[:16] if p["ultimo_movimiento"] else "Sin actividad",
+            "comprador_id": p.get("comprador_id"),
+            "comprador_nombre": p.get("comprador_nombre") or "",
+            "tipo_compra": p.get("tipo_compra") or "",
         })
+
+        # Agregar datos de seguimiento del comprador
+        seg = seguimientos.get(p["id"])
+        if seg:
+            from datetime import datetime, timezone
+            seg_fecha = seg["created_at"]
+            if isinstance(seg_fecha, str):
+                try:
+                    seg_fecha = datetime.fromisoformat(seg_fecha)
+                except (ValueError, TypeError):
+                    seg_fecha = None
+            if seg_fecha:
+                if seg_fecha.tzinfo is None:
+                    seg_fecha = seg_fecha.replace(tzinfo=timezone.utc)
+                dias_desde = (datetime.now(timezone.utc) - seg_fecha).days
+            else:
+                dias_desde = None
+            propiedades[-1]["ultimo_mensaje"] = seg["mensaje"]
+            propiedades[-1]["dias_desde_contacto"] = dias_desde
+            propiedades[-1]["seg_modo"] = seg.get("modo", "seguimiento")
+        else:
+            propiedades[-1]["ultimo_mensaje"] = None
+            propiedades[-1]["dias_desde_contacto"] = None
+            propiedades[-1]["seg_modo"] = None
 
     # Ordenar: prioridad (alta→baja), luego último movimiento ASC (más olvidados primero)
     propiedades.sort(key=lambda x: (
@@ -2176,15 +2390,8 @@ async def mis_documentos_sin_id(request: Request):
             "progreso": None,
         })
 
-    # Sin propiedad asignada
-    return templates.TemplateResponse(request=request, name="documentos_vendedor.html", context={
-        "user": user,
-        "propiedad": None,
-        "propiedades": [],
-        "checklist": [],
-        "docs_subidos": {},
-        "progreso": None,
-    })
+    # Sin propiedad asignada → flujo de selección
+    return RedirectResponse("/seleccionar-propiedad", status_code=302)
 
 
 @app.get("/mis-documentos/{propiedad_id}", response_class=HTMLResponse)
@@ -4199,13 +4406,8 @@ async def portal_comprador_sin_id(request: Request):
             "tipos_compra": TIPOS_COMPRA,
         })
 
-    # Sin propiedad asignada
-    return templates.TemplateResponse(request=request, name="portal_comprador.html", context={
-        "user": user,
-        "propiedad": None,
-        "propiedades": [],
-        "tipos_compra": TIPOS_COMPRA,
-    })
+    # Sin propiedad asignada → flujo de selección
+    return RedirectResponse("/seleccionar-propiedad", status_code=302)
 
 
 @app.get("/portal-comprador/{propiedad_id}", response_class=HTMLResponse)
@@ -4285,6 +4487,70 @@ async def guardar_tipo_compra(request: Request):
 
     await set_tipo_compra(propiedad_id, tipo_compra)
     return RedirectResponse(f"/portal-comprador/{propiedad_id}", status_code=302)
+
+
+# ─── Selección de propiedad (onboarding vendedor/comprador) ─────────
+
+@app.get("/seleccionar-propiedad", response_class=HTMLResponse)
+async def seleccionar_propiedad_page(request: Request, agente_id: Optional[int] = None):
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    if user["rol"] not in ("vendedor", "comprador"):
+        return RedirectResponse("/dashboard", status_code=302)
+
+    agentes = await get_users_by_rol("agente")
+    propiedades = []
+
+    if agente_id:
+        todas = await get_properties_by_user(agente_id)
+        # Filtrar: solo propiedades sin vendedor/comprador asignado según el rol
+        for p in todas:
+            if not p.get("activa", True):
+                continue
+            if user["rol"] == "vendedor" and not p.get("vendedor_id"):
+                propiedades.append(p)
+            elif user["rol"] == "comprador" and not p.get("comprador_id"):
+                propiedades.append(p)
+
+    return templates.TemplateResponse(request=request, name="seleccionar_propiedad.html", context={
+        "user": user,
+        "agentes": agentes,
+        "agente_id": agente_id,
+        "propiedades": propiedades,
+    })
+
+
+@app.post("/seleccionar-propiedad")
+async def seleccionar_propiedad_submit(request: Request):
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    if user["rol"] not in ("vendedor", "comprador"):
+        return RedirectResponse("/dashboard", status_code=302)
+
+    form = await request.form()
+    propiedad_id = int(form.get("propiedad_id", 0))
+    if not propiedad_id:
+        return RedirectResponse("/seleccionar-propiedad", status_code=302)
+
+    prop = await get_property_by_id(propiedad_id)
+    if not prop:
+        return RedirectResponse("/seleccionar-propiedad", status_code=302)
+
+    # Asignar según rol
+    if user["rol"] == "vendedor":
+        if prop.get("vendedor_id"):
+            return RedirectResponse("/seleccionar-propiedad", status_code=302)
+        await update_property(propiedad_id, {"vendedor_id": user["id"]})
+        return RedirectResponse("/mis-documentos", status_code=302)
+    else:
+        if prop.get("comprador_id"):
+            return RedirectResponse("/seleccionar-propiedad", status_code=302)
+        await update_property(propiedad_id, {"comprador_id": user["id"]})
+        return RedirectResponse("/portal-comprador", status_code=302)
 
 
 if __name__ == "__main__":

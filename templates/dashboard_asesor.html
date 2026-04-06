@@ -158,6 +158,52 @@
       display: none; z-index: 1000;
     }
 
+    .btn-msg {
+      padding: 7px 12px; border: 1px solid rgba(37,211,102,.3); border-radius: 8px;
+      background: transparent; color: #25d366; font-size: 11px; font-weight: 600;
+      cursor: pointer; font-family: 'Inter', sans-serif; transition: all .2s; flex-shrink: 0;
+      white-space: nowrap;
+    }
+    .btn-msg:hover { background: rgba(37,211,102,.1); border-color: #25d366; }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 999;
+      display: none; align-items: center; justify-content: center; padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: #1a1a1a; border: 1px solid rgba(201,162,39,.2); border-radius: 14px;
+      max-width: 520px; width: 100%; padding: 28px; position: relative;
+    }
+    .modal-close {
+      position: absolute; top: 12px; right: 16px; background: none; border: none;
+      color: rgba(255,255,255,.4); font-size: 22px; cursor: pointer;
+    }
+    .modal-close:hover { color: #fff; }
+    .modal h3 { font-size: 16px; color: #c9a227; margin-bottom: 6px; font-family: 'Playfair Display', serif; }
+    .modal-meta { font-size: 12px; color: rgba(255,255,255,.4); margin-bottom: 14px; display: flex; gap: 12px; flex-wrap: wrap; }
+    .modal-meta span { background: rgba(255,255,255,.06); padding: 2px 8px; border-radius: 6px; }
+    .modal-text {
+      background: #111; border: 1px solid rgba(255,255,255,.08); border-radius: 10px;
+      padding: 16px; font-size: 14px; line-height: 1.6; color: #e0e0e0;
+      margin-bottom: 16px; white-space: pre-wrap;
+    }
+    .modal-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn-copy {
+      padding: 10px 20px; border: none; border-radius: 8px; font-size: 13px;
+      font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;
+      background: #c9a227; color: #000; transition: background .2s;
+    }
+    .btn-copy:hover { background: #d4af37; }
+    .btn-wa-modal {
+      padding: 10px 20px; border: none; border-radius: 8px; font-size: 13px;
+      font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;
+      background: #25d366; color: #fff; text-decoration: none;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .btn-wa-modal:hover { background: #20bd5a; }
+
     .empty-state {
       text-align: center; padding: 60px 20px; color: rgba(255,255,255,.3);
     }
@@ -270,7 +316,10 @@
         <div class="prop-info">
           <div class="prop-title">{{ p.tipo_propiedad }} — {{ p.operacion }}</div>
           <div class="prop-sub">{{ p.direccion }}, {{ p.ciudad }}</div>
-          <div class="prop-cliente">{{ p.vendedor_nombre }}</div>
+          <div class="prop-cliente">Vendedor: {{ p.vendedor_nombre or '—' }}</div>
+          {% if p.comprador_nombre %}
+          <div class="prop-cliente" style="color:#63b3ed;">Comprador: {{ p.comprador_nombre }}{% if p.tipo_compra %} ({{ p.tipo_compra }}){% endif %}</div>
+          {% endif %}
         </div>
 
         <div class="prop-progress">
@@ -301,9 +350,29 @@
           <div class="docs-rejected">{{ p.docs_rechazados }} rechazados</div>
           {% endif %}
           <div class="last-activity">{{ p.ultimo_movimiento }}</div>
+          {% if p.comprador_id %}
+            {% if p.dias_desde_contacto is not none %}
+            <div style="font-size:10px;margin-top:4px;color:{% if p.dias_desde_contacto > 2 %}#fc8181{% else %}rgba(255,255,255,.35){% endif %};">
+              {% if p.dias_desde_contacto == 0 %}Contactado hoy
+              {% elif p.dias_desde_contacto == 1 %}Contactado ayer
+              {% else %}Hace {{ p.dias_desde_contacto }} d&iacute;as{% endif %}
+            </div>
+            {% if p.dias_desde_contacto > 2 %}
+            <div style="font-size:10px;color:#fc8181;font-weight:600;margin-top:2px;">&#x26A0;&#xFE0F; Sin seguimiento reciente</div>
+            {% endif %}
+            {% else %}
+            <div style="font-size:10px;color:#fc8181;margin-top:4px;">&#x26A0;&#xFE0F; Sin contactar a&uacute;n</div>
+            {% endif %}
+          {% endif %}
         </div>
 
         <a href="/mis-documentos/{{ p.id }}" class="btn-ver">Ver docs</a>
+        {% if p.comprador_id %}
+        <button class="btn-msg" onclick="generarMensaje({{ p.comprador_id }})">&#x1F4F2; Mensaje comprador</button>
+        {% endif %}
+        {% if p.estado == 'atorado' and p.comprador_id %}
+        <button class="btn-msg" style="border-color:rgba(252,129,129,.4);color:#fc8181;" onclick="generarMensaje({{ p.comprador_id }},'recuperar')">&#x1F525; Recuperar cliente</button>
+        {% endif %}
       </div>
       {% endfor %}
     </div>
@@ -318,6 +387,20 @@
 
   <div class="copied-toast" id="copiedToast">Mensaje copiado al portapapeles</div>
 
+  <!-- Modal mensaje comprador -->
+  <div class="modal-overlay" id="modalOverlay" onclick="if(event.target===this)cerrarModal();">
+    <div class="modal">
+      <button class="modal-close" onclick="cerrarModal();">&times;</button>
+      <h3 id="modalTitle">Mensaje de seguimiento</h3>
+      <div class="modal-meta" id="modalMeta"></div>
+      <div class="modal-text" id="modalText">Cargando...</div>
+      <div class="modal-actions">
+        <button class="btn-copy" onclick="copiarModal();">Copiar mensaje</button>
+        <a href="#" class="btn-wa-modal" id="modalWa" target="_blank" onclick="registrarSeguimiento();">&#x1F4AC; Abrir WhatsApp</a>
+      </div>
+    </div>
+  </div>
+
   <script>
   // Mensajes sugeridos generados por el backend
   var mensajes = [
@@ -330,10 +413,14 @@
     var msg = mensajes[idx] || '';
     if (!msg) return;
     navigator.clipboard.writeText(msg).then(function() {
-      var toast = document.getElementById('copiedToast');
-      toast.style.display = 'block';
-      setTimeout(function() { toast.style.display = 'none'; }, 2000);
+      showToast();
     });
+  }
+
+  function showToast() {
+    var toast = document.getElementById('copiedToast');
+    toast.style.display = 'block';
+    setTimeout(function() { toast.style.display = 'none'; }, 2000);
   }
 
   function filtrar(estado) {
@@ -348,6 +435,76 @@
       }
     });
   }
+
+  // ── Modal mensaje comprador ──
+  var mensajeActual = '';
+  var mensajeData = {};
+
+  function generarMensaje(compradorId, modo) {
+    modo = modo || 'seguimiento';
+    var overlay = document.getElementById('modalOverlay');
+    var text = document.getElementById('modalText');
+    var meta = document.getElementById('modalMeta');
+    var title = document.getElementById('modalTitle');
+    var wa = document.getElementById('modalWa');
+
+    text.textContent = 'Cargando...';
+    meta.innerHTML = '';
+    wa.style.display = 'none';
+    overlay.classList.add('open');
+
+    fetch('/api/mensaje-seguimiento/' + compradorId + '?modo=' + modo)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        text.textContent = 'Error: ' + data.error;
+        return;
+      }
+      mensajeActual = data.mensaje;
+      mensajeData = { comprador_id: data.comprador_id, propiedad_id: data.propiedad_id, mensaje: data.mensaje, modo: data.modo };
+      title.textContent = 'Mensaje para ' + data.comprador;
+      text.textContent = data.mensaje;
+
+      var metaHtml = '';
+      if (data.tipo_compra) metaHtml += '<span>' + data.tipo_compra + '</span>';
+      metaHtml += '<span>Avance: ' + data.porcentaje + '%</span>';
+      if (data.dias_sin_actividad !== null) metaHtml += '<span>' + data.dias_sin_actividad + ' d\u00edas sin actividad</span>';
+      meta.innerHTML = metaHtml;
+
+      wa.href = 'https://wa.me/?text=' + encodeURIComponent(data.mensaje);
+      wa.style.display = 'inline-flex';
+    })
+    .catch(function() {
+      text.textContent = 'Error de conexi\u00f3n';
+    });
+  }
+
+  function cerrarModal() {
+    document.getElementById('modalOverlay').classList.remove('open');
+  }
+
+  function copiarModal() {
+    if (!mensajeActual) return;
+    navigator.clipboard.writeText(mensajeActual).then(function() {
+      registrarSeguimiento();
+      cerrarModal();
+      showToast();
+    });
+  }
+
+  function registrarSeguimiento() {
+    if (!mensajeData.comprador_id) return;
+    fetch('/api/mensaje-seguimiento/registrar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(mensajeData),
+    }).catch(function() {});
+  }
+
+  // Cerrar con Escape
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') cerrarModal();
+  });
   </script>
 </body>
 </html>

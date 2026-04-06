@@ -178,6 +178,18 @@
           <div class="prop-card-agent">
             Agente: {{ p.agente_nombre }}
           </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
+            {% if p.vendedor_id %}
+            <span style="font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(104,211,145,.12);color:#68d391;">Vendedor asignado</span>
+            {% else %}
+            <span style="font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(252,129,129,.1);color:#fc8181;">Sin vendedor</span>
+            {% endif %}
+            {% if p.comprador_id %}
+            <span style="font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(104,211,145,.12);color:#68d391;">Comprador asignado</span>
+            {% else %}
+            <span style="font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.05);color:rgba(255,255,255,.3);">Sin comprador</span>
+            {% endif %}
+          </div>
           <div class="prop-card-actions">
             {% set can_edit = (user.rol == 'admin') or (p.user_id == user.id) %}
             {% if can_edit %}
