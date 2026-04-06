@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iRealEstateMxPro — Seguimiento de Cierres</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #0d0d0d; color: #e0e0e0; min-height: 100vh; }
+    .topbar {
+      background: #111; border-bottom: 1px solid rgba(201,162,39,.15); padding: 16px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar-logo { height: 36px; }
+    .topbar-nav { display: flex; gap: 16px; align-items: center; }
+    .topbar-nav a { color: rgba(255,255,255,.6); text-decoration: none; font-size: 14px; font-weight: 500; transition: color .2s; }
+    .topbar-nav a:hover { color: #c9a227; }
+    .topbar-nav a.active { color: #c9a227; border-bottom: 2px solid #c9a227; padding-bottom: 2px; }
+    .topbar-user { color: rgba(255,255,255,.4); font-size: 13px; }
+    .hamburger { display:none; background:none; border:none; cursor:pointer; padding:4px; }
+    .hamburger span { display:block; width:22px; height:2px; background:#c9a227; margin:5px 0; border-radius:2px; transition:all .25s; }
+    .hamburger.open span:nth-child(1) { transform:rotate(45deg) translate(5px,5px); }
+    .hamburger.open span:nth-child(2) { opacity:0; }
+    .hamburger.open span:nth-child(3) { transform:rotate(-45deg) translate(5px,-5px); }
+    @media(max-width:768px){
+      .hamburger { display:block; }
+      .topbar { flex-wrap:wrap; padding:12px 16px; }
+      .topbar-nav { display:none; width:100%; flex-direction:column; gap:0; padding-top:12px; border-top:1px solid rgba(255,255,255,.1); margin-top:12px; }
+      .topbar-nav.open { display:flex; }
+      .topbar-nav a, .topbar-nav span { padding:10px 0; font-size:15px; }
+    }
+    .notif-badge {
+      background: #e74c3c; color: #fff; font-size: 10px; font-weight: 700;
+      padding: 1px 6px; border-radius: 10px; margin-left: 4px; vertical-align: super;
+    }
+    .container { max-width: 1100px; margin: 24px auto; padding: 0 20px; }
+    h1 { font-size: 22px; color: #c9a227; font-family: 'Playfair Display', serif; margin-bottom: 20px; }
+
+    /* Stats row */
+    .stats-row { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+    .stat-card {
+      background: #1a1a1a; border: 1px solid rgba(201,162,39,.15); border-radius: 10px;
+      padding: 14px 20px; flex: 1; min-width: 100px; text-align: center;
+    }
+    .stat-card .num { font-size: 26px; font-weight: 700; }
+    .stat-card .lbl { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 2px; }
+    .c-red { color: #fc8181; }
+    .c-yellow { color: #c9a227; }
+    .c-blue { color: #63b3ed; }
+    .c-green { color: #68d391; }
+    .c-gray { color: rgba(255,255,255,.3); }
+
+    /* Filter tabs */
+    .filter-tabs { display: flex; gap: 6px; margin-bottom: 20px; flex-wrap: wrap; }
+    .filter-tab {
+      padding: 6px 14px; border-radius: 20px; border: 1px solid rgba(255,255,255,.1);
+      background: transparent; color: rgba(255,255,255,.5); font-size: 12px; font-weight: 600;
+      cursor: pointer; font-family: 'Inter', sans-serif; transition: all .2s;
+    }
+    .filter-tab:hover { border-color: #c9a227; color: #c9a227; }
+    .filter-tab.active { background: rgba(201,162,39,.15); border-color: #c9a227; color: #c9a227; }
+
+    /* Property cards */
+    .prop-list { display: flex; flex-direction: column; gap: 12px; }
+    .prop-row {
+      background: #1a1a1a; border: 1px solid rgba(255,255,255,.08); border-radius: 12px;
+      padding: 18px 20px; display: flex; align-items: center; gap: 16px;
+      transition: border-color .2s;
+    }
+    .prop-row:hover { border-color: rgba(201,162,39,.25); }
+    .prop-row.st-atorado { border-left: 4px solid #fc8181; }
+    .prop-row.st-casi_listo { border-left: 4px solid #63b3ed; }
+    .prop-row.st-en_proceso { border-left: 4px solid #c9a227; }
+    .prop-row.st-completo { border-left: 4px solid #68d391; }
+    .prop-row.st-sin_iniciar { border-left: 4px solid rgba(255,255,255,.15); }
+
+    .prop-thumb {
+      width: 70px; height: 54px; border-radius: 8px; object-fit: cover;
+      background: #222; flex-shrink: 0;
+    }
+    .prop-info { flex: 1; min-width: 0; }
+    .prop-title { font-size: 14px; font-weight: 600; color: #fff; margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .prop-sub { font-size: 12px; color: rgba(255,255,255,.4); }
+    .prop-cliente { font-size: 12px; color: rgba(255,255,255,.55); margin-top: 2px; }
+
+    .prop-progress { width: 180px; flex-shrink: 0; }
+    .progress-bar-bg { background: rgba(255,255,255,.08); border-radius: 5px; height: 8px; overflow: hidden; margin-bottom: 4px; }
+    .progress-bar-fill { height: 100%; border-radius: 5px; transition: width .4s; }
+    .progress-text { font-size: 11px; color: rgba(255,255,255,.4); }
+
+    .prop-status { width: 140px; flex-shrink: 0; text-align: center; }
+    .estado-badge {
+      display: inline-block; font-size: 10px; font-weight: 700; padding: 4px 10px;
+      border-radius: 12px; text-transform: uppercase; letter-spacing: .3px;
+    }
+    .eb-atorado { background: rgba(252,129,129,.15); color: #fc8181; }
+    .eb-casi_listo { background: rgba(99,179,237,.15); color: #63b3ed; }
+    .eb-en_proceso { background: rgba(201,162,39,.15); color: #c9a227; }
+    .eb-completo { background: rgba(104,211,145,.15); color: #68d391; }
+    .eb-sin_iniciar { background: rgba(255,255,255,.06); color: rgba(255,255,255,.35); }
+
+    .prop-alert { font-size: 11px; margin-top: 4px; }
+    .alert-atorado { color: #fc8181; }
+    .alert-casi { color: #63b3ed; }
+
+    .prop-meta { width: 100px; flex-shrink: 0; text-align: right; }
+    .prop-meta .docs-count { font-size: 12px; color: rgba(255,255,255,.5); }
+    .prop-meta .docs-rejected { font-size: 11px; color: #fc8181; font-weight: 600; }
+    .prop-meta .last-activity { font-size: 10px; color: rgba(255,255,255,.25); margin-top: 4px; }
+
+    .btn-ver {
+      padding: 7px 14px; border: 1px solid rgba(201,162,39,.3); border-radius: 8px;
+      background: transparent; color: #c9a227; font-size: 12px; font-weight: 600;
+      cursor: pointer; text-decoration: none; font-family: 'Inter', sans-serif;
+      transition: all .2s; flex-shrink: 0;
+    }
+    .btn-ver:hover { background: rgba(201,162,39,.15); border-color: #c9a227; }
+
+    /* Tareas de hoy */
+    .tareas-section {
+      background: linear-gradient(135deg, rgba(201,162,39,.08), rgba(201,162,39,.02));
+      border: 1px solid rgba(201,162,39,.2); border-radius: 14px;
+      padding: 20px 24px; margin-bottom: 28px;
+    }
+    .tareas-title { font-size: 16px; font-weight: 700; color: #c9a227; margin-bottom: 14px; }
+    .tarea-card {
+      background: #1a1a1a; border: 1px solid rgba(255,255,255,.08); border-radius: 10px;
+      padding: 14px 18px; margin-bottom: 10px; display: flex; align-items: center;
+      gap: 14px; flex-wrap: wrap;
+    }
+    .tarea-card.pr-alta { border-left: 4px solid #fc8181; }
+    .tarea-card.pr-media { border-left: 4px solid #63b3ed; }
+    .tarea-info { flex: 1; min-width: 180px; }
+    .tarea-cliente { font-size: 14px; font-weight: 600; color: #fff; }
+    .tarea-prop { font-size: 12px; color: rgba(255,255,255,.4); }
+    .tarea-motivo { font-size: 12px; margin-top: 3px; }
+    .tarea-motivo.alta { color: #fc8181; }
+    .tarea-motivo.media { color: #63b3ed; }
+    .tarea-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+    .btn-contactar {
+      padding: 8px 16px; border: none; border-radius: 8px;
+      font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;
+      background: #c9a227; color: #000; transition: background .2s;
+    }
+    .btn-contactar:hover { background: #d4af37; }
+    .btn-wa {
+      padding: 8px 14px; border: none; border-radius: 8px;
+      font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;
+      background: #25d366; color: #fff; text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .btn-wa:hover { background: #20bd5a; }
+    .copied-toast {
+      position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%);
+      background: #1a1a1a; border: 1px solid #c9a227; color: #c9a227;
+      padding: 10px 24px; border-radius: 10px; font-size: 13px; font-weight: 600;
+      display: none; z-index: 1000;
+    }
+
+    .empty-state {
+      text-align: center; padding: 60px 20px; color: rgba(255,255,255,.3);
+    }
+    .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
+
+    @media(max-width:768px){
+      .prop-row { flex-wrap: wrap; gap: 10px; }
+      .prop-thumb { width: 50px; height: 40px; }
+      .prop-progress { width: 100%; order: 10; }
+      .prop-status { width: auto; text-align: left; }
+      .prop-meta { width: auto; text-align: left; }
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <img src="/static/img/logo-header.png" alt="iRealEstateMx" class="topbar-logo" />
+    <button class="hamburger" onclick="this.classList.toggle('open');document.querySelector('.topbar-nav').classList.toggle('open');" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="topbar-nav">
+      <a href="/">Nueva Propiedad</a>
+      <a href="/dashboard">Propiedades</a>
+      <a href="/dashboard-asesor" class="active">Seguimiento</a>
+      {% if user.rol == 'admin' %}
+      <a href="/admin/prospectos">Prospectos</a>
+      <a href="/admin/usuarios">Usuarios</a>
+      {% endif %}
+      <span class="topbar-user">
+        {{ user.nombre }}
+        {% if notif_count > 0 %}
+        <span class="notif-badge">{{ notif_count }}</span>
+        {% endif %}
+      </span>
+      <a href="/logout">Salir</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <h1>Seguimiento de Cierres</h1>
+
+    <!-- Stats -->
+    <div class="stats-row">
+      <div class="stat-card">
+        <div class="num c-red">{{ contadores.atorado }}</div>
+        <div class="lbl">Atorados</div>
+      </div>
+      <div class="stat-card">
+        <div class="num c-blue">{{ contadores.casi_listo }}</div>
+        <div class="lbl">Casi listos</div>
+      </div>
+      <div class="stat-card">
+        <div class="num c-yellow">{{ contadores.en_proceso }}</div>
+        <div class="lbl">En proceso</div>
+      </div>
+      <div class="stat-card">
+        <div class="num c-gray">{{ contadores.sin_iniciar }}</div>
+        <div class="lbl">Sin iniciar</div>
+      </div>
+      <div class="stat-card">
+        <div class="num c-green">{{ contadores.completo }}</div>
+        <div class="lbl">Completos</div>
+      </div>
+    </div>
+
+    <!-- Tareas de hoy -->
+    {% if tareas_hoy %}
+    <div class="tareas-section">
+      <div class="tareas-title">Tareas de hoy ({{ tareas_hoy|length }})</div>
+      {% for t in tareas_hoy %}
+      <div class="tarea-card pr-{{ t.prioridad }}">
+        <div class="tarea-info">
+          <div class="tarea-cliente">{{ t.vendedor_nombre }}</div>
+          <div class="tarea-prop">{{ t.tipo_propiedad }} — {{ t.direccion }}, {{ t.ciudad }}</div>
+          <div class="tarea-motivo {{ t.prioridad }}">
+            {% if t.prioridad == 'alta' %}&#x26A0;&#xFE0F;{% else %}&#x1F525;{% endif %}
+            {{ t.motivo }}
+          </div>
+        </div>
+        <div class="tarea-actions">
+          <button class="btn-contactar" onclick="copiarMensaje({{ loop.index0 }})">Copiar mensaje</button>
+          <a href="/mis-documentos/{{ t.id }}" class="btn-ver">Ver docs</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Filtros -->
+    <div class="filter-tabs">
+      <button class="filter-tab active" onclick="filtrar('todos')">Todos ({{ total_propiedades }})</button>
+      <button class="filter-tab" onclick="filtrar('atorado')">Atorados ({{ contadores.atorado }})</button>
+      <button class="filter-tab" onclick="filtrar('casi_listo')">Casi listos ({{ contadores.casi_listo }})</button>
+      <button class="filter-tab" onclick="filtrar('en_proceso')">En proceso ({{ contadores.en_proceso }})</button>
+      <button class="filter-tab" onclick="filtrar('sin_iniciar')">Sin iniciar ({{ contadores.sin_iniciar }})</button>
+      <button class="filter-tab" onclick="filtrar('completo')">Completos ({{ contadores.completo }})</button>
+    </div>
+
+    <!-- Lista de propiedades -->
+    {% if propiedades %}
+    <div class="prop-list" id="propList">
+      {% for p in propiedades %}
+      <div class="prop-row st-{{ p.estado }}" data-estado="{{ p.estado }}">
+        {% if p.foto_portada_url %}
+        <img src="{{ p.foto_portada_url }}" alt="" class="prop-thumb" />
+        {% else %}
+        <div class="prop-thumb"></div>
+        {% endif %}
+
+        <div class="prop-info">
+          <div class="prop-title">{{ p.tipo_propiedad }} — {{ p.operacion }}</div>
+          <div class="prop-sub">{{ p.direccion }}, {{ p.ciudad }}</div>
+          <div class="prop-cliente">{{ p.vendedor_nombre }}</div>
+        </div>
+
+        <div class="prop-progress">
+          <div class="progress-bar-bg">
+            <div class="progress-bar-fill" style="width:{{ p.porcentaje }}%;background:{% if p.estado == 'completo' %}#68d391{% elif p.estado == 'atorado' %}#fc8181{% elif p.estado == 'casi_listo' %}#63b3ed{% else %}#c9a227{% endif %};"></div>
+          </div>
+          <div class="progress-text">{{ p.porcentaje }}% — {{ p.docs_subidos }}/{{ p.docs_total }} docs</div>
+        </div>
+
+        <div class="prop-status">
+          <span class="estado-badge eb-{{ p.estado }}">
+            {% if p.estado == 'atorado' %}Atorado
+            {% elif p.estado == 'casi_listo' %}Casi listo
+            {% elif p.estado == 'en_proceso' %}En proceso
+            {% elif p.estado == 'completo' %}Completo
+            {% else %}Sin iniciar{% endif %}
+          </span>
+          {% if p.estado == 'atorado' %}
+          <div class="prop-alert alert-atorado">Cliente requiere atenci&oacute;n</div>
+          {% elif p.estado == 'casi_listo' %}
+          <div class="prop-alert alert-casi">Listo para cerrar pronto</div>
+          {% endif %}
+        </div>
+
+        <div class="prop-meta">
+          <div class="docs-count">{{ p.docs_subidos }}/{{ p.docs_total }}</div>
+          {% if p.docs_rechazados > 0 %}
+          <div class="docs-rejected">{{ p.docs_rechazados }} rechazados</div>
+          {% endif %}
+          <div class="last-activity">{{ p.ultimo_movimiento }}</div>
+        </div>
+
+        <a href="/mis-documentos/{{ p.id }}" class="btn-ver">Ver docs</a>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <div class="icon">📋</div>
+      <p>No hay propiedades con vendedor asignado a&uacute;n.</p>
+      <p style="font-size:13px;margin-top:6px;">Asigna un vendedor a una propiedad para comenzar el seguimiento.</p>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="copied-toast" id="copiedToast">Mensaje copiado al portapapeles</div>
+
+  <script>
+  // Mensajes sugeridos generados por el backend
+  var mensajes = [
+    {% for t in tareas_hoy %}
+    {{ t.mensaje_sugerido | tojson }},
+    {% endfor %}
+  ];
+
+  function copiarMensaje(idx) {
+    var msg = mensajes[idx] || '';
+    if (!msg) return;
+    navigator.clipboard.writeText(msg).then(function() {
+      var toast = document.getElementById('copiedToast');
+      toast.style.display = 'block';
+      setTimeout(function() { toast.style.display = 'none'; }, 2000);
+    });
+  }
+
+  function filtrar(estado) {
+    document.querySelectorAll('.filter-tab').forEach(function(t) { t.classList.remove('active'); });
+    event.target.classList.add('active');
+
+    document.querySelectorAll('.prop-row').forEach(function(row) {
+      if (estado === 'todos' || row.dataset.estado === estado) {
+        row.style.display = '';
+      } else {
+        row.style.display = 'none';
+      }
+    });
+  }
+  </script>
+</body>
+</html>

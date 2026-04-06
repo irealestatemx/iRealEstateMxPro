@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iRealEstateMxPro — Documentos del Vendedor</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #0d0d0d; color: #e0e0e0; min-height: 100vh; }
+    .topbar {
+      background: #111; border-bottom: 1px solid rgba(201,162,39,.15); padding: 16px 32px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .topbar-logo { height: 36px; }
+    .topbar-nav { display: flex; gap: 16px; align-items: center; }
+    .topbar-nav a { color: rgba(255,255,255,.6); text-decoration: none; font-size: 14px; font-weight: 500; transition: color .2s; }
+    .topbar-nav a:hover { color: #c9a227; }
+    .topbar-nav a.active { color: #c9a227; border-bottom: 2px solid #c9a227; padding-bottom: 2px; }
+    .topbar-user { color: rgba(255,255,255,.4); font-size: 13px; }
+    .hamburger { display:none; background:none; border:none; cursor:pointer; padding:4px; }
+    .hamburger span { display:block; width:22px; height:2px; background:#c9a227; margin:5px 0; border-radius:2px; transition:all .25s; }
+    .hamburger.open span:nth-child(1) { transform:rotate(45deg) translate(5px,5px); }
+    .hamburger.open span:nth-child(2) { opacity:0; }
+    .hamburger.open span:nth-child(3) { transform:rotate(-45deg) translate(5px,-5px); }
+    @media(max-width:768px){
+      .hamburger { display:block; }
+      .topbar { flex-wrap:wrap; padding:12px 16px; }
+      .topbar-nav { display:none; width:100%; flex-direction:column; gap:0; padding-top:12px; border-top:1px solid rgba(255,255,255,.1); margin-top:12px; }
+      .topbar-nav.open { display:flex; }
+      .topbar-nav a, .topbar-nav span { padding:10px 0; font-size:15px; }
+    }
+    .container { max-width: 900px; margin: 24px auto; padding: 0 20px; }
+    h1 { font-size: 22px; color: #c9a227; font-family: 'Playfair Display', serif; margin-bottom: 20px; }
+
+    /* Tarjeta propiedad */
+    .prop-card {
+      background: #1a1a1a; border: 1px solid rgba(201,162,39,.15); border-radius: 12px;
+      display: flex; gap: 16px; padding: 16px; margin-bottom: 28px; align-items: center;
+    }
+    .prop-card img { width: 120px; height: 90px; object-fit: cover; border-radius: 8px; background: #222; flex-shrink: 0; }
+    .prop-card-info h2 { font-size: 16px; color: #fff; margin-bottom: 4px; }
+    .prop-card-info p { font-size: 13px; color: rgba(255,255,255,.45); }
+    @media(max-width:500px){
+      .prop-card { flex-direction: column; align-items: flex-start; }
+      .prop-card img { width: 100%; height: 160px; }
+    }
+
+    /* Checklist */
+    .doc-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
+    .doc-row {
+      background: #1a1a1a; border: 1px solid rgba(255,255,255,.08); border-radius: 10px;
+      padding: 14px 18px; display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap;
+    }
+    .doc-row.uploaded { border-color: rgba(104,211,145,.3); }
+    .doc-name { font-size: 14px; font-weight: 500; flex: 1; min-width: 180px; }
+    .doc-badge {
+      font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
+      text-transform: uppercase; flex-shrink: 0;
+    }
+    .badge-req { background: rgba(201,162,39,.15); color: #c9a227; }
+    .badge-opt { background: rgba(255,255,255,.06); color: rgba(255,255,255,.4); }
+    .badge-ok { background: rgba(104,211,145,.15); color: #68d391; }
+    .badge-pending { background: rgba(201,162,39,.15); color: #c9a227; }
+    .badge-rejected { background: rgba(252,129,129,.15); color: #fc8181; }
+    .doc-row.rejected { border-color: rgba(252,129,129,.25); }
+    .doc-row.approved { border-color: rgba(104,211,145,.3); }
+    .doc-row.pending { border-color: rgba(201,162,39,.25); }
+    .doc-notas { font-size: 12px; color: #fc8181; width: 100%; margin-top: 4px; padding: 6px 10px; background: rgba(252,129,129,.08); border-radius: 6px; }
+    .doc-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+    .doc-file-name { font-size: 11px; color: rgba(255,255,255,.4); max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .btn-upload {
+      padding: 6px 14px; border: none; border-radius: 6px; font-size: 12px;
+      font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;
+      background: #c9a227; color: #000; transition: background .2s;
+    }
+    .btn-upload:hover { background: #d4af37; }
+    .btn-upload:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-view {
+      padding: 6px 12px; border: 1px solid rgba(255,255,255,.15); border-radius: 6px;
+      font-size: 11px; color: rgba(255,255,255,.6); background: none; cursor: pointer;
+      text-decoration: none; font-family: 'Inter', sans-serif;
+    }
+    .btn-view:hover { border-color: #c9a227; color: #c9a227; }
+
+    /* Status msg */
+    .status-msg {
+      font-size: 12px; padding: 4px 0; display: none;
+    }
+    .status-msg.ok { color: #68d391; display: block; }
+    .status-msg.err { color: #fc8181; display: block; }
+
+    /* Links y leyenda */
+    .links-section {
+      background: #1a1a1a; border: 1px solid rgba(201,162,39,.1); border-radius: 10px;
+      padding: 16px 20px; margin-bottom: 16px;
+    }
+    .links-section h3 { font-size: 13px; color: #c9a227; margin-bottom: 8px; }
+    .links-section a { color: #63b3ed; font-size: 13px; text-decoration: none; display: block; margin-bottom: 4px; }
+    .links-section a:hover { text-decoration: underline; }
+    .leyenda {
+      font-size: 12px; color: rgba(255,255,255,.35); font-style: italic;
+      padding: 12px 0; border-top: 1px solid rgba(255,255,255,.06); margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="topbar">
+    <img src="/static/img/logo-header.png" alt="iRealEstateMx" class="topbar-logo" />
+    <button class="hamburger" onclick="this.classList.toggle('open');document.querySelector('.topbar-nav').classList.toggle('open');" aria-label="Menu">
+      <span></span><span></span><span></span>
+    </button>
+    <div class="topbar-nav">
+      {% if user.rol in ('admin', 'agente') %}
+      <a href="/dashboard">Propiedades</a>
+      {% endif %}
+      <a href="/mis-documentos" class="active">Documentos</a>
+      <span class="topbar-user">{{ user.nombre }}</span>
+      <a href="/logout">Salir</a>
+    </div>
+  </div>
+
+  <div class="container">
+    <h1>Documentos del Vendedor</h1>
+
+    {% if not propiedad and propiedades %}
+    <!-- Múltiples propiedades asignadas -->
+    <h2 style="font-size:16px;color:#fff;margin-bottom:16px;">Selecciona una propiedad</h2>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:28px;">
+      {% for p in propiedades %}
+      <a href="/mis-documentos/{{ p.id }}" style="text-decoration:none;">
+        <div class="prop-card" style="cursor:pointer;transition:border-color .2s;">
+          {% if p.foto_portada_url %}
+          <img src="{{ p.foto_portada_url }}" alt="Propiedad" />
+          {% else %}
+          <img src="" alt="" style="background:#333;" />
+          {% endif %}
+          <div class="prop-card-info">
+            <h2>{{ p.tipo_propiedad or 'Propiedad' }} — {{ p.operacion or '' }}</h2>
+            <p>{{ p.direccion or '' }}, {{ p.ciudad or '' }}</p>
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+
+    {% elif not propiedad %}
+    <!-- Sin propiedad asignada -->
+    <div style="background:#1a1a1a;border:1px solid rgba(201,162,39,.15);border-radius:12px;padding:40px 24px;text-align:center;margin-bottom:28px;">
+      <div style="font-size:2.5rem;margin-bottom:12px;">📋</div>
+      <p style="font-size:15px;color:rgba(255,255,255,.6);margin-bottom:8px;">A&uacute;n no tienes una propiedad asignada.</p>
+      <p style="font-size:13px;color:rgba(255,255,255,.35);">Tu asesor te ayudar&aacute; a configurarla.</p>
+    </div>
+    {% else %}
+
+    <!-- Tarjeta de la propiedad -->
+    <div class="prop-card">
+      {% if propiedad.foto_portada_url %}
+      <img src="{{ propiedad.foto_portada_url }}" alt="Propiedad" />
+      {% else %}
+      <img src="" alt="" style="background:#333;" />
+      {% endif %}
+      <div class="prop-card-info">
+        <h2>{{ propiedad.tipo_propiedad or 'Propiedad' }} — {{ propiedad.operacion or '' }}</h2>
+        <p>{{ propiedad.direccion or '' }}, {{ propiedad.ciudad or '' }}, {{ propiedad.estado or '' }}</p>
+        {% if propiedad.precio_formateado %}
+        <p style="color:#c9a227;font-weight:600;margin-top:4px;">{{ propiedad.precio_formateado }}</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Barra de progreso -->
+    {% if progreso %}
+    <div style="background:#1a1a1a;border:1px solid rgba(201,162,39,.15);border-radius:10px;padding:16px 20px;margin-bottom:20px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-size:13px;font-weight:600;color:#fff;">Progreso: {{ progreso.subidos }} / {{ progreso.total }} documentos</span>
+        <span style="font-size:13px;font-weight:700;color:#c9a227;">{{ progreso.porcentaje }}%</span>
+      </div>
+      <div style="background:rgba(255,255,255,.08);border-radius:6px;height:10px;overflow:hidden;">
+        <div style="background:{% if progreso.porcentaje == 100 %}#68d391{% elif progreso.porcentaje >= 50 %}#c9a227{% else %}#fc8181{% endif %};height:100%;width:{{ progreso.porcentaje }}%;border-radius:6px;transition:width .4s;"></div>
+      </div>
+      {% if progreso.porcentaje == 100 %}
+      <p style="font-size:11px;color:#68d391;margin-top:6px;">Todos los documentos obligatorios han sido subidos</p>
+      {% else %}
+      <p style="font-size:11px;color:rgba(255,255,255,.35);margin-top:6px;">Faltan {{ progreso.obligatorios_total - progreso.obligatorios_subidos }} documentos obligatorios</p>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Checklist de documentos -->
+    <div class="doc-list">
+      {% for doc in checklist %}
+      {% set subido = docs_subidos.get(doc.tipo) %}
+      {% set estado = subido.estado if subido else '' %}
+      <div class="doc-row{% if estado == 'aprobado' %} approved{% elif estado == 'rechazado' %} rejected{% elif estado == 'pendiente' %} pending{% endif %}" id="row-{{ loop.index }}">
+        <div class="doc-name">
+          {{ doc.tipo }}
+          {% if estado == 'aprobado' %}
+          <span class="doc-badge badge-ok">Aprobado</span>
+          {% elif estado == 'rechazado' %}
+          <span class="doc-badge badge-rejected">Rechazado</span>
+          {% elif estado == 'pendiente' %}
+          <span class="doc-badge badge-pending">Pendiente</span>
+          {% elif doc.obligatorio %}
+          <span class="doc-badge badge-req">Obligatorio</span>
+          {% else %}
+          <span class="doc-badge badge-opt">Opcional</span>
+          {% endif %}
+        </div>
+        <div class="doc-actions">
+          {% if subido %}
+          <a href="{{ subido.archivo_url }}" target="_blank" class="btn-view">Ver archivo</a>
+          {% endif %}
+          {% if estado != 'aprobado' %}
+          <label class="btn-upload" style="position:relative;overflow:hidden;">
+            {% if estado == 'rechazado' %}Corregir{% elif subido %}Reemplazar{% else %}Subir archivo{% endif %}
+            <input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx"
+              onchange="subirDoc(this, '{{ doc.tipo }}', {{ loop.index }})"
+              style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
+          </label>
+          {% endif %}
+        </div>
+        {% if estado == 'rechazado' and subido.notas %}
+        <div class="doc-notas">{{ subido.notas }}</div>
+        {% endif %}
+        <div class="status-msg" id="status-{{ loop.index }}"></div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <!-- Links -->
+    <div class="links-section">
+      <h3>Links para tramitar documentos</h3>
+      <a href="https://www.gob.mx/curp/" target="_blank">Consulta y descarga tu CURP</a>
+      <a href="https://www.miregistrocivil.gob.mx/" target="_blank">Solicita actas de nacimiento / matrimonio / divorcio</a>
+    </div>
+
+    <!-- Leyenda -->
+    <p class="leyenda">
+      En caso de no contar con alg&uacute;n documento, favor de avisar a tu asesor para apoyarte en el proceso.
+    </p>
+
+    <!-- ═══════ DOCUMENTOS DEL AGENTE ═══════ -->
+    {% if checklist_agente %}
+    <div style="margin-top:36px;padding-top:24px;border-top:1px solid rgba(201,162,39,.15);">
+      <h1 style="font-size:20px;">Documentos del Agente</h1>
+
+      {% if progreso_agente %}
+      <div style="background:#1a1a1a;border:1px solid rgba(201,162,39,.15);border-radius:10px;padding:16px 20px;margin-bottom:20px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+          <span style="font-size:13px;font-weight:600;color:#fff;">Progreso: {{ progreso_agente.subidos }} / {{ progreso_agente.total }} documentos</span>
+          <span style="font-size:13px;font-weight:700;color:#c9a227;">{{ progreso_agente.porcentaje }}%</span>
+        </div>
+        <div style="background:rgba(255,255,255,.08);border-radius:6px;height:10px;overflow:hidden;">
+          <div style="background:{% if progreso_agente.porcentaje == 100 %}#68d391{% elif progreso_agente.porcentaje >= 50 %}#c9a227{% else %}#fc8181{% endif %};height:100%;width:{{ progreso_agente.porcentaje }}%;border-radius:6px;transition:width .4s;"></div>
+        </div>
+        {% if progreso_agente.porcentaje == 100 %}
+        <p style="font-size:11px;color:#68d391;margin-top:6px;">Todos los documentos obligatorios del agente est&aacute;n completos</p>
+        {% else %}
+        <p style="font-size:11px;color:rgba(255,255,255,.35);margin-top:6px;">Faltan {{ progreso_agente.obligatorios_total - progreso_agente.obligatorios_subidos }} documentos obligatorios</p>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      <div class="doc-list">
+        {% for doc in checklist_agente %}
+        {% set subido = docs_agente.get(doc.tipo) %}
+        {% set estado = subido.estado if subido else '' %}
+        <div class="doc-row{% if estado == 'aprobado' %} approved{% elif estado == 'rechazado' %} rejected{% elif estado == 'pendiente' %} pending{% endif %}" id="row-a-{{ loop.index }}">
+          <div class="doc-name">
+            {{ doc.nombre }}
+            {% if estado == 'aprobado' %}
+            <span class="doc-badge badge-ok">Aprobado</span>
+            {% elif estado == 'rechazado' %}
+            <span class="doc-badge badge-rejected">Rechazado</span>
+            {% elif estado == 'pendiente' %}
+            <span class="doc-badge badge-pending">Pendiente</span>
+            {% elif doc.obligatorio %}
+            <span class="doc-badge badge-req">Obligatorio</span>
+            {% else %}
+            <span class="doc-badge badge-opt">Opcional</span>
+            {% endif %}
+          </div>
+          <div class="doc-actions">
+            {% if subido %}
+            <a href="{{ subido.archivo_url }}" target="_blank" class="btn-view">Ver archivo</a>
+            {% endif %}
+            {% if user.rol in ('admin', 'agente') and estado != 'aprobado' %}
+            <label class="btn-upload" style="position:relative;overflow:hidden;">
+              {% if estado == 'rechazado' %}Corregir{% elif subido %}Reemplazar{% else %}Subir archivo{% endif %}
+              <input type="file" accept=".jpg,.jpeg,.png,.webp,.pdf,.doc,.docx"
+                onchange="subirDoc(this, '{{ doc.tipo }}', 'a-{{ loop.index }}', 'agente')"
+                style="position:absolute;inset:0;opacity:0;cursor:pointer;" />
+            </label>
+            {% endif %}
+          </div>
+          {% if estado == 'rechazado' and subido.notas %}
+          <div class="doc-notas">{{ subido.notas }}</div>
+          {% endif %}
+          <div class="status-msg" id="status-a-{{ loop.index }}"></div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    {% endif %}
+  </div>
+
+  <script>
+  function subirDoc(input, tipoDocumento, rowIndex, categoria) {
+    if (!input.files || !input.files[0]) return;
+    categoria = categoria || 'vendedor';
+
+    var file = input.files[0];
+    var statusEl = document.getElementById('status-' + rowIndex);
+    var row = document.getElementById('row-' + rowIndex);
+
+    statusEl.className = 'status-msg';
+    statusEl.textContent = 'Subiendo...';
+    statusEl.style.display = 'block';
+
+    var fd = new FormData();
+    fd.append('archivo', file);
+    fd.append('propiedad_id', '{{ propiedad.id }}');
+    fd.append('tipo_documento', tipoDocumento);
+    fd.append('categoria', categoria);
+
+    fetch('/api/documentos/subir', {
+      method: 'POST',
+      body: fd
+    })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        statusEl.className = 'status-msg ok';
+        statusEl.textContent = 'Documento subido correctamente';
+        row.classList.add('uploaded');
+        // Recargar para actualizar estado
+        setTimeout(function() { location.reload(); }, 1200);
+      } else {
+        statusEl.className = 'status-msg err';
+        statusEl.textContent = data.error || 'Error al subir';
+      }
+    })
+    .catch(function() {
+      statusEl.className = 'status-msg err';
+      statusEl.textContent = 'Error de conexi\u00f3n';
+    });
+  }
+  </script>
+</body>
+</html>

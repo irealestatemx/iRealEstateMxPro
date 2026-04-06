@@ -109,6 +109,35 @@ CREATE TABLE IF NOT EXISTS prospectos (
 );
 """
 
+CREATE_DOCUMENTOS = """
+CREATE TABLE IF NOT EXISTS documentos (
+    id              SERIAL PRIMARY KEY,
+    propiedad_id    INTEGER REFERENCES propiedades(id) ON DELETE CASCADE,
+    subido_por      INTEGER REFERENCES usuarios(id),
+    tipo_documento  VARCHAR(100) NOT NULL,
+    categoria       VARCHAR(50) NOT NULL,
+    archivo_url     VARCHAR(500) NOT NULL,
+    estado          VARCHAR(50) DEFAULT 'pendiente',
+    obligatorio     BOOLEAN DEFAULT TRUE,
+    version         INTEGER DEFAULT 1,
+    notas           TEXT,
+    created_at      TIMESTAMP DEFAULT NOW(),
+    updated_at      TIMESTAMP DEFAULT NOW()
+);
+"""
+
+CREATE_NOTIFICACIONES = """
+CREATE TABLE IF NOT EXISTS notificaciones (
+    id              SERIAL PRIMARY KEY,
+    tipo            VARCHAR(50) NOT NULL,
+    user_id         INTEGER REFERENCES usuarios(id),
+    propiedad_id    INTEGER REFERENCES propiedades(id) ON DELETE CASCADE,
+    metadata        JSONB DEFAULT '{}',
+    leida           BOOLEAN DEFAULT FALSE,
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+"""
+
 CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_propiedades_ciudad ON propiedades(ciudad);",
     "CREATE INDEX IF NOT EXISTS idx_propiedades_operacion ON propiedades(operacion);",
@@ -120,12 +149,22 @@ CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_prospectos_referido ON prospectos(referido_id);",
     "CREATE INDEX IF NOT EXISTS idx_prospectos_estado ON prospectos(estado);",
     "CREATE INDEX IF NOT EXISTS idx_prospectos_created ON prospectos(created_at DESC);",
+    "CREATE INDEX IF NOT EXISTS idx_documentos_propiedad ON documentos(propiedad_id);",
+    "CREATE INDEX IF NOT EXISTS idx_documentos_subido_por ON documentos(subido_por);",
+    "CREATE INDEX IF NOT EXISTS idx_documentos_estado ON documentos(estado);",
+    "CREATE INDEX IF NOT EXISTS idx_notificaciones_user ON notificaciones(user_id);",
+    "CREATE INDEX IF NOT EXISTS idx_notificaciones_leida ON notificaciones(leida);",
+    "CREATE INDEX IF NOT EXISTS idx_notificaciones_created ON notificaciones(created_at DESC);",
 ]
 
 
 MIGRATIONS = [
     "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS user_id INTEGER;",
     "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS prefijo_whatsapp VARCHAR(10);",
+    "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS vendedor_id INTEGER REFERENCES usuarios(id);",
+    "ALTER TABLE documentos ADD COLUMN IF NOT EXISTS rol_documento VARCHAR(20) DEFAULT 'vendedor';",
+    "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS comprador_id INTEGER REFERENCES usuarios(id);",
+    "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS tipo_compra VARCHAR(50);",
 ]
 
 
@@ -136,6 +175,8 @@ async def init_db():
     await database.execute(CREATE_USERS)
     await database.execute(CREATE_DESARROLLOS)
     await database.execute(CREATE_PROSPECTOS)
+    await database.execute(CREATE_DOCUMENTOS)
+    await database.execute(CREATE_NOTIFICACIONES)
     for idx in CREATE_INDEXES:
         await database.execute(idx)
     for mig in MIGRATIONS:
@@ -220,6 +261,59 @@ async def get_properties_by_user(user_id: int, limit: int = 50, offset: int = 0)
     """
     rows = await database.fetch_all(query=query, values={"user_id": user_id, "limit": limit, "offset": offset})
     return [_normalize_prop(dict(r._mapping)) for r in rows]
+
+
+async def get_propiedades_seguimiento(agente_id: int = None):
+    """Lista propiedades con vendedor asignado + conteos de documentos para dashboard asesor."""
+    where = "WHERE p.vendedor_id IS NOT NULL AND p.activa = TRUE"
+    values = {}
+    if agente_id:
+        where += " AND p.user_id = :agente_id"
+        values["agente_id"] = agente_id
+    query = f"""
+    SELECT p.id, p.tipo_propiedad, p.operacion, p.direccion, p.ciudad, p.estado,
+           p.precio_formateado, p.foto_portada_url, p.vendedor_id, p.user_id,
+           u_v.nombre as vendedor_nombre, u_v.email as vendedor_email,
+           COUNT(d.id) as docs_subidos,
+           COUNT(CASE WHEN d.estado = 'aprobado' THEN 1 END) as docs_aprobados,
+           COUNT(CASE WHEN d.estado = 'rechazado' THEN 1 END) as docs_rechazados,
+           COUNT(CASE WHEN d.estado = 'pendiente' THEN 1 END) as docs_pendientes,
+           MAX(d.created_at) as ultimo_movimiento
+    FROM propiedades p
+    LEFT JOIN usuarios u_v ON p.vendedor_id = u_v.id
+    LEFT JOIN documentos d ON d.propiedad_id = p.id AND d.categoria = 'vendedor'
+    {where}
+    GROUP BY p.id, u_v.nombre, u_v.email
+    ORDER BY p.created_at DESC
+    """
+    rows = await database.fetch_all(query=query, values=values)
+    return [dict(r._mapping) for r in rows]
+
+
+async def get_properties_by_vendedor(vendedor_id: int):
+    """Lista propiedades asignadas a un vendedor."""
+    query = """
+    SELECT * FROM propiedades WHERE vendedor_id = :vendedor_id
+    ORDER BY created_at DESC
+    """
+    rows = await database.fetch_all(query=query, values={"vendedor_id": vendedor_id})
+    return [_normalize_prop(dict(r._mapping)) for r in rows]
+
+
+async def get_properties_by_comprador(comprador_id: int):
+    """Lista propiedades asignadas a un comprador."""
+    query = """
+    SELECT * FROM propiedades WHERE comprador_id = :comprador_id
+    ORDER BY created_at DESC
+    """
+    rows = await database.fetch_all(query=query, values={"comprador_id": comprador_id})
+    return [_normalize_prop(dict(r._mapping)) for r in rows]
+
+
+async def set_tipo_compra(propiedad_id: int, tipo_compra: str):
+    """Guarda el tipo de compra seleccionado por el comprador."""
+    query = "UPDATE propiedades SET tipo_compra = :tipo_compra, updated_at = NOW() WHERE id = :id"
+    await database.execute(query=query, values={"id": propiedad_id, "tipo_compra": tipo_compra})
 
 
 async def get_all_properties(active_only: bool = True, limit: int = 50, offset: int = 0):
@@ -626,3 +720,121 @@ async def delete_prospecto(prospecto_id: int):
     """Elimina un prospecto permanentemente."""
     query = "DELETE FROM prospectos WHERE id = :id"
     await database.execute(query=query, values={"id": prospecto_id})
+
+
+# ─── Documentos ───
+
+async def save_documento(data: dict) -> int:
+    """Guarda un documento y devuelve su ID."""
+    query = """
+    INSERT INTO documentos (propiedad_id, subido_por, tipo_documento, categoria, archivo_url, estado, obligatorio, notas)
+    VALUES (:propiedad_id, :subido_por, :tipo_documento, :categoria, :archivo_url, :estado, :obligatorio, :notas)
+    RETURNING id
+    """
+    values = {
+        "propiedad_id": data["propiedad_id"],
+        "subido_por": data["subido_por"],
+        "tipo_documento": data["tipo_documento"],
+        "categoria": data["categoria"],
+        "archivo_url": data["archivo_url"],
+        "estado": data.get("estado", "pendiente"),
+        "obligatorio": data.get("obligatorio", True),
+        "notas": data.get("notas", ""),
+    }
+    return await database.execute(query=query, values=values)
+
+
+async def get_documentos_by_propiedad(propiedad_id: int):
+    """Lista todos los documentos de una propiedad."""
+    query = """
+    SELECT d.*, u.nombre as subido_por_nombre
+    FROM documentos d
+    LEFT JOIN usuarios u ON d.subido_por = u.id
+    WHERE d.propiedad_id = :propiedad_id
+    ORDER BY d.created_at DESC
+    """
+    rows = await database.fetch_all(query=query, values={"propiedad_id": propiedad_id})
+    return [dict(r._mapping) for r in rows]
+
+
+async def update_documento_estado(doc_id: int, estado: str, notas: str = ""):
+    """Actualiza el estado de un documento (pendiente, aprobado, rechazado)."""
+    query = """
+    UPDATE documentos SET estado = :estado, notas = :notas, updated_at = NOW()
+    WHERE id = :id RETURNING propiedad_id, tipo_documento, subido_por
+    """
+    row = await database.fetch_one(query=query, values={"id": doc_id, "estado": estado, "notas": notas})
+    return dict(row._mapping) if row else None
+
+
+# ─── Notificaciones ───
+
+async def crear_notificacion(tipo: str, user_id: int, propiedad_id: int, metadata: dict = None):
+    """Crea una notificación. Función reutilizable para cualquier trigger."""
+    query = """
+    INSERT INTO notificaciones (tipo, user_id, propiedad_id, metadata)
+    VALUES (:tipo, :user_id, :propiedad_id, :metadata)
+    RETURNING id
+    """
+    import json as _j
+    values = {
+        "tipo": tipo,
+        "user_id": user_id,
+        "propiedad_id": propiedad_id,
+        "metadata": _j.dumps(metadata or {}),
+    }
+    return await database.execute(query=query, values=values)
+
+
+async def get_notificaciones(user_id: int, solo_no_leidas: bool = False, limit: int = 50):
+    """Lista notificaciones de un usuario."""
+    where = "WHERE n.user_id = :user_id"
+    if solo_no_leidas:
+        where += " AND n.leida = FALSE"
+    query = f"""
+    SELECT n.*, p.tipo_propiedad, p.direccion, p.ciudad
+    FROM notificaciones n
+    LEFT JOIN propiedades p ON n.propiedad_id = p.id
+    {where}
+    ORDER BY n.created_at DESC LIMIT :limit
+    """
+    rows = await database.fetch_all(query=query, values={"user_id": user_id, "limit": limit})
+    return [dict(r._mapping) for r in rows]
+
+
+async def marcar_notificacion_leida(notif_id: int):
+    """Marca una notificación como leída."""
+    await database.execute("UPDATE notificaciones SET leida = TRUE WHERE id = :id", values={"id": notif_id})
+
+
+async def contar_notificaciones_no_leidas(user_id: int) -> int:
+    """Cuenta notificaciones no leídas de un usuario."""
+    row = await database.fetch_one(
+        "SELECT COUNT(*) as total FROM notificaciones WHERE user_id = :user_id AND leida = FALSE",
+        values={"user_id": user_id}
+    )
+    return row._mapping["total"] if row else 0
+
+
+async def get_propiedades_con_docs_pendientes():
+    """Detecta propiedades con documentos obligatorios faltantes o pendientes.
+    Función lista para ejecutarse manualmente o con cron después."""
+    query = """
+    SELECT p.id as propiedad_id, p.tipo_propiedad, p.direccion, p.ciudad,
+           p.user_id as agente_id, p.vendedor_id,
+           u_agente.nombre as agente_nombre,
+           u_vendedor.nombre as vendedor_nombre,
+           COUNT(d.id) as docs_subidos,
+           COUNT(CASE WHEN d.estado = 'aprobado' THEN 1 END) as docs_aprobados,
+           COUNT(CASE WHEN d.estado = 'rechazado' THEN 1 END) as docs_rechazados,
+           COUNT(CASE WHEN d.estado = 'pendiente' THEN 1 END) as docs_pendientes
+    FROM propiedades p
+    LEFT JOIN documentos d ON d.propiedad_id = p.id AND d.categoria = 'vendedor'
+    LEFT JOIN usuarios u_agente ON p.user_id = u_agente.id
+    LEFT JOIN usuarios u_vendedor ON p.vendedor_id = u_vendedor.id
+    WHERE p.vendedor_id IS NOT NULL AND p.activa = TRUE
+    GROUP BY p.id, u_agente.nombre, u_vendedor.nombre
+    ORDER BY p.created_at DESC
+    """
+    rows = await database.fetch_all(query=query)
+    return [dict(r._mapping) for r in rows]

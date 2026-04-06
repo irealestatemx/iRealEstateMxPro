@@ -35,6 +35,11 @@ from database import (
     get_user_by_prefijo, get_all_referidos,
     create_prospecto, get_all_prospectos, get_prospecto_by_id,
     update_prospecto, count_prospectos, delete_prospecto,
+    save_documento, get_documentos_by_propiedad, update_documento_estado,
+    get_properties_by_vendedor, get_properties_by_comprador,
+    get_propiedades_seguimiento, set_tipo_compra,
+    crear_notificacion, get_notificaciones, marcar_notificacion_leida,
+    contar_notificaciones_no_leidas, get_propiedades_con_docs_pendientes,
 )
 
 # ─── Sesiones con cookie firmada ───
@@ -1243,7 +1248,14 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
         return templates.TemplateResponse(request=request, name="login.html", context={"error": "Email o contraseña incorrectos"})
     token = serializer.dumps(user["id"])
     # Referidos van directo a su dashboard de prospectos
-    redirect_url = "/mis-prospectos" if user["rol"] == "referido" else "/"
+    if user["rol"] == "referido":
+        redirect_url = "/mis-prospectos"
+    elif user["rol"] == "vendedor":
+        redirect_url = "/mis-documentos"
+    elif user["rol"] == "comprador":
+        redirect_url = "/portal-comprador"
+    else:
+        redirect_url = "/"
     response = RedirectResponse(redirect_url, status_code=302)
     response.set_cookie("session", token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax")
     return response
@@ -1628,6 +1640,458 @@ async def dashboard_delete(request: Request, prop_id: int):
     from database import database as db
     await db.execute("DELETE FROM propiedades WHERE id = :id", values={"id": prop_id})
     return RedirectResponse("/dashboard", status_code=302)
+
+
+# ─── Documentos ───
+
+VALID_DOC_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".pdf", ".doc", ".docx"}
+VALID_CATEGORIAS = {"vendedor", "comprador", "agente", "notaria"}
+
+@app.post("/api/documentos/subir")
+async def subir_documento(
+    request: Request,
+    propiedad_id: int = Form(...),
+    tipo_documento: str = Form(...),
+    categoria: str = Form(...),
+    archivo: UploadFile = File(...),
+    notas: Optional[str] = Form(None),
+):
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"error": "No autenticado"}, status_code=401)
+
+    # Validar que la propiedad existe
+    prop = await get_property_by_id(propiedad_id)
+    if not prop:
+        return JSONResponse({"error": "Propiedad no encontrada"}, status_code=404)
+
+    # Validar permisos: dueño, vendedor asignado, agente, o admin
+    rol = user["rol"]
+    es_dueño = prop.get("user_id") == user["id"]
+    es_vendedor_asignado = prop.get("vendedor_id") == user["id"]
+    es_comprador_asignado = prop.get("comprador_id") == user["id"]
+    if rol not in ("admin", "agente") and not es_dueño and not es_vendedor_asignado and not es_comprador_asignado:
+        return JSONResponse({"error": "Sin permisos"}, status_code=403)
+
+    # Validar categoría
+    if categoria not in VALID_CATEGORIAS:
+        return JSONResponse({"error": f"Categoría inválida. Opciones: {', '.join(VALID_CATEGORIAS)}"}, status_code=400)
+
+    # Validar que la categoría coincida con el rol del usuario
+    if rol == "vendedor" and categoria != "vendedor":
+        return JSONResponse({"error": "Solo puedes subir documentos de categoría 'vendedor'"}, status_code=403)
+    if rol == "comprador" and categoria != "comprador":
+        return JSONResponse({"error": "Solo puedes subir documentos de categoría 'comprador'"}, status_code=403)
+
+    # Validar extensión del archivo
+    ext = Path(archivo.filename).suffix.lower()
+    if ext not in VALID_DOC_EXTENSIONS:
+        return JSONResponse({"error": f"Tipo de archivo no permitido. Permitidos: {', '.join(VALID_DOC_EXTENSIONS)}"}, status_code=400)
+
+    # Guardar archivo (reutiliza UPLOAD_DIR + session_id de la propiedad)
+    doc_dir = UPLOAD_DIR / prop["session_id"] / "documentos"
+    doc_dir.mkdir(parents=True, exist_ok=True)
+
+    safe_tipo = re.sub(r"[^a-zA-Z0-9_-]", "_", tipo_documento.lower())
+    filename = f"{safe_tipo}_{uuid.uuid4().hex[:8]}{ext}"
+    dest = doc_dir / filename
+
+    with open(dest, "wb") as buffer:
+        shutil.copyfileobj(archivo.file, buffer)
+
+    archivo_url = f"/static/uploads/{prop['session_id']}/documentos/{filename}"
+
+    # Guardar registro en BD
+    doc_id = await save_documento({
+        "propiedad_id": propiedad_id,
+        "subido_por": user["id"],
+        "tipo_documento": tipo_documento,
+        "categoria": categoria,
+        "archivo_url": archivo_url,
+        "notas": notas or "",
+    })
+
+    # ── Trigger: notificar al agente/admin que se subió un documento ──
+    agente_id = prop.get("user_id")
+    if agente_id and agente_id != user["id"]:
+        await crear_notificacion(
+            tipo="documento_subido",
+            user_id=agente_id,
+            propiedad_id=propiedad_id,
+            metadata={
+                "tipo_documento": tipo_documento,
+                "categoria": categoria,
+                "cliente_nombre": user.get("nombre", ""),
+                "cliente_id": user["id"],
+            },
+        )
+
+    # ── Trigger: verificar si todos los obligatorios están completos ──
+    docs = await get_documentos_by_propiedad(propiedad_id)
+    docs_vendedor = {d["tipo_documento"]: d for d in docs if d.get("categoria") == "vendedor"}
+    obligatorios_completos = all(
+        d["tipo"] in docs_vendedor for d in DOCS_VENDEDOR if d["obligatorio"]
+    )
+    if obligatorios_completos and agente_id:
+        await crear_notificacion(
+            tipo="documentos_completos",
+            user_id=agente_id,
+            propiedad_id=propiedad_id,
+            metadata={
+                "mensaje": "Todos los documentos obligatorios del vendedor han sido subidos. Propiedad lista para avanzar al cierre.",
+                "vendedor_nombre": user.get("nombre", ""),
+            },
+        )
+
+    return JSONResponse({
+        "ok": True,
+        "documento_id": doc_id,
+        "archivo_url": archivo_url,
+    })
+
+
+@app.get("/api/documentos/{propiedad_id}")
+async def listar_documentos(request: Request, propiedad_id: int):
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"error": "No autenticado"}, status_code=401)
+
+    prop = await get_property_by_id(propiedad_id)
+    if not prop:
+        return JSONResponse({"error": "Propiedad no encontrada"}, status_code=404)
+
+    if user["rol"] != "admin" and prop.get("user_id") != user["id"]:
+        return JSONResponse({"error": "Sin permisos"}, status_code=403)
+
+    docs = await get_documentos_by_propiedad(propiedad_id)
+    return JSONResponse({"ok": True, "documentos": docs})
+
+
+@app.post("/api/documentos/{doc_id}/estado")
+async def cambiar_estado_documento(
+    request: Request,
+    doc_id: int,
+    estado: str = Form(...),
+    notas: str = Form(""),
+):
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"error": "No autenticado"}, status_code=401)
+
+    # Solo agente o admin puede cambiar estado
+    if user["rol"] not in ("admin", "agente"):
+        return JSONResponse({"error": "Sin permisos"}, status_code=403)
+
+    if estado not in ("pendiente", "aprobado", "rechazado"):
+        return JSONResponse({"error": "Estado inválido"}, status_code=400)
+
+    result = await update_documento_estado(doc_id, estado, notas)
+    if not result:
+        return JSONResponse({"error": "Documento no encontrado"}, status_code=404)
+
+    # ── Trigger: si se rechazó, notificar al vendedor ──
+    if estado == "rechazado":
+        prop = await get_property_by_id(result["propiedad_id"])
+        vendedor_id = prop.get("vendedor_id") if prop else None
+        if not vendedor_id:
+            vendedor_id = result.get("subido_por")
+        if vendedor_id:
+            await crear_notificacion(
+                tipo="documento_rechazado",
+                user_id=vendedor_id,
+                propiedad_id=result["propiedad_id"],
+                metadata={
+                    "tipo_documento": result["tipo_documento"],
+                    "notas": notas,
+                    "revisado_por": user.get("nombre", ""),
+                },
+            )
+
+    return JSONResponse({"ok": True, "estado": estado})
+
+
+# ── Notificaciones API ──
+
+@app.get("/api/notificaciones")
+async def api_notificaciones(request: Request):
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"error": "No autenticado"}, status_code=401)
+    notifs = await get_notificaciones(user["id"], solo_no_leidas=False, limit=50)
+    count = await contar_notificaciones_no_leidas(user["id"])
+    return JSONResponse({"ok": True, "notificaciones": notifs, "no_leidas": count})
+
+
+@app.post("/api/notificaciones/{notif_id}/leer")
+async def api_marcar_leida(request: Request, notif_id: int):
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"error": "No autenticado"}, status_code=401)
+    await marcar_notificacion_leida(notif_id)
+    return JSONResponse({"ok": True})
+
+
+@app.get("/api/docs-pendientes")
+async def api_docs_pendientes(request: Request):
+    """Reporte de propiedades con documentos incompletos. Solo agente/admin."""
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"error": "No autenticado"}, status_code=401)
+    if user["rol"] not in ("admin", "agente"):
+        return JSONResponse({"error": "Sin permisos"}, status_code=403)
+    resumen = await get_propiedades_con_docs_pendientes()
+    return JSONResponse({"ok": True, "propiedades": resumen})
+
+
+ESTADO_ORDEN = {"atorado": 0, "casi_listo": 1, "en_proceso": 2, "sin_iniciar": 3, "completo": 4}
+PRIORIDAD_ORDEN = {"alta": 0, "media": 1, "normal": 2, "baja": 3, "ninguna": 4}
+
+
+def calcular_estado_propiedad(docs_subidos, docs_rechazados, total_obligatorios):
+    """Calcula el estado de avance de una propiedad."""
+    if docs_rechazados > 0:
+        return "atorado"
+    if docs_subidos == 0:
+        return "sin_iniciar"
+    porcentaje = round(docs_subidos / total_obligatorios * 100) if total_obligatorios > 0 else 0
+    if porcentaje >= 100:
+        return "completo"
+    if porcentaje > 80:
+        return "casi_listo"
+    return "en_proceso"
+
+
+def calcular_prioridad(estado):
+    """Calcula la prioridad de contacto basada en el estado."""
+    if estado == "atorado":
+        return "alta"
+    if estado == "casi_listo":
+        return "media"
+    if estado == "en_proceso":
+        return "normal"
+    if estado == "sin_iniciar":
+        return "baja"
+    return "ninguna"
+
+
+def generar_mensaje_seguimiento(estado, nombre, propiedad):
+    """Genera mensaje de WhatsApp sugerido según el estado del proceso."""
+    nombre = nombre or "cliente"
+    propiedad = propiedad or "tu propiedad"
+    mensajes = {
+        "atorado": f"Hola {nombre}, vi que uno de tus documentos necesita una corrección para avanzar con {propiedad}. ¿Te puedo ayudar a revisarlo? 👍",
+        "casi_listo": f"Hola {nombre}, ya casi terminamos tu proceso para {propiedad}. Solo falta un paso para avanzar con tu cierre 🙌",
+        "en_proceso": f"Hola {nombre}, ¿cómo vas con tus documentos para {propiedad}? Te ayudo a avanzar para asegurar tu proceso 👍",
+        "sin_iniciar": f"Hola {nombre}, te recuerdo que necesitamos tus documentos para iniciar el proceso de {propiedad}. ¿Cuándo puedes enviarlos? 📄",
+    }
+    return mensajes.get(estado, "")
+
+
+@app.get("/dashboard-asesor", response_class=HTMLResponse)
+async def dashboard_asesor(request: Request):
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    if user["rol"] not in ("admin", "agente"):
+        return RedirectResponse("/dashboard", status_code=302)
+
+    # Admin ve todo, agente solo las suyas
+    agente_id = None if user["rol"] == "admin" else user["id"]
+    props_raw = await get_propiedades_seguimiento(agente_id=agente_id)
+
+    total_obligatorios = sum(1 for d in DOCS_VENDEDOR_LIST if d["obligatorio"])
+
+    propiedades = []
+    contadores = {"sin_iniciar": 0, "en_proceso": 0, "casi_listo": 0, "atorado": 0, "completo": 0}
+
+    for p in props_raw:
+        subidos = p["docs_subidos"] or 0
+        rechazados = p["docs_rechazados"] or 0
+        porcentaje = round(subidos / total_obligatorios * 100) if total_obligatorios > 0 else 0
+        if porcentaje > 100:
+            porcentaje = 100
+        estado = calcular_estado_propiedad(subidos, rechazados, total_obligatorios)
+        contadores[estado] += 1
+
+        prioridad = calcular_prioridad(estado)
+        nombre_prop = f"{p['tipo_propiedad'] or 'Propiedad'} en {p['ciudad'] or ''}"
+        mensaje = generar_mensaje_seguimiento(estado, p["vendedor_nombre"], nombre_prop)
+
+        # Motivo para tareas de hoy
+        if estado == "atorado":
+            motivo = f"{rechazados} documento(s) rechazado(s)"
+        elif estado == "casi_listo":
+            motivo = "Listo para cerrar pronto"
+        elif estado == "en_proceso":
+            motivo = f"Faltan {total_obligatorios - subidos} documentos"
+        elif estado == "sin_iniciar":
+            motivo = "No ha subido documentos"
+        else:
+            motivo = ""
+
+        propiedades.append({
+            "id": p["id"],
+            "tipo_propiedad": p["tipo_propiedad"] or "Propiedad",
+            "operacion": p["operacion"] or "",
+            "direccion": p["direccion"] or "",
+            "ciudad": p["ciudad"] or "",
+            "precio_formateado": p["precio_formateado"] or "",
+            "foto_portada_url": p["foto_portada_url"],
+            "vendedor_nombre": p["vendedor_nombre"] or "Sin asignar",
+            "vendedor_email": p.get("vendedor_email", ""),
+            "docs_subidos": subidos,
+            "docs_total": len(DOCS_VENDEDOR_LIST),
+            "docs_rechazados": rechazados,
+            "docs_pendientes": p["docs_pendientes"] or 0,
+            "porcentaje": porcentaje,
+            "estado": estado,
+            "prioridad": prioridad,
+            "motivo": motivo,
+            "mensaje_sugerido": mensaje,
+            "ultimo_movimiento": str(p["ultimo_movimiento"])[:16] if p["ultimo_movimiento"] else "Sin actividad",
+        })
+
+    # Ordenar: prioridad (alta→baja), luego último movimiento ASC (más olvidados primero)
+    propiedades.sort(key=lambda x: (
+        PRIORIDAD_ORDEN.get(x["prioridad"], 99),
+        x["ultimo_movimiento"] if x["ultimo_movimiento"] != "Sin actividad" else "0000",
+    ))
+
+    # Tareas de hoy: solo prioridad alta y media
+    tareas_hoy = [p for p in propiedades if p["prioridad"] in ("alta", "media")]
+
+    notif_count = await contar_notificaciones_no_leidas(user["id"])
+
+    return templates.TemplateResponse(request=request, name="dashboard_asesor.html", context={
+        "user": user,
+        "propiedades": propiedades,
+        "tareas_hoy": tareas_hoy,
+        "contadores": contadores,
+        "total_propiedades": len(propiedades),
+        "notif_count": notif_count,
+    })
+
+
+DOCS_VENDEDOR_LIST = DOCS_VENDEDOR = [
+    {"tipo": "Escrituras", "obligatorio": True},
+    {"tipo": "Estado de cuenta", "obligatorio": True},
+    {"tipo": "Identificación oficial", "obligatorio": True},
+    {"tipo": "CURP", "obligatorio": True},
+    {"tipo": "Comprobante de servicios", "obligatorio": True},
+    {"tipo": "Predial", "obligatorio": True},
+    {"tipo": "Poder notarial", "obligatorio": False},
+    {"tipo": "Planos", "obligatorio": False},
+    {"tipo": "Acta de matrimonio/divorcio", "obligatorio": True},
+    {"tipo": "Acta de nacimiento", "obligatorio": True},
+]
+
+DOCS_AGENTE = [
+    {"tipo": "libertad_gravamen", "nombre": "Libertad de gravamen", "obligatorio": True},
+    {"tipo": "contrato_comision", "nombre": "Contrato de comisión firmado", "obligatorio": True},
+    {"tipo": "alta_propiedad", "nombre": "Alta de la propiedad", "obligatorio": True},
+    {"tipo": "factibilidades", "nombre": "Factibilidades (agua/luz - terreno)", "obligatorio": False},
+    {"tipo": "alineamiento_numero", "nombre": "Alineamiento y número oficial", "obligatorio": False},
+    {"tipo": "cuotas_cooperacion", "nombre": "Cuotas de obras de cooperación", "obligatorio": True},
+    {"tipo": "avaluo_fiscal", "nombre": "Avalúo fiscal", "obligatorio": True},
+    {"tipo": "avaluo_comercial", "nombre": "Avalúo comercial", "obligatorio": False},
+]
+
+
+@app.get("/mis-documentos", response_class=HTMLResponse)
+async def mis_documentos_sin_id(request: Request):
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    # Buscar propiedades asignadas al vendedor
+    props = await get_properties_by_vendedor(user["id"])
+
+    if len(props) == 1:
+        return RedirectResponse(f"/mis-documentos/{props[0]['id']}", status_code=302)
+    elif len(props) > 1:
+        # Múltiples propiedades: mostrar lista para elegir
+        return templates.TemplateResponse(request=request, name="documentos_vendedor.html", context={
+            "user": user,
+            "propiedad": None,
+            "propiedades": props,
+            "checklist": [],
+            "docs_subidos": {},
+            "progreso": None,
+        })
+
+    # Sin propiedad asignada
+    return templates.TemplateResponse(request=request, name="documentos_vendedor.html", context={
+        "user": user,
+        "propiedad": None,
+        "propiedades": [],
+        "checklist": [],
+        "docs_subidos": {},
+        "progreso": None,
+    })
+
+
+@app.get("/mis-documentos/{propiedad_id}", response_class=HTMLResponse)
+async def mis_documentos_vendedor(request: Request, propiedad_id: int):
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    prop = await get_property_by_id(propiedad_id)
+    if not prop:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    # Permisos: admin, agente, o vendedor asignado
+    rol = user["rol"]
+    es_vendedor_asignado = prop.get("vendedor_id") == user["id"]
+    es_dueño = prop.get("user_id") == user["id"]
+    if rol not in ("admin", "agente") and not es_vendedor_asignado and not es_dueño:
+        return RedirectResponse("/mis-documentos", status_code=302)
+
+    docs = await get_documentos_by_propiedad(propiedad_id)
+
+    # Mapear documentos subidos por categoría y tipo
+    docs_vendedor = {}
+    docs_agente = {}
+    for d in docs:
+        cat = d.get("categoria", "")
+        if cat == "vendedor":
+            docs_vendedor[d["tipo_documento"]] = d
+        elif cat == "agente":
+            docs_agente[d["tipo_documento"]] = d
+
+    # Progreso vendedor
+    total_oblig_v = sum(1 for d in DOCS_VENDEDOR if d["obligatorio"])
+    subidos_oblig_v = sum(1 for d in DOCS_VENDEDOR if d["obligatorio"] and d["tipo"] in docs_vendedor)
+    progreso_vendedor = {
+        "subidos": len(docs_vendedor),
+        "total": len(DOCS_VENDEDOR),
+        "obligatorios_subidos": subidos_oblig_v,
+        "obligatorios_total": total_oblig_v,
+        "porcentaje": round(subidos_oblig_v / total_oblig_v * 100) if total_oblig_v > 0 else 0,
+    }
+
+    # Progreso agente
+    total_oblig_a = sum(1 for d in DOCS_AGENTE if d["obligatorio"])
+    subidos_oblig_a = sum(1 for d in DOCS_AGENTE if d["obligatorio"] and d["tipo"] in docs_agente)
+    progreso_agente = {
+        "subidos": len(docs_agente),
+        "total": len(DOCS_AGENTE),
+        "obligatorios_subidos": subidos_oblig_a,
+        "obligatorios_total": total_oblig_a,
+        "porcentaje": round(subidos_oblig_a / total_oblig_a * 100) if total_oblig_a > 0 else 0,
+    }
+
+    return templates.TemplateResponse(request=request, name="documentos_vendedor.html", context={
+        "user": user,
+        "propiedad": prop,
+        "propiedades": [],
+        "checklist": DOCS_VENDEDOR,
+        "docs_subidos": docs_vendedor,
+        "progreso": progreso_vendedor,
+        "checklist_agente": DOCS_AGENTE,
+        "docs_agente": docs_agente,
+        "progreso_agente": progreso_agente,
+    })
 
 
 # ─── Dashboard de Referidos ───
@@ -3491,6 +3955,161 @@ async def download_video(job_id: str):
         media_type="video/mp4",
         filename=job["filename"],
     )
+
+
+# ─── Portal del comprador ───────────────────────────────────────────
+
+TIPOS_COMPRA = ["Contado", "Transferencia", "Crédito bancario", "Crédito Infonavit", "Crédito ISSEG"]
+
+DOCS_COMPRADOR = {
+    "Crédito Infonavit": [
+        {"tipo": "Solicitud de avalúo", "obligatorio": True},
+        {"tipo": "Solicitud de crédito", "obligatorio": True},
+        {"tipo": "Constancia Saber +", "obligatorio": True},
+        {"tipo": "Aviso de retención", "obligatorio": True},
+        {"tipo": "Carta autorización crédito", "obligatorio": False},
+        {"tipo": "Avalúo", "obligatorio": True},
+        {"tipo": "Croquis de localización (Anexo C)", "obligatorio": True},
+        {"tipo": "Constancia de crédito", "obligatorio": True},
+        {"tipo": "Elección de notario", "obligatorio": True},
+        {"tipo": "Formato Bajoprotesta (Creditereno)", "obligatorio": True},
+        {"tipo": "Poder para trámites Infonavit", "obligatorio": True},
+        {"tipo": "Alineamiento", "obligatorio": True},
+        {"tipo": "Predial", "obligatorio": True},
+        {"tipo": "Agua y luz", "obligatorio": True},
+    ],
+    "Crédito ISSEG": [
+        {"tipo": "Solicitud de préstamo", "obligatorio": True},
+        {"tipo": "Talón de pago actual", "obligatorio": True},
+        {"tipo": "Aviso de privacidad firmado", "obligatorio": True},
+        {"tipo": "Carta de pago de gastos notariales", "obligatorio": True},
+        {"tipo": "Avalúo comercial", "obligatorio": True},
+        {"tipo": "Avalúo fiscal", "obligatorio": True},
+        {"tipo": "Comprobante de domicilio", "obligatorio": True},
+        {"tipo": "Consentimiento de monto y plazo", "obligatorio": True},
+        {"tipo": "Contrato de promesa", "obligatorio": True},
+    ],
+    "_basico": [
+        {"tipo": "Escrituras", "obligatorio": True},
+        {"tipo": "Identificación oficial", "obligatorio": True},
+        {"tipo": "Comprobante de domicilio", "obligatorio": True},
+        {"tipo": "RFC", "obligatorio": True},
+        {"tipo": "CURP", "obligatorio": True},
+        {"tipo": "Acta de matrimonio", "obligatorio": False},
+        {"tipo": "Acta de nacimiento", "obligatorio": True},
+        {"tipo": "Estado de cuenta", "obligatorio": True},
+    ],
+}
+
+def get_docs_comprador(tipo_compra: str) -> list:
+    """Retorna la lista de documentos según tipo de compra."""
+    return DOCS_COMPRADOR.get(tipo_compra, DOCS_COMPRADOR["_basico"])
+
+
+@app.get("/portal-comprador", response_class=HTMLResponse)
+async def portal_comprador_sin_id(request: Request):
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    props = await get_properties_by_comprador(user["id"])
+
+    if len(props) == 1:
+        return RedirectResponse(f"/portal-comprador/{props[0]['id']}", status_code=302)
+    elif len(props) > 1:
+        return templates.TemplateResponse(request=request, name="portal_comprador.html", context={
+            "user": user,
+            "propiedad": None,
+            "propiedades": props,
+            "tipos_compra": TIPOS_COMPRA,
+        })
+
+    # Sin propiedad asignada
+    return templates.TemplateResponse(request=request, name="portal_comprador.html", context={
+        "user": user,
+        "propiedad": None,
+        "propiedades": [],
+        "tipos_compra": TIPOS_COMPRA,
+    })
+
+
+@app.get("/portal-comprador/{propiedad_id}", response_class=HTMLResponse)
+async def portal_comprador(request: Request, propiedad_id: int):
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+
+    prop = await get_property_by_id(propiedad_id)
+    if not prop:
+        return RedirectResponse("/portal-comprador", status_code=302)
+
+    # Permisos: admin, agente, o comprador asignado
+    rol = user["rol"]
+    es_comprador_asignado = prop.get("comprador_id") == user["id"]
+    if rol not in ("admin", "agente") and not es_comprador_asignado:
+        return RedirectResponse("/portal-comprador", status_code=302)
+
+    # Checklist y documentos subidos
+    checklist = []
+    docs_subidos = {}
+    progreso = None
+
+    if prop.get("tipo_compra"):
+        checklist = get_docs_comprador(prop["tipo_compra"])
+        docs = await get_documentos_by_propiedad(propiedad_id)
+        for d in docs:
+            if d.get("categoria") == "comprador":
+                docs_subidos[d["tipo_documento"]] = d
+
+        total_oblig = sum(1 for d in checklist if d["obligatorio"])
+        subidos_oblig = sum(1 for d in checklist if d["obligatorio"] and d["tipo"] in docs_subidos)
+        progreso = {
+            "subidos": len(docs_subidos),
+            "total": len(checklist),
+            "obligatorios_subidos": subidos_oblig,
+            "obligatorios_total": total_oblig,
+            "porcentaje": round(subidos_oblig / total_oblig * 100) if total_oblig > 0 else 0,
+        }
+
+    return templates.TemplateResponse(request=request, name="portal_comprador.html", context={
+        "user": user,
+        "propiedad": prop,
+        "propiedades": [],
+        "tipos_compra": TIPOS_COMPRA,
+        "checklist": checklist,
+        "docs_subidos": docs_subidos,
+        "progreso": progreso,
+    })
+
+
+@app.post("/portal-comprador/tipo-compra")
+async def guardar_tipo_compra(request: Request):
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"success": False, "error": "No autenticado"}, status_code=401)
+
+    form = await request.form()
+    propiedad_id = int(form.get("propiedad_id", 0))
+    tipo_compra = form.get("tipo_compra", "").strip()
+
+    if not propiedad_id or tipo_compra not in TIPOS_COMPRA:
+        return JSONResponse({"success": False, "error": "Datos inválidos"}, status_code=400)
+
+    prop = await get_property_by_id(propiedad_id)
+    if not prop:
+        return JSONResponse({"success": False, "error": "Propiedad no encontrada"}, status_code=404)
+
+    # Solo comprador asignado, agente o admin
+    es_comprador_asignado = prop.get("comprador_id") == user["id"]
+    if user["rol"] not in ("admin", "agente") and not es_comprador_asignado:
+        return JSONResponse({"success": False, "error": "Sin permisos"}, status_code=403)
+
+    # Si ya tiene tipo_compra, no permitir cambio
+    if prop.get("tipo_compra"):
+        return JSONResponse({"success": False, "error": "El tipo de compra ya fue seleccionado"}, status_code=400)
+
+    await set_tipo_compra(propiedad_id, tipo_compra)
+    return RedirectResponse(f"/portal-comprador/{propiedad_id}", status_code=302)
 
 
 if __name__ == "__main__":
