@@ -1268,6 +1268,141 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "iRealEstateMxPro")
+N8N_WEBHOOK_NOTIFICACIONES = os.getenv("N8N_WEBHOOK_NOTIFICACIONES", "")
+
+
+# ─── Mensajes de notificación por tipo ─────────────────────────────
+
+NOTIF_MENSAJES = {
+    "documento_subido": {
+        "asunto": "Nuevo documento subido",
+        "cuerpo": "Se ha subido el documento '{tipo_documento}' para la propiedad en {direccion}. Subido por: {cliente_nombre}.",
+        "whatsapp": "Se subió el documento *{tipo_documento}* para la propiedad en _{direccion}_. Subido por: {cliente_nombre}.",
+    },
+    "documento_rechazado": {
+        "asunto": "Documento rechazado — Acción requerida",
+        "cuerpo": "Tu documento '{tipo_documento}' fue rechazado. Motivo: {notas}. Por favor sube una versión corregida.",
+        "whatsapp": "Tu documento *{tipo_documento}* fue rechazado. Motivo: _{notas}_. Por favor sube una versión corregida.",
+    },
+    "documentos_completos": {
+        "asunto": "Documentos completos — Listo para avanzar",
+        "cuerpo": "Todos los documentos obligatorios han sido subidos para la propiedad en {direccion}. {vendedor_nombre} completó su expediente.",
+        "whatsapp": "Todos los documentos obligatorios de *{vendedor_nombre}* están completos para la propiedad en _{direccion}_. Listo para avanzar al cierre.",
+    },
+}
+
+
+async def enviar_email_notificacion(to_email: str, to_name: str, asunto: str, cuerpo: str):
+    """Envía un email de notificación usando SMTP (reutiliza config existente)."""
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    if not SMTP_USER or not SMTP_PASSWORD:
+        print(f"[EMAIL-NOTIF] SMTP no configurado. Asunto: {asunto}")
+        return False
+
+    msg = MIMEMultipart("alternative")
+    msg["From"] = f"{SMTP_FROM_NAME} <{SMTP_USER}>"
+    msg["To"] = to_email
+    msg["Subject"] = f"{asunto} — iRealEstateMxPro"
+
+    html = f"""
+    <div style="font-family:'Inter',Arial,sans-serif;max-width:500px;margin:0 auto;padding:40px 20px;">
+      <div style="text-align:center;margin-bottom:30px;">
+        <h1 style="color:#1a3c5e;font-size:22px;margin:0;">iRealEstateMxPro</h1>
+      </div>
+      <div style="background:#fff;border-radius:12px;padding:32px;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+        <h2 style="color:#1a3c5e;font-size:18px;margin-top:0;">Hola {to_name},</h2>
+        <p style="color:#4a5568;font-size:14px;line-height:1.6;">{cuerpo}</p>
+        <div style="text-align:center;margin:28px 0;">
+          <a href="{APP_URL}"
+             style="background:linear-gradient(135deg,#c9a227,#d4af37);color:#1a3c5e;
+                    padding:14px 32px;border-radius:10px;text-decoration:none;
+                    font-weight:700;font-size:15px;display:inline-block;">
+            Ir a la plataforma
+          </a>
+        </div>
+      </div>
+      <p style="text-align:center;color:#a0aec0;font-size:11px;margin-top:20px;">
+        iRealEstateMxPro &copy; 2026
+      </p>
+    </div>
+    """
+    msg.attach(MIMEText(html, "html"))
+
+    try:
+        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
+        server.starttls()
+        server.login(SMTP_USER, SMTP_PASSWORD)
+        server.sendmail(SMTP_USER, to_email, msg.as_string())
+        server.quit()
+        print(f"[EMAIL-NOTIF] Enviado a {to_email}: {asunto}")
+        return True
+    except Exception as e:
+        print(f"[EMAIL-NOTIF] Error: {e}")
+        return False
+
+
+async def enviar_whatsapp_n8n(tipo: str, destinatario: dict, metadata: dict):
+    """Dispara webhook de n8n para enviar WhatsApp."""
+    import httpx
+
+    if not N8N_WEBHOOK_NOTIFICACIONES:
+        print(f"[WHATSAPP] Webhook n8n no configurado. Tipo: {tipo}")
+        return False
+
+    plantilla = NOTIF_MENSAJES.get(tipo, {})
+    mensaje = plantilla.get("whatsapp", "")
+    if mensaje:
+        try:
+            mensaje = mensaje.format(**metadata)
+        except KeyError:
+            pass
+
+    payload = {
+        "tipo": tipo,
+        "destinatario_nombre": destinatario.get("nombre", ""),
+        "destinatario_email": destinatario.get("email", ""),
+        "mensaje": mensaje,
+        "metadata": metadata,
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.post(N8N_WEBHOOK_NOTIFICACIONES, json=payload)
+            print(f"[WHATSAPP] Webhook n8n respondió {resp.status_code} para {tipo}")
+            return resp.status_code < 400
+    except Exception as e:
+        print(f"[WHATSAPP] Error webhook: {e}")
+        return False
+
+
+async def disparar_notificaciones(tipo: str, user_id: int, propiedad_id: int, metadata: dict):
+    """Envía email + WhatsApp al usuario. Se llama después de crear_notificacion()."""
+    user = await get_user_by_id(user_id)
+    if not user:
+        return
+
+    prop = await get_property_by_id(propiedad_id)
+    direccion = prop.get("direccion", "") if prop else ""
+    meta_con_dir = {**metadata, "direccion": direccion}
+
+    plantilla = NOTIF_MENSAJES.get(tipo, {})
+    asunto = plantilla.get("asunto", "Notificación")
+    cuerpo = plantilla.get("cuerpo", "")
+    if cuerpo:
+        try:
+            cuerpo = cuerpo.format(**meta_con_dir)
+        except KeyError:
+            pass
+
+    # Email (en background para no bloquear la respuesta)
+    import asyncio
+    asyncio.create_task(enviar_email_notificacion(user["email"], user["nombre"], asunto, cuerpo))
+
+    # WhatsApp vía n8n
+    asyncio.create_task(enviar_whatsapp_n8n(tipo, user, meta_con_dir))
 APP_URL = os.getenv("APP_URL", "https://api.irealestatemx.cloud")
 
 
@@ -1713,18 +1848,20 @@ async def subir_documento(
 
     # ── Trigger: notificar al agente/admin que se subió un documento ──
     agente_id = prop.get("user_id")
+    meta_subido = {
+        "tipo_documento": tipo_documento,
+        "categoria": categoria,
+        "cliente_nombre": user.get("nombre", ""),
+        "cliente_id": user["id"],
+    }
     if agente_id and agente_id != user["id"]:
         await crear_notificacion(
             tipo="documento_subido",
             user_id=agente_id,
             propiedad_id=propiedad_id,
-            metadata={
-                "tipo_documento": tipo_documento,
-                "categoria": categoria,
-                "cliente_nombre": user.get("nombre", ""),
-                "cliente_id": user["id"],
-            },
+            metadata=meta_subido,
         )
+        await disparar_notificaciones("documento_subido", agente_id, propiedad_id, meta_subido)
 
     # ── Trigger: verificar si todos los obligatorios están completos ──
     docs = await get_documentos_by_propiedad(propiedad_id)
@@ -1733,15 +1870,17 @@ async def subir_documento(
         d["tipo"] in docs_vendedor for d in DOCS_VENDEDOR if d["obligatorio"]
     )
     if obligatorios_completos and agente_id:
+        meta_completos = {
+            "mensaje": "Todos los documentos obligatorios del vendedor han sido subidos. Propiedad lista para avanzar al cierre.",
+            "vendedor_nombre": user.get("nombre", ""),
+        }
         await crear_notificacion(
             tipo="documentos_completos",
             user_id=agente_id,
             propiedad_id=propiedad_id,
-            metadata={
-                "mensaje": "Todos los documentos obligatorios del vendedor han sido subidos. Propiedad lista para avanzar al cierre.",
-                "vendedor_nombre": user.get("nombre", ""),
-            },
+            metadata=meta_completos,
         )
+        await disparar_notificaciones("documentos_completos", agente_id, propiedad_id, meta_completos)
 
     return JSONResponse({
         "ok": True,
@@ -1789,23 +1928,29 @@ async def cambiar_estado_documento(
     if not result:
         return JSONResponse({"error": "Documento no encontrado"}, status_code=404)
 
-    # ── Trigger: si se rechazó, notificar al vendedor ──
+    # ── Trigger: si se rechazó, notificar al vendedor/comprador ──
     if estado == "rechazado":
         prop = await get_property_by_id(result["propiedad_id"])
-        vendedor_id = prop.get("vendedor_id") if prop else None
-        if not vendedor_id:
-            vendedor_id = result.get("subido_por")
-        if vendedor_id:
+        destinatario_id = None
+        if result.get("categoria") == "comprador" and prop:
+            destinatario_id = prop.get("comprador_id")
+        if not destinatario_id and prop:
+            destinatario_id = prop.get("vendedor_id")
+        if not destinatario_id:
+            destinatario_id = result.get("subido_por")
+        if destinatario_id:
+            meta_rechazado = {
+                "tipo_documento": result["tipo_documento"],
+                "notas": notas,
+                "revisado_por": user.get("nombre", ""),
+            }
             await crear_notificacion(
                 tipo="documento_rechazado",
-                user_id=vendedor_id,
+                user_id=destinatario_id,
                 propiedad_id=result["propiedad_id"],
-                metadata={
-                    "tipo_documento": result["tipo_documento"],
-                    "notas": notas,
-                    "revisado_por": user.get("nombre", ""),
-                },
+                metadata=meta_rechazado,
             )
+            await disparar_notificaciones("documento_rechazado", destinatario_id, result["propiedad_id"], meta_rechazado)
 
     return JSONResponse({"ok": True, "estado": estado})
 
@@ -3988,6 +4133,24 @@ DOCS_COMPRADOR = {
         {"tipo": "Comprobante de domicilio", "obligatorio": True},
         {"tipo": "Consentimiento de monto y plazo", "obligatorio": True},
         {"tipo": "Contrato de promesa", "obligatorio": True},
+    ],
+    "Crédito bancario": [
+        {"tipo": "Escritura de propiedad completa y legible con registro público", "obligatorio": True},
+        {"tipo": "Régimen de propiedad en condominio", "obligatorio": False},
+        {"tipo": "Planos arquitectónicos", "obligatorio": False},
+        {"tipo": "Constancia de Alineamiento y Número oficial", "obligatorio": False},
+        {"tipo": "Boleta predial con comprobante de pago", "obligatorio": True},
+        {"tipo": "Boleta de agua con comprobante de pago", "obligatorio": True},
+        {"tipo": "Contacto para el avalúo (Nombre y teléfono)", "obligatorio": True},
+        {"tipo": "Confirmación de notaría o carta petición del cliente", "obligatorio": True},
+        {"tipo": "Cuenta del cliente donde se ligará el crédito", "obligatorio": True},
+        {"tipo": "Estado de cuenta del vendedor", "obligatorio": True},
+        {"tipo": "INE", "obligatorio": True},
+        {"tipo": "Acta de nacimiento", "obligatorio": True},
+        {"tipo": "Acta de matrimonio", "obligatorio": False},
+        {"tipo": "Comprobante de domicilio", "obligatorio": True},
+        {"tipo": "CURP", "obligatorio": True},
+        {"tipo": "Constancia de situación fiscal (CSF)", "obligatorio": True},
     ],
     "_basico": [
         {"tipo": "Escrituras", "obligatorio": True},

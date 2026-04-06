@@ -215,19 +215,21 @@
     <div class="section-title">Documentos requeridos</div>
 
     {% if progreso %}
-    <div style="background:#1a1a1a;border:1px solid rgba(201,162,39,.15);border-radius:10px;padding:16px 20px;margin-bottom:20px;">
+    <div id="progreso-box" style="background:#1a1a1a;border:1px solid rgba(201,162,39,.15);border-radius:10px;padding:16px 20px;margin-bottom:20px;">
+      <div style="font-size:15px;font-weight:700;color:#c9a227;margin-bottom:10px;">Progreso de tu trámite</div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-        <span style="font-size:13px;font-weight:600;color:#fff;">Progreso: {{ progreso.subidos }} / {{ progreso.total }} documentos</span>
-        <span style="font-size:13px;font-weight:700;color:#c9a227;">{{ progreso.porcentaje }}%</span>
+        <span id="progreso-texto" style="font-size:13px;font-weight:600;color:#fff;">{{ progreso.obligatorios_subidos }} de {{ progreso.obligatorios_total }} obligatorios</span>
+        <span id="progreso-pct" style="font-size:13px;font-weight:700;color:#c9a227;">{{ progreso.porcentaje }}%</span>
       </div>
       <div style="background:rgba(255,255,255,.08);border-radius:6px;height:10px;overflow:hidden;">
-        <div style="background:{% if progreso.porcentaje == 100 %}#68d391{% elif progreso.porcentaje >= 50 %}#c9a227{% else %}#fc8181{% endif %};height:100%;width:{{ progreso.porcentaje }}%;border-radius:6px;transition:width .4s;"></div>
+        <div id="progreso-bar" style="background:{% if progreso.porcentaje == 100 %}#68d391{% elif progreso.porcentaje >= 50 %}#c9a227{% else %}#fc8181{% endif %};height:100%;width:{{ progreso.porcentaje }}%;border-radius:6px;transition:width .4s;"></div>
       </div>
-      {% if progreso.porcentaje == 100 %}
-      <p style="font-size:11px;color:#68d391;margin-top:6px;">Todos los documentos obligatorios han sido subidos</p>
-      {% else %}
-      <p style="font-size:11px;color:rgba(255,255,255,.35);margin-top:6px;">Faltan {{ progreso.obligatorios_total - progreso.obligatorios_subidos }} documentos obligatorios</p>
-      {% endif %}
+      <p id="progreso-msg" style="font-size:13px;margin-top:10px;font-weight:500;color:{% if progreso.porcentaje == 100 %}#68d391{% elif progreso.porcentaje > 80 %}#63b3ed{% elif progreso.porcentaje >= 30 %}#c9a227{% else %}rgba(255,255,255,.5){% endif %};">
+        {% if progreso.porcentaje == 100 %}Todo listo para avanzar a firma
+        {% elif progreso.porcentaje > 80 %}Estás cerca de finalizar tu proceso
+        {% elif progreso.porcentaje >= 30 %}Vas avanzando, pronto podremos continuar con el proceso
+        {% else %}Completa tus documentos para avanzar con tu compra{% endif %}
+      </p>
     </div>
     {% endif %}
 
@@ -271,8 +273,14 @@
       {% endfor %}
     </div>
 
+    <div style="background:#1a1a1a;border:1px solid rgba(201,162,39,.1);border-radius:10px;padding:16px 20px;margin-bottom:16px;">
+      <h3 style="font-size:13px;color:#c9a227;margin-bottom:8px;">Links para tramitar documentos</h3>
+      <a href="https://www.gob.mx/curp/" target="_blank" style="color:#63b3ed;font-size:13px;text-decoration:none;display:block;margin-bottom:4px;">Consulta y descarga tu CURP</a>
+      <a href="https://www.miregistrocivil.gob.mx/" target="_blank" style="color:#63b3ed;font-size:13px;text-decoration:none;display:block;">Solicita actas de nacimiento / matrimonio / divorcio</a>
+    </div>
+
     <p style="font-size:12px;color:rgba(255,255,255,.35);font-style:italic;padding:12px 0;border-top:1px solid rgba(255,255,255,.06);margin-top:8px;">
-      En caso de no contar con algún documento, favor de avisar a tu asesor para apoyarte en el proceso.
+      Si no cuentas con algún documento, contacta a tu asesor para apoyarte.
     </p>
 
     {% else %}
@@ -320,6 +328,49 @@
     });
   }
 
+  // Datos de progreso inyectados desde el servidor
+  var progresoData = {
+    obligatoriosSubidos: {{ progreso.obligatorios_subidos if progreso else 0 }},
+    obligatoriosTotal: {{ progreso.obligatorios_total if progreso else 0 }}
+  };
+
+  // Mapa de qué docs son obligatorios para actualización dinámica
+  var docsObligatorios = {
+    {% if checklist %}{% for doc in checklist %}'{{ doc.tipo }}': {{ 'true' if doc.obligatorio else 'false' }}{% if not loop.last %},{% endif %}
+    {% endfor %}{% endif %}
+  };
+
+  function actualizarProgreso() {
+    var bar = document.getElementById('progreso-bar');
+    var pct = document.getElementById('progreso-pct');
+    var texto = document.getElementById('progreso-texto');
+    var msg = document.getElementById('progreso-msg');
+    if (!bar) return;
+
+    var s = progresoData.obligatoriosSubidos;
+    var t = progresoData.obligatoriosTotal;
+    var porcentaje = t > 0 ? Math.round(s / t * 100) : 0;
+
+    bar.style.width = porcentaje + '%';
+    bar.style.background = porcentaje >= 100 ? '#68d391' : porcentaje >= 50 ? '#c9a227' : '#fc8181';
+    pct.textContent = porcentaje + '%';
+    texto.textContent = s + ' de ' + t + ' obligatorios';
+
+    if (porcentaje >= 100) {
+      msg.textContent = 'Todo listo para avanzar a firma';
+      msg.style.color = '#68d391';
+    } else if (porcentaje > 80) {
+      msg.textContent = 'Estás cerca de finalizar tu proceso';
+      msg.style.color = '#63b3ed';
+    } else if (porcentaje >= 30) {
+      msg.textContent = 'Vas avanzando, pronto podremos continuar con el proceso';
+      msg.style.color = '#c9a227';
+    } else {
+      msg.textContent = 'Completa tus documentos para avanzar con tu compra';
+      msg.style.color = 'rgba(255,255,255,.5)';
+    }
+  }
+
   function subirDoc(input, tipoDocumento, rowIndex) {
     if (!input.files || !input.files[0]) return;
     var file = input.files[0];
@@ -342,8 +393,26 @@
       if (data.ok) {
         statusEl.className = 'status-msg ok';
         statusEl.textContent = 'Documento subido correctamente';
-        row.classList.add('uploaded');
-        setTimeout(function() { location.reload(); }, 1200);
+        row.classList.add('uploaded', 'pending');
+        row.classList.remove('rejected');
+
+        // Actualizar badge en el row
+        var badge = row.querySelector('.doc-badge');
+        if (badge) {
+          badge.className = 'doc-badge badge-pending';
+          badge.textContent = 'Pendiente';
+        }
+
+        // Actualizar barra de progreso dinámicamente
+        var esNuevo = !row.classList.contains('was-uploaded');
+        if (esNuevo && docsObligatorios[tipoDocumento]) {
+          progresoData.obligatoriosSubidos++;
+          row.classList.add('was-uploaded');
+        }
+        actualizarProgreso();
+
+        // Reload después para sincronizar estado completo del servidor
+        setTimeout(function() { location.reload(); }, 2000);
       } else {
         statusEl.className = 'status-msg err';
         statusEl.textContent = data.error || 'Error al subir';
@@ -354,6 +423,11 @@
       statusEl.textContent = 'Error de conexión';
     });
   }
+
+  // Marcar rows que ya tienen documento subido
+  document.querySelectorAll('.doc-row.pending, .doc-row.approved').forEach(function(r) {
+    r.classList.add('was-uploaded');
+  });
   </script>
 </body>
 </html>
