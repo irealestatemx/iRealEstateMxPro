@@ -307,6 +307,16 @@
     {% endif %}
 
     {% endif %}
+
+    <!-- Gastos de cierre del vendedor (si existen) -->
+    <div id="gastosVendedorSection" style="display:none;background:#1a1a1a;border:1px solid rgba(252,129,129,.2);border-radius:10px;padding:16px 20px;margin-top:20px;">
+      <div style="font-size:15px;font-weight:700;color:#fc8181;margin-bottom:12px;">&#x1F4B0; Tus gastos estimados de cierre</div>
+      <div id="gastosVendedorLista"></div>
+      <div style="border-top:1px solid rgba(255,255,255,.1);margin-top:10px;padding-top:10px;text-align:right;">
+        <span style="font-size:14px;font-weight:700;color:#fc8181;">Total estimado: $<span id="gastosVendedorTotal">0</span></span>
+      </div>
+      <p style="font-size:11px;color:rgba(255,255,255,.3);margin-top:8px;">* Montos estimados sujetos a confirmaci&oacute;n. Consulta a tu agente para m&aacute;s detalles.</p>
+    </div>
   </div>
 
   <script>
@@ -350,6 +360,36 @@
       statusEl.textContent = 'Error de conexi\u00f3n';
     });
   }
+
+  // Cargar gastos del vendedor
+  (function() {
+    var propId = {{ propiedad.id }};
+    fetch('/api/gastos-cierre/' + propId)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error || !data.mis_gastos) return;
+      var gastos = data.mis_gastos;
+      var template = data.template || [];
+      var hayGastos = false;
+      var html = '';
+      template.forEach(function(g) {
+        var val = gastos[g.clave];
+        if (val && parseFloat(String(val).replace(/,/g, '')) > 0) {
+          hayGastos = true;
+          html += '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);">';
+          html += '<span style="font-size:13px;color:rgba(255,255,255,.7);">' + g.label + '</span>';
+          html += '<span style="font-size:13px;font-weight:600;color:#e0e0e0;">$' + Number(String(val).replace(/,/g, '')).toLocaleString('es-MX') + '</span>';
+          html += '</div>';
+        }
+      });
+      if (hayGastos) {
+        document.getElementById('gastosVendedorLista').innerHTML = html;
+        document.getElementById('gastosVendedorTotal').textContent = Number(data.total || 0).toLocaleString('es-MX');
+        document.getElementById('gastosVendedorSection').style.display = 'block';
+      }
+    })
+    .catch(function() {});
+  })();
   </script>
 </body>
 </html>

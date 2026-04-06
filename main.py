@@ -1293,7 +1293,169 @@ NOTIF_MENSAJES = {
         "cuerpo": "Todos los documentos obligatorios han sido subidos para la propiedad en {direccion}. {vendedor_nombre} completó su expediente.",
         "whatsapp": "Todos los documentos obligatorios de *{vendedor_nombre}* están completos para la propiedad en _{direccion}_. Listo para avanzar al cierre.",
     },
+    "cierre_fecha_notaria": {
+        "asunto": "Fecha de escrituración programada",
+        "cuerpo": "Se ha programado la fecha de escrituración para la propiedad en {direccion}.\n\n📅 Fecha: {fecha_escrituracion}\n🏛️ Notaría: {notaria_nombre}\n📍 Dirección notaría: {notaria_direccion}\n💰 Forma de pago: {forma_pago}\n💵 Monto total: ${monto_total}\n\n{desglose_gastos}\n\nPor favor confirma tu asistencia con tu agente.",
+        "whatsapp": "📋 *FECHA DE ESCRITURACIÓN*\n\nPropiedad: _{direccion}_\n\n📅 *Fecha:* {fecha_escrituracion}\n🏛️ *Notaría:* {notaria_nombre}\n📍 *Dirección:* {notaria_direccion}\n💰 *Forma de pago:* {forma_pago}\n💵 *Monto total:* ${monto_total}\n\n{desglose_gastos}\n\n✅ Por favor confirma tu asistencia con tu agente.",
+    },
+    "cierre_gastos_vendedor": {
+        "asunto": "Desglose de gastos de cierre — Vendedor",
+        "cuerpo": "Se han calculado los gastos de cierre para la propiedad en {direccion}.\n\n{desglose_gastos}\n\n💰 Total a tu cargo: ${total_gastos}\n\nSi tienes dudas sobre algún concepto, contacta a tu agente.",
+        "whatsapp": "💰 *GASTOS DE CIERRE — VENDEDOR*\n\nPropiedad: _{direccion}_\n\n{desglose_gastos}\n\n🔸 *Total a tu cargo: ${total_gastos}*\n\nSi tienes dudas, contacta a tu agente.",
+    },
+    "cierre_gastos_comprador": {
+        "asunto": "Desglose de gastos de cierre — Comprador",
+        "cuerpo": "Se han calculado los gastos de cierre para la propiedad en {direccion}.\n\n{desglose_gastos}\n\n💰 Total a tu cargo: ${total_gastos}\n\nSi tienes dudas sobre algún concepto, contacta a tu agente.",
+        "whatsapp": "💰 *GASTOS DE CIERRE — COMPRADOR*\n\nPropiedad: _{direccion}_\n\n{desglose_gastos}\n\n🔸 *Total a tu cargo: ${total_gastos}*\n\nSi tienes dudas, contacta a tu agente.",
+    },
 }
+
+
+def _construir_desglose_gastos(gastos_dict: dict, labels_list: list, modo: str = "whatsapp") -> str:
+    """Construye texto de desglose de gastos para notificaciones.
+    modo='whatsapp' usa formato con asteriscos, modo='email' usa texto plano."""
+    lineas = []
+    for item in labels_list:
+        clave = item["clave"]
+        valor = gastos_dict.get(clave)
+        if valor and str(valor).strip():
+            try:
+                monto = float(str(valor).replace(",", ""))
+                if monto > 0:
+                    if modo == "whatsapp":
+                        lineas.append(f"  • {item['label']}: *${monto:,.2f}*")
+                    else:
+                        lineas.append(f"  • {item['label']}: ${monto:,.2f}")
+            except (ValueError, TypeError):
+                pass
+    return "\n".join(lineas) if lineas else "Sin gastos registrados aún."
+
+
+async def _notificar_cierre_fecha(prop: dict, datos: dict):
+    """Envía notificación de fecha de escrituración a vendedor y comprador."""
+    import asyncio
+    direccion = prop.get("direccion", "Sin dirección")
+    metadata = {
+        "direccion": direccion,
+        "fecha_escrituracion": datos.get("fecha_escrituracion", "Por definir"),
+        "notaria_nombre": datos.get("notaria_nombre", "Por definir"),
+        "notaria_direccion": datos.get("notaria_direccion", "Por definir"),
+        "forma_pago": datos.get("forma_pago", "Por definir"),
+        "monto_total": datos.get("monto_total", "Por definir"),
+    }
+
+    cierre_data = prop.get("cierre_data") or {}
+    gastos = cierre_data.get("gastos", {})
+
+    # Notificar al vendedor
+    vendedor_id = prop.get("vendedor_id")
+    if vendedor_id:
+        vendedor = await get_user_by_id(vendedor_id)
+        if vendedor:
+            desglose_v = _construir_desglose_gastos(
+                gastos.get("vendedor", {}), GASTOS_VENDEDOR, "whatsapp"
+            )
+            meta_v = {**metadata, "desglose_gastos": f"📝 *Tus gastos como vendedor:*\n{desglose_v}"}
+            plantilla = NOTIF_MENSAJES["cierre_fecha_notaria"]
+            asunto = plantilla["asunto"]
+            cuerpo_email = plantilla["cuerpo"]
+            desglose_email = _construir_desglose_gastos(
+                gastos.get("vendedor", {}), GASTOS_VENDEDOR, "email"
+            )
+            meta_email = {**metadata, "desglose_gastos": f"Tus gastos como vendedor:\n{desglose_email}"}
+            try:
+                cuerpo_email = cuerpo_email.format(**meta_email)
+            except KeyError:
+                pass
+            asyncio.create_task(enviar_email_notificacion(vendedor["email"], vendedor["nombre"], asunto, cuerpo_email))
+            asyncio.create_task(enviar_whatsapp_n8n("cierre_fecha_notaria", vendedor, meta_v))
+
+    # Notificar al comprador
+    comprador_id = prop.get("comprador_id")
+    if comprador_id:
+        comprador = await get_user_by_id(comprador_id)
+        if comprador:
+            desglose_c = _construir_desglose_gastos(
+                gastos.get("comprador", {}), GASTOS_COMPRADOR, "whatsapp"
+            )
+            meta_c = {**metadata, "desglose_gastos": f"📝 *Tus gastos como comprador:*\n{desglose_c}"}
+            plantilla = NOTIF_MENSAJES["cierre_fecha_notaria"]
+            asunto = plantilla["asunto"]
+            cuerpo_email = plantilla["cuerpo"]
+            desglose_email = _construir_desglose_gastos(
+                gastos.get("comprador", {}), GASTOS_COMPRADOR, "email"
+            )
+            meta_email = {**metadata, "desglose_gastos": f"Tus gastos como comprador:\n{desglose_email}"}
+            try:
+                cuerpo_email = cuerpo_email.format(**meta_email)
+            except KeyError:
+                pass
+            asyncio.create_task(enviar_email_notificacion(comprador["email"], comprador["nombre"], asunto, cuerpo_email))
+            asyncio.create_task(enviar_whatsapp_n8n("cierre_fecha_notaria", comprador, meta_c))
+
+
+async def _notificar_gastos_cierre(prop: dict, gastos: dict):
+    """Envía notificación de gastos de cierre a vendedor y/o comprador."""
+    import asyncio
+    direccion = prop.get("direccion", "Sin dirección")
+
+    # Notificar vendedor si tiene gastos
+    vendedor_id = prop.get("vendedor_id")
+    gastos_vend = gastos.get("vendedor", {})
+    total_vend = gastos.get("total_vendedor", 0)
+    if vendedor_id and total_vend and float(total_vend) > 0:
+        vendedor = await get_user_by_id(vendedor_id)
+        if vendedor:
+            desglose_wa = _construir_desglose_gastos(gastos_vend, GASTOS_VENDEDOR, "whatsapp")
+            desglose_em = _construir_desglose_gastos(gastos_vend, GASTOS_VENDEDOR, "email")
+            meta_wa = {
+                "direccion": direccion,
+                "desglose_gastos": desglose_wa,
+                "total_gastos": f"{float(total_vend):,.2f}",
+            }
+            plantilla = NOTIF_MENSAJES["cierre_gastos_vendedor"]
+            asunto = plantilla["asunto"]
+            cuerpo = plantilla["cuerpo"]
+            meta_em = {
+                "direccion": direccion,
+                "desglose_gastos": desglose_em,
+                "total_gastos": f"{float(total_vend):,.2f}",
+            }
+            try:
+                cuerpo = cuerpo.format(**meta_em)
+            except KeyError:
+                pass
+            asyncio.create_task(enviar_email_notificacion(vendedor["email"], vendedor["nombre"], asunto, cuerpo))
+            asyncio.create_task(enviar_whatsapp_n8n("cierre_gastos_vendedor", vendedor, meta_wa))
+
+    # Notificar comprador si tiene gastos
+    comprador_id = prop.get("comprador_id")
+    gastos_comp = gastos.get("comprador", {})
+    total_comp = gastos.get("total_comprador", 0)
+    if comprador_id and total_comp and float(total_comp) > 0:
+        comprador = await get_user_by_id(comprador_id)
+        if comprador:
+            desglose_wa = _construir_desglose_gastos(gastos_comp, GASTOS_COMPRADOR, "whatsapp")
+            desglose_em = _construir_desglose_gastos(gastos_comp, GASTOS_COMPRADOR, "email")
+            meta_wa = {
+                "direccion": direccion,
+                "desglose_gastos": desglose_wa,
+                "total_gastos": f"{float(total_comp):,.2f}",
+            }
+            plantilla = NOTIF_MENSAJES["cierre_gastos_comprador"]
+            asunto = plantilla["asunto"]
+            cuerpo = plantilla["cuerpo"]
+            meta_em = {
+                "direccion": direccion,
+                "desglose_gastos": desglose_em,
+                "total_gastos": f"{float(total_comp):,.2f}",
+            }
+            try:
+                cuerpo = cuerpo.format(**meta_em)
+            except KeyError:
+                pass
+            asyncio.create_task(enviar_email_notificacion(comprador["email"], comprador["nombre"], asunto, cuerpo))
+            asyncio.create_task(enviar_whatsapp_n8n("cierre_gastos_comprador", comprador, meta_wa))
 
 
 async def enviar_email_notificacion(to_email: str, to_name: str, asunto: str, cuerpo: str):
@@ -2041,8 +2203,56 @@ async def api_docs_pendientes(request: Request):
     return JSONResponse({"ok": True, "propiedades": resumen})
 
 
-ESTADO_ORDEN = {"atorado": 0, "listo_para_cerrar": 1, "casi_listo": 2, "en_proceso": 3, "sin_iniciar": 4, "completo": 5}
+ESTADO_ORDEN = {
+    "atorado": 0, "esperando_notaria": 1, "en_cierre": 2, "listo_para_cerrar": 3,
+    "en_proceso_inscripcion": 4, "casi_listo": 5, "en_proceso": 6, "sin_iniciar": 7, "completo": 8,
+}
 PRIORIDAD_ORDEN = {"alta": 0, "alta_cierre": 1, "media": 2, "normal": 3, "baja": 4, "ninguna": 5}
+
+CHECKLIST_CIERRE = [
+    {"clave": "docs_vendedor", "label": "Documentos del vendedor completos", "fase": 1},
+    {"clave": "docs_comprador", "label": "Documentos del comprador completos", "fase": 1},
+    {"clave": "promesa_compraventa", "label": "Firma de promesa de compraventa", "fase": 2},
+    {"clave": "forma_pago", "label": "Forma de pago definida (contado / crédito / transferencia)", "fase": 2},
+    {"clave": "enganche_recibido", "label": "Enganche recibido", "fase": 2},
+    {"clave": "notaria_seleccionada", "label": "Notaría seleccionada", "fase": 3},
+    {"clave": "fecha_notaria", "label": "Fecha tentativa de escrituración", "fase": 3},
+    {"clave": "gastos_calculados", "label": "Gastos de cierre calculados", "fase": 3},
+    {"clave": "avaluo_realizado", "label": "Avalúo realizado (si aplica crédito)", "fase": 4},
+    {"clave": "credito_autorizado", "label": "Crédito autorizado (si aplica)", "fase": 4},
+    {"clave": "predial_al_corriente", "label": "Predial al corriente", "fase": 5},
+    {"clave": "libre_gravamen", "label": "Certificado de libertad de gravamen", "fase": 5},
+    {"clave": "firma_escrituras", "label": "Firma de escrituras", "fase": 6},
+    {"clave": "entrega_llaves", "label": "Entrega de llaves", "fase": 6},
+]
+
+FASES_CIERRE = {
+    1: "Documentación",
+    2: "Promesa y pago",
+    3: "Notaría y gastos",
+    4: "Crédito y avalúo",
+    5: "Certificados",
+    6: "Escrituración y entrega",
+}
+
+GASTOS_VENDEDOR = [
+    {"clave": "isr", "label": "ISR (Impuesto Sobre la Renta)", "porcentaje_sugerido": None},
+    {"clave": "cancelacion_hipoteca", "label": "Cancelación de hipoteca", "porcentaje_sugerido": None},
+    {"clave": "predial", "label": "Predial al corriente", "porcentaje_sugerido": None},
+    {"clave": "comision_agente", "label": "Comisión del agente", "porcentaje_sugerido": 4.0},
+    {"clave": "plusvalia", "label": "Plusvalía (si aplica)", "porcentaje_sugerido": None},
+    {"clave": "otros_vendedor", "label": "Otros gastos vendedor", "porcentaje_sugerido": None},
+]
+
+GASTOS_COMPRADOR = [
+    {"clave": "isai", "label": "ISAI (Impuesto adquisición inmuebles)", "porcentaje_sugerido": 2.0},
+    {"clave": "honorarios_notariales", "label": "Honorarios notariales", "porcentaje_sugerido": None},
+    {"clave": "registro_publico", "label": "Registro público de la propiedad", "porcentaje_sugerido": None},
+    {"clave": "avaluo", "label": "Avalúo", "porcentaje_sugerido": None},
+    {"clave": "gastos_credito", "label": "Gastos de crédito (apertura, seguro)", "solo_credito": True},
+    {"clave": "certificado_libertad", "label": "Certificado de libertad de gravamen", "porcentaje_sugerido": None},
+    {"clave": "otros_comprador", "label": "Otros gastos comprador", "porcentaje_sugerido": None},
+]
 
 
 def _dias_desde(fecha):
@@ -2060,13 +2270,56 @@ def _dias_desde(fecha):
     return (datetime.now(timezone.utc) - fecha).days
 
 
-def calcular_estado_propiedad(docs_subidos, docs_rechazados, total_obligatorios):
-    """Calcula el estado de avance de una propiedad."""
+def calcular_estado_propiedad(docs_subidos, docs_rechazados, total_obligatorios, cierre_data=None):
+    """Calcula el estado de avance de una propiedad incluyendo estados de cierre."""
     if docs_rechazados > 0:
         return "atorado"
     if docs_subidos == 0:
         return "sin_iniciar"
     porcentaje = round(docs_subidos / total_obligatorios * 100) if total_obligatorios > 0 else 0
+
+    # Si hay datos de cierre, evaluar estados avanzados
+    if cierre_data and isinstance(cierre_data, dict):
+        items = cierre_data.get("items", {})
+        datos = cierre_data.get("datos", {})
+        tipo_compra = (datos.get("forma_pago") or "").lower()
+        es_credito = any(x in tipo_compra for x in ("crédito", "credito", "infonavit", "isseg", "bancario", "mixto"))
+
+        # Contar items completados por fase
+        fase_completa = {}
+        for item in CHECKLIST_CIERRE:
+            f = item["fase"]
+            if f not in fase_completa:
+                fase_completa[f] = {"total": 0, "done": 0}
+            # Saltar crédito si no aplica
+            if not es_credito and item["clave"] in ("avaluo_realizado", "credito_autorizado"):
+                continue
+            fase_completa[f]["total"] += 1
+            if items.get(item["clave"]):
+                fase_completa[f]["done"] += 1
+
+        def fase_ok(n):
+            f = fase_completa.get(n, {})
+            return f.get("total", 0) > 0 and f["done"] >= f["total"]
+
+        # Estado: esperando_notaria — fases 1-5 completas, falta escritura
+        if fase_ok(1) and fase_ok(2) and fase_ok(3) and fase_ok(5):
+            if es_credito and not fase_ok(4):
+                pass  # falta crédito, no puede estar esperando notaría
+            else:
+                return "esperando_notaria"
+
+        # Estado: en_proceso_inscripcion — crédito en trámite (fase 2 ok, fase 4 parcial)
+        if es_credito and fase_ok(2) and not fase_ok(4):
+            f4 = fase_completa.get(4, {})
+            if f4.get("done", 0) > 0:
+                return "en_proceso_inscripcion"
+
+        # Estado: en_cierre — fase 2 completa (promesa + pago)
+        if fase_ok(2):
+            return "en_cierre"
+
+    # Estados de documentación
     if porcentaje >= 100:
         return "completo"
     if porcentaje >= 90 and docs_rechazados == 0:
@@ -2078,17 +2331,17 @@ def calcular_estado_propiedad(docs_subidos, docs_rechazados, total_obligatorios)
 
 def calcular_prioridad(estado):
     """Calcula la prioridad de contacto basada en el estado."""
-    if estado == "atorado":
-        return "alta"
-    if estado == "listo_para_cerrar":
-        return "alta_cierre"
-    if estado == "casi_listo":
-        return "media"
-    if estado == "en_proceso":
-        return "normal"
-    if estado == "sin_iniciar":
-        return "baja"
-    return "ninguna"
+    prioridades = {
+        "atorado": "alta",
+        "esperando_notaria": "alta_cierre",
+        "listo_para_cerrar": "alta_cierre",
+        "en_cierre": "alta_cierre",
+        "en_proceso_inscripcion": "media",
+        "casi_listo": "media",
+        "en_proceso": "normal",
+        "sin_iniciar": "baja",
+    }
+    return prioridades.get(estado, "ninguna")
 
 
 def generar_mensaje_seguimiento(estado, nombre, propiedad):
@@ -2097,6 +2350,9 @@ def generar_mensaje_seguimiento(estado, nombre, propiedad):
     propiedad = propiedad or "tu propiedad"
     mensajes = {
         "atorado": f"Hola {nombre}, vi que uno de tus documentos necesita una corrección para avanzar con {propiedad}. ¿Te puedo ayudar a revisarlo? 👍",
+        "esperando_notaria": f"Hola {nombre}, ya todo está listo para {propiedad}. Solo estamos esperando la fecha de escrituración en notaría. Te confirmo en cuanto tengamos el día exacto 🏛️✅",
+        "en_cierre": f"Hola {nombre}, ya firmamos promesa y estamos avanzando con el cierre de {propiedad}. Vamos muy bien, te mantengo informado de los siguientes pasos 📋🚀",
+        "en_proceso_inscripcion": f"Hola {nombre}, tu crédito está en proceso de autorización para {propiedad}. Estamos dando seguimiento con el banco, te aviso de cualquier novedad 🏦",
         "listo_para_cerrar": f"Hola {nombre}, ya tenemos todo listo para avanzar con la firma de {propiedad}. Estamos en etapa final, solo falta coordinar firma de promesa y fecha en notaría. ¿Te parece si lo agendamos esta semana? 🚀",
         "casi_listo": f"Hola {nombre}, ya casi terminamos tu proceso para {propiedad}. Solo falta un paso para avanzar con tu cierre 🙌",
         "en_proceso": f"Hola {nombre}, ¿cómo vas con tus documentos para {propiedad}? Te ayudo a avanzar para asegurar tu proceso 👍",
@@ -2251,6 +2507,348 @@ async def registrar_seguimiento(request: Request):
     return JSONResponse({"ok": True})
 
 
+@app.get("/api/generar-cierre/{propiedad_id}")
+async def generar_cierre(propiedad_id: int, request: Request):
+    """Genera el checklist de cierre para una propiedad lista para cerrar."""
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"error": "No autenticado"}, status_code=401)
+    if user["rol"] not in ("admin", "agente"):
+        return JSONResponse({"error": "Sin permisos"}, status_code=403)
+
+    prop = await get_property_by_id(propiedad_id)
+    if not prop:
+        return JSONResponse({"error": "Propiedad no encontrada"}, status_code=404)
+
+    # Verificar propiedad del agente
+    if user["rol"] == "agente" and prop.get("user_id") != user["id"]:
+        return JSONResponse({"error": "Sin permisos sobre esta propiedad"}, status_code=403)
+
+    # Datos del vendedor y comprador
+    vendedor = await get_user_by_id(prop["vendedor_id"]) if prop.get("vendedor_id") else None
+    comprador = await get_user_by_id(prop["comprador_id"]) if prop.get("comprador_id") else None
+
+    # Auto-evaluar items de fase 1 (docs completos)
+    cierre_data = prop.get("cierre_data") or {}
+    items_estado = cierre_data.get("items", {})
+
+    # Contar docs reales de la propiedad
+    all_docs = await get_documentos_by_propiedad(propiedad_id)
+    docs_vendedor = [d for d in all_docs if d.get("rol_documento", "vendedor") == "vendedor"]
+    docs_comprador_list = [d for d in all_docs if d.get("rol_documento") == "comprador"]
+
+    # Verificar docs vendedor
+    total_vend = sum(1 for d in DOCS_VENDEDOR_LIST if d["obligatorio"])
+    docs_vend_subidos = sum(1 for d in docs_vendedor if d.get("estado") != "rechazado")
+    rech_vend = sum(1 for d in docs_vendedor if d.get("estado") == "rechazado")
+    if docs_vend_subidos >= total_vend and rech_vend == 0:
+        items_estado.setdefault("docs_vendedor", True)
+
+    # Verificar docs comprador (se evaluará manualmente por el agente)
+    tipo_compra = prop.get("tipo_compra") or ""
+
+    # Datos de cierre guardados por el agente
+    datos_cierre = cierre_data.get("datos", {})
+
+    # Auto-marcar items según datos capturados
+    if datos_cierre.get("promesa_fecha") and datos_cierre.get("promesa_monto"):
+        items_estado.setdefault("promesa_compraventa", True)
+    if datos_cierre.get("forma_pago"):
+        items_estado.setdefault("forma_pago", True)
+    if datos_cierre.get("enganche_monto"):
+        items_estado.setdefault("enganche_recibido", True)
+    if datos_cierre.get("notaria_nombre"):
+        items_estado.setdefault("notaria_seleccionada", True)
+    if datos_cierre.get("fecha_escrituracion"):
+        items_estado.setdefault("fecha_notaria", True)
+
+    # Determinar qué items aplican según tipo de compra
+    checklist = []
+    completados = 0
+    for item in CHECKLIST_CIERRE:
+        clave = item["clave"]
+        # Saltar items de crédito si es contado
+        if tipo_compra.lower() in ("contado", "transferencia"):
+            if clave in ("avaluo_realizado", "credito_autorizado"):
+                continue
+        estado_item = items_estado.get(clave, False)
+        if estado_item:
+            completados += 1
+        checklist.append({
+            "clave": clave,
+            "label": item["label"],
+            "fase": item["fase"],
+            "fase_nombre": FASES_CIERRE.get(item["fase"], ""),
+            "completado": estado_item,
+        })
+
+    total_items = len(checklist)
+    pct_cierre = round(completados / total_items * 100) if total_items > 0 else 0
+
+    nombre_prop = f"{prop.get('tipo_propiedad', 'Propiedad')} en {prop.get('ciudad', '')}"
+
+    # Mensaje de cierre para WhatsApp
+    nombre_cliente = (comprador or {}).get("nombre") or (vendedor or {}).get("nombre") or "cliente"
+    if pct_cierre >= 80:
+        msg_cierre = (
+            f"Hola {nombre_cliente}, estamos en la recta final del cierre de {nombre_prop}. "
+            f"Solo faltan {total_items - completados} paso(s) para completar la operación. "
+            f"¿Podemos agendar la firma esta semana? 🏠✅"
+        )
+    elif pct_cierre >= 50:
+        msg_cierre = (
+            f"Hola {nombre_cliente}, vamos avanzando muy bien con el cierre de {nombre_prop}. "
+            f"Llevamos {completados} de {total_items} pasos completados. "
+            f"Te comparto lo que sigue para agilizar el proceso. 📋"
+        )
+    else:
+        msg_cierre = (
+            f"Hola {nombre_cliente}, ya estamos listos para iniciar el proceso de cierre de {nombre_prop}. "
+            f"Te paso el checklist de pasos que necesitamos cubrir para llegar a la firma. 📝🚀"
+        )
+
+    # Enriquecer mensaje con datos de cierre si están disponibles
+    extras = []
+    if datos_cierre.get("fecha_escrituracion"):
+        extras.append(f"📅 Fecha tentativa de escrituración: {datos_cierre['fecha_escrituracion']}")
+    if datos_cierre.get("notaria_nombre"):
+        extras.append(f"🏛️ Notaría: {datos_cierre['notaria_nombre']}")
+    if datos_cierre.get("forma_pago"):
+        extras.append(f"💳 Forma de pago: {datos_cierre['forma_pago']}")
+    if datos_cierre.get("monto_total"):
+        extras.append(f"💰 Monto total: ${datos_cierre['monto_total']}")
+    if extras:
+        msg_cierre += "\n\n" + "\n".join(extras)
+
+    return JSONResponse({
+        "propiedad_id": propiedad_id,
+        "propiedad": nombre_prop,
+        "vendedor": vendedor["nombre"] if vendedor else None,
+        "comprador": comprador["nombre"] if comprador else None,
+        "tipo_compra": tipo_compra,
+        "precio_formateado": prop.get("precio_formateado") or "",
+        "checklist": checklist,
+        "completados": completados,
+        "total": total_items,
+        "porcentaje_cierre": pct_cierre,
+        "mensaje_cierre": msg_cierre,
+        "datos": datos_cierre,
+        "gastos": cierre_data.get("gastos", {}),
+        "gastos_vendedor_template": GASTOS_VENDEDOR,
+        "gastos_comprador_template": GASTOS_COMPRADOR,
+    })
+
+
+@app.post("/api/generar-cierre/{propiedad_id}/actualizar")
+async def actualizar_cierre(propiedad_id: int, request: Request):
+    """Actualiza el estado de un item del checklist de cierre."""
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"error": "No autenticado"}, status_code=401)
+    if user["rol"] not in ("admin", "agente"):
+        return JSONResponse({"error": "Sin permisos"}, status_code=403)
+
+    prop = await get_property_by_id(propiedad_id)
+    if not prop:
+        return JSONResponse({"error": "Propiedad no encontrada"}, status_code=404)
+    if user["rol"] == "agente" and prop.get("user_id") != user["id"]:
+        return JSONResponse({"error": "Sin permisos"}, status_code=403)
+
+    body = await request.json()
+    clave = body.get("clave", "")
+    completado = body.get("completado", False)
+
+    # Validar que la clave existe
+    claves_validas = {item["clave"] for item in CHECKLIST_CIERRE}
+    if clave not in claves_validas:
+        return JSONResponse({"error": "Item no válido"}, status_code=400)
+
+    # Actualizar cierre_data en la propiedad
+    cierre_data = prop.get("cierre_data") or {}
+    items = cierre_data.get("items", {})
+    items[clave] = completado
+    cierre_data["items"] = items
+    from datetime import datetime
+    cierre_data["updated_at"] = str(datetime.now())
+
+    await update_property(propiedad_id, {"cierre_data": cierre_data})
+    return JSONResponse({"ok": True, "clave": clave, "completado": completado})
+
+
+@app.post("/api/generar-cierre/{propiedad_id}/datos")
+async def guardar_datos_cierre(propiedad_id: int, request: Request):
+    """Guarda los datos del cierre: promesa, notaría, forma de pago, fecha."""
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"error": "No autenticado"}, status_code=401)
+    if user["rol"] not in ("admin", "agente"):
+        return JSONResponse({"error": "Sin permisos"}, status_code=403)
+
+    prop = await get_property_by_id(propiedad_id)
+    if not prop:
+        return JSONResponse({"error": "Propiedad no encontrada"}, status_code=404)
+    if user["rol"] == "agente" and prop.get("user_id") != user["id"]:
+        return JSONResponse({"error": "Sin permisos"}, status_code=403)
+
+    body = await request.json()
+
+    # Campos permitidos para datos de cierre
+    campos_permitidos = {
+        "promesa_fecha", "promesa_monto", "promesa_notas",
+        "forma_pago", "banco", "enganche_monto", "monto_total",
+        "notaria_nombre", "notaria_direccion", "notaria_contacto",
+        "fecha_escrituracion", "notas_cierre",
+    }
+
+    cierre_data = prop.get("cierre_data") or {}
+    datos = cierre_data.get("datos", {})
+
+    # Actualizar solo campos permitidos
+    for campo, valor in body.items():
+        if campo in campos_permitidos:
+            datos[campo] = valor
+
+    cierre_data["datos"] = datos
+    from datetime import datetime
+    cierre_data["datos_updated_at"] = str(datetime.now())
+
+    # Auto-marcar checklist items según datos guardados
+    items = cierre_data.get("items", {})
+    if datos.get("promesa_fecha") and datos.get("promesa_monto"):
+        items["promesa_compraventa"] = True
+    if datos.get("forma_pago"):
+        items["forma_pago"] = True
+    if datos.get("enganche_monto"):
+        items["enganche_recibido"] = True
+    if datos.get("notaria_nombre"):
+        items["notaria_seleccionada"] = True
+    if datos.get("fecha_escrituracion"):
+        items["fecha_notaria"] = True
+    cierre_data["items"] = items
+
+    await update_property(propiedad_id, {"cierre_data": cierre_data})
+
+    # ── Phase 6: Notificaciones cuando se guarda fecha de escrituración ──
+    if datos.get("fecha_escrituracion") and body.get("fecha_escrituracion"):
+        # Recargar prop con cierre_data actualizado para incluir gastos
+        import asyncio
+        prop_actualizada = await get_property_by_id(propiedad_id)
+        if prop_actualizada:
+            prop_actualizada["cierre_data"] = cierre_data
+            asyncio.create_task(_notificar_cierre_fecha(prop_actualizada, datos))
+
+    return JSONResponse({"ok": True, "datos": datos})
+
+
+@app.post("/api/generar-cierre/{propiedad_id}/gastos")
+async def guardar_gastos_cierre(propiedad_id: int, request: Request):
+    """Guarda los gastos de cierre desglosados por vendedor y comprador."""
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"error": "No autenticado"}, status_code=401)
+    if user["rol"] not in ("admin", "agente"):
+        return JSONResponse({"error": "Sin permisos"}, status_code=403)
+
+    prop = await get_property_by_id(propiedad_id)
+    if not prop:
+        return JSONResponse({"error": "Propiedad no encontrada"}, status_code=404)
+    if user["rol"] == "agente" and prop.get("user_id") != user["id"]:
+        return JSONResponse({"error": "Sin permisos"}, status_code=403)
+
+    body = await request.json()
+    # body = {"vendedor": {"isr": "50000", ...}, "comprador": {"isai": "70000", ...}}
+
+    cierre_data = prop.get("cierre_data") or {}
+    gastos = cierre_data.get("gastos", {})
+
+    # Validar claves permitidas
+    claves_vend = {g["clave"] for g in GASTOS_VENDEDOR}
+    claves_comp = {g["clave"] for g in GASTOS_COMPRADOR}
+
+    if "vendedor" in body and isinstance(body["vendedor"], dict):
+        gv = gastos.get("vendedor", {})
+        for k, v in body["vendedor"].items():
+            if k in claves_vend:
+                gv[k] = v
+        gastos["vendedor"] = gv
+
+    if "comprador" in body and isinstance(body["comprador"], dict):
+        gc = gastos.get("comprador", {})
+        for k, v in body["comprador"].items():
+            if k in claves_comp:
+                gc[k] = v
+        gastos["comprador"] = gc
+
+    # Calcular totales
+    total_vend = sum(float(v) for v in gastos.get("vendedor", {}).values() if v and str(v).replace(",", "").replace(".", "").isdigit())
+    total_comp = sum(float(v) for v in gastos.get("comprador", {}).values() if v and str(v).replace(",", "").replace(".", "").isdigit())
+    gastos["total_vendedor"] = round(total_vend, 2)
+    gastos["total_comprador"] = round(total_comp, 2)
+    gastos["total_general"] = round(total_vend + total_comp, 2)
+
+    cierre_data["gastos"] = gastos
+
+    # Auto-marcar checklist item
+    items = cierre_data.get("items", {})
+    if total_vend > 0 or total_comp > 0:
+        items["gastos_calculados"] = True
+    cierre_data["items"] = items
+
+    from datetime import datetime
+    cierre_data["gastos_updated_at"] = str(datetime.now())
+    await update_property(propiedad_id, {"cierre_data": cierre_data})
+
+    # ── Phase 6: Notificaciones cuando se guardan gastos ──
+    import asyncio
+    asyncio.create_task(_notificar_gastos_cierre(prop, gastos))
+
+    return JSONResponse({"ok": True, "gastos": gastos})
+
+
+@app.get("/api/gastos-cierre/{propiedad_id}")
+async def ver_gastos_cierre(propiedad_id: int, request: Request):
+    """Retorna gastos de cierre para visualización en portales (vendedor/comprador)."""
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"error": "No autenticado"}, status_code=401)
+
+    prop = await get_property_by_id(propiedad_id)
+    if not prop:
+        return JSONResponse({"error": "Propiedad no encontrada"}, status_code=404)
+
+    # Permisos: admin, agente, vendedor asignado, comprador asignado
+    rol = user["rol"]
+    es_vendedor = prop.get("vendedor_id") == user["id"]
+    es_comprador = prop.get("comprador_id") == user["id"]
+    es_agente = rol in ("admin", "agente")
+    if not es_agente and not es_vendedor and not es_comprador:
+        return JSONResponse({"error": "Sin permisos"}, status_code=403)
+
+    cierre_data = prop.get("cierre_data") or {}
+    gastos = cierre_data.get("gastos", {})
+
+    # Filtrar: vendedor solo ve sus gastos, comprador solo los suyos
+    resultado = {"propiedad_id": propiedad_id}
+    if es_agente:
+        resultado["vendedor"] = gastos.get("vendedor", {})
+        resultado["comprador"] = gastos.get("comprador", {})
+        resultado["total_vendedor"] = gastos.get("total_vendedor", 0)
+        resultado["total_comprador"] = gastos.get("total_comprador", 0)
+        resultado["total_general"] = gastos.get("total_general", 0)
+        resultado["template_vendedor"] = GASTOS_VENDEDOR
+        resultado["template_comprador"] = GASTOS_COMPRADOR
+    elif es_vendedor:
+        resultado["mis_gastos"] = gastos.get("vendedor", {})
+        resultado["total"] = gastos.get("total_vendedor", 0)
+        resultado["template"] = GASTOS_VENDEDOR
+    elif es_comprador:
+        resultado["mis_gastos"] = gastos.get("comprador", {})
+        resultado["total"] = gastos.get("total_comprador", 0)
+        resultado["template"] = GASTOS_COMPRADOR
+
+    return JSONResponse(resultado)
+
+
 @app.get("/dashboard-asesor", response_class=HTMLResponse)
 async def dashboard_asesor(request: Request):
     user = await require_auth(request)
@@ -2270,7 +2868,11 @@ async def dashboard_asesor(request: Request):
     seguimientos = await get_ultimo_seguimiento_por_propiedad(prop_ids)
 
     propiedades = []
-    contadores = {"sin_iniciar": 0, "en_proceso": 0, "casi_listo": 0, "atorado": 0, "listo_para_cerrar": 0, "completo": 0}
+    contadores = {
+        "sin_iniciar": 0, "en_proceso": 0, "casi_listo": 0, "atorado": 0,
+        "listo_para_cerrar": 0, "en_cierre": 0, "en_proceso_inscripcion": 0,
+        "esperando_notaria": 0, "completo": 0,
+    }
 
     for p in props_raw:
         subidos = p["docs_subidos"] or 0
@@ -2278,26 +2880,35 @@ async def dashboard_asesor(request: Request):
         porcentaje = round(subidos / total_obligatorios * 100) if total_obligatorios > 0 else 0
         if porcentaje > 100:
             porcentaje = 100
-        estado = calcular_estado_propiedad(subidos, rechazados, total_obligatorios)
-        contadores[estado] += 1
+
+        # Parsear cierre_data si viene como string
+        cierre_raw = p.get("cierre_data") or {}
+        if isinstance(cierre_raw, str):
+            import json as _json
+            try:
+                cierre_raw = _json.loads(cierre_raw)
+            except (ValueError, TypeError):
+                cierre_raw = {}
+
+        estado = calcular_estado_propiedad(subidos, rechazados, total_obligatorios, cierre_raw)
+        contadores[estado] = contadores.get(estado, 0) + 1
 
         prioridad = calcular_prioridad(estado)
         nombre_prop = f"{p['tipo_propiedad'] or 'Propiedad'} en {p['ciudad'] or ''}"
         mensaje = generar_mensaje_seguimiento(estado, p["vendedor_nombre"], nombre_prop)
 
         # Motivo para tareas de hoy
-        if estado == "atorado":
-            motivo = f"{rechazados} documento(s) rechazado(s)"
-        elif estado == "listo_para_cerrar":
-            motivo = "Momento ideal para cerrar"
-        elif estado == "casi_listo":
-            motivo = "Listo para cerrar pronto"
-        elif estado == "en_proceso":
-            motivo = f"Faltan {total_obligatorios - subidos} documentos"
-        elif estado == "sin_iniciar":
-            motivo = "No ha subido documentos"
-        else:
-            motivo = ""
+        motivos = {
+            "atorado": f"{rechazados} documento(s) rechazado(s)",
+            "esperando_notaria": "Esperando fecha de escrituración",
+            "en_cierre": "En proceso de cierre",
+            "en_proceso_inscripcion": "Crédito en trámite",
+            "listo_para_cerrar": "Momento ideal para cerrar",
+            "casi_listo": "Listo para cerrar pronto",
+            "en_proceso": f"Faltan {total_obligatorios - subidos} documentos",
+            "sin_iniciar": "No ha subido documentos",
+        }
+        motivo = motivos.get(estado, "")
 
         propiedades.append({
             "id": p["id"],
@@ -2359,7 +2970,8 @@ async def dashboard_asesor(request: Request):
     tareas_hoy = [p for p in propiedades if p["prioridad"] in ("alta", "alta_cierre", "media")]
 
     # Listos para cerrar (sección prioritaria)
-    listos_cierre = [p for p in propiedades if p["estado"] == "listo_para_cerrar"]
+    estados_cierre = {"listo_para_cerrar", "en_cierre", "en_proceso_inscripcion", "esperando_notaria"}
+    listos_cierre = [p for p in propiedades if p["estado"] in estados_cierre]
 
     notif_count = await contar_notificaciones_no_leidas(user["id"])
 

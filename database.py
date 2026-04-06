@@ -178,6 +178,7 @@ MIGRATIONS = [
     "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS comprador_id INTEGER REFERENCES usuarios(id);",
     "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS tipo_compra VARCHAR(50);",
     "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS telefono VARCHAR(20);",
+    "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS cierre_data JSONB DEFAULT '{}';",
 ]
 
 
@@ -254,7 +255,7 @@ async def save_property(data: dict) -> int:
 
 
 def _normalize_prop(d: dict) -> dict:
-    """Asegura que los campos JSONB sean listas Python (no strings JSON)."""
+    """Asegura que los campos JSONB sean listas/dicts Python (no strings JSON)."""
     for key in ("amenidades", "fotos_extra_urls"):
         val = d.get(key)
         if val is None:
@@ -264,6 +265,16 @@ def _normalize_prop(d: dict) -> dict:
                 d[key] = json.loads(val)
             except (json.JSONDecodeError, TypeError):
                 d[key] = []
+    # JSONB dict fields
+    for key in ("cierre_data",):
+        val = d.get(key)
+        if val is None:
+            d[key] = {}
+        elif isinstance(val, str):
+            try:
+                d[key] = json.loads(val)
+            except (json.JSONDecodeError, TypeError):
+                d[key] = {}
     return d
 
 
@@ -287,7 +298,7 @@ async def get_propiedades_seguimiento(agente_id: int = None):
     query = f"""
     SELECT p.id, p.tipo_propiedad, p.operacion, p.direccion, p.ciudad, p.estado,
            p.precio_formateado, p.foto_portada_url, p.vendedor_id, p.comprador_id, p.user_id,
-           p.tipo_compra,
+           p.tipo_compra, p.cierre_data,
            u_v.nombre as vendedor_nombre, u_v.email as vendedor_email,
            u_c.nombre as comprador_nombre, u_c.email as comprador_email,
            COUNT(d.id) as docs_subidos,
@@ -438,14 +449,14 @@ async def update_property(prop_id: int, updates: dict):
         "instagram_copy", "agente_nombre", "agente_telefono", "agente_email",
         "foto_portada_url", "fotos_extra_urls",
         "publicada_instagram", "publicada_web", "activa",
-        "vendedor_id", "comprador_id",
+        "vendedor_id", "comprador_id", "cierre_data", "tipo_compra",
     }
     fields = {k: v for k, v in updates.items() if k in allowed}
     if not fields:
         return False
 
     # Serializar JSON fields
-    for jf in ("amenidades", "fotos_extra_urls"):
+    for jf in ("amenidades", "fotos_extra_urls", "cierre_data"):
         if jf in fields and isinstance(fields[jf], (list, dict)):
             fields[jf] = json.dumps(fields[jf])
 

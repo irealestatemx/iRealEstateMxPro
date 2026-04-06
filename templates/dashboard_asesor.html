@@ -71,7 +71,10 @@
     }
     .prop-row:hover { border-color: rgba(201,162,39,.25); }
     .prop-row.st-atorado { border-left: 4px solid #fc8181; }
+    .prop-row.st-esperando_notaria { border-left: 4px solid #9f7aea; box-shadow: 0 0 12px rgba(159,122,234,.1); }
+    .prop-row.st-en_cierre { border-left: 4px solid #48bb78; box-shadow: 0 0 12px rgba(72,187,120,.1); }
     .prop-row.st-listo_para_cerrar { border-left: 4px solid #48bb78; box-shadow: 0 0 12px rgba(72,187,120,.1); }
+    .prop-row.st-en_proceso_inscripcion { border-left: 4px solid #f6ad55; }
     .prop-row.st-casi_listo { border-left: 4px solid #63b3ed; }
     .prop-row.st-en_proceso { border-left: 4px solid #c9a227; }
     .prop-row.st-completo { border-left: 4px solid #68d391; }
@@ -97,7 +100,10 @@
       border-radius: 12px; text-transform: uppercase; letter-spacing: .3px;
     }
     .eb-atorado { background: rgba(252,129,129,.15); color: #fc8181; }
+    .eb-esperando_notaria { background: rgba(159,122,234,.2); color: #9f7aea; font-weight: 800; }
+    .eb-en_cierre { background: rgba(72,187,120,.2); color: #48bb78; font-weight: 800; }
     .eb-listo_para_cerrar { background: rgba(72,187,120,.2); color: #48bb78; font-weight: 800; }
+    .eb-en_proceso_inscripcion { background: rgba(246,173,85,.15); color: #f6ad55; }
     .eb-casi_listo { background: rgba(99,179,237,.15); color: #63b3ed; }
     .eb-en_proceso { background: rgba(201,162,39,.15); color: #c9a227; }
     .eb-completo { background: rgba(104,211,145,.15); color: #68d391; }
@@ -244,6 +250,70 @@
       .prop-status { width: auto; text-align: left; }
       .prop-meta { width: auto; text-align: left; }
     }
+
+    /* Modal cierre */
+    .cierre-modal { max-width: 600px; max-height: 85vh; overflow-y: auto; }
+    .cierre-fase { margin-bottom: 16px; }
+    .cierre-fase-title { font-size: 13px; font-weight: 700; color: #48bb78; margin-bottom: 8px; padding-bottom: 4px; border-bottom: 1px solid rgba(72,187,120,.2); }
+    .cierre-item {
+      display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+      background: rgba(255,255,255,.03); border-radius: 8px; margin-bottom: 4px;
+      cursor: pointer; transition: background .2s;
+    }
+    .cierre-item:hover { background: rgba(255,255,255,.06); }
+    .cierre-item.done { opacity: .6; }
+    .cierre-item.done .cierre-label { text-decoration: line-through; }
+    .cierre-check {
+      width: 20px; height: 20px; border-radius: 5px; border: 2px solid rgba(255,255,255,.2);
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      font-size: 12px; transition: all .2s;
+    }
+    .cierre-item.done .cierre-check { border-color: #48bb78; background: rgba(72,187,120,.2); color: #48bb78; }
+    .cierre-label { font-size: 13px; color: #e0e0e0; }
+    .cierre-progress-bar { background: rgba(255,255,255,.08); border-radius: 6px; height: 10px; overflow: hidden; margin: 12px 0; }
+    .cierre-progress-fill { height: 100%; background: #48bb78; border-radius: 6px; transition: width .3s; }
+    .cierre-pct-text { font-size: 12px; color: rgba(255,255,255,.5); text-align: center; margin-bottom: 12px; }
+
+    /* Formulario datos cierre */
+    .cierre-form-section {
+      margin-top: 18px; padding-top: 14px;
+      border-top: 1px solid rgba(72,187,120,.15);
+    }
+    .cierre-form-title {
+      font-size: 14px; font-weight: 700; color: #48bb78; margin-bottom: 12px;
+      display: flex; align-items: center; gap: 8px; cursor: pointer;
+    }
+    .cierre-form-title .toggle-arrow { transition: transform .2s; font-size: 10px; }
+    .cierre-form-title .toggle-arrow.open { transform: rotate(90deg); }
+    .cierre-form-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+    }
+    .cierre-form-grid.cols-1 { grid-template-columns: 1fr; }
+    .cf-field { display: flex; flex-direction: column; gap: 3px; }
+    .cf-field label { font-size: 11px; color: rgba(255,255,255,.45); font-weight: 600; }
+    .cf-input {
+      background: #111; border: 1px solid rgba(255,255,255,.1); border-radius: 6px;
+      padding: 8px 10px; font-size: 13px; color: #e0e0e0;
+      font-family: 'Inter', sans-serif; transition: border-color .2s;
+    }
+    .cf-input:focus { outline: none; border-color: #48bb78; }
+    .cf-input::placeholder { color: rgba(255,255,255,.2); }
+    select.cf-input { appearance: auto; }
+    .cf-saved {
+      font-size: 11px; color: #48bb78; text-align: center;
+      margin-top: 8px; display: none;
+    }
+    .btn-save-cierre {
+      padding: 8px 20px; border: none; border-radius: 8px;
+      font-size: 12px; font-weight: 700; cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      background: #48bb78; color: #000; transition: background .2s;
+      margin-top: 10px; width: 100%;
+    }
+    .btn-save-cierre:hover { background: #38a169; }
+    @media(max-width:500px) {
+      .cierre-form-grid { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -292,8 +362,12 @@
         <div class="lbl">Sin iniciar</div>
       </div>
       <div class="stat-card" style="border-color:rgba(72,187,120,.3);">
-        <div class="num" style="color:#48bb78;">{{ contadores.listo_para_cerrar }}</div>
-        <div class="lbl">Cierres potenciales</div>
+        <div class="num" style="color:#48bb78;">{{ contadores.listo_para_cerrar + contadores.en_cierre }}</div>
+        <div class="lbl">En cierre</div>
+      </div>
+      <div class="stat-card" style="border-color:rgba(159,122,234,.3);">
+        <div class="num" style="color:#9f7aea;">{{ contadores.esperando_notaria }}</div>
+        <div class="lbl">Esperando notar&iacute;a</div>
       </div>
       <div class="stat-card">
         <div class="num c-green">{{ contadores.completo }}</div>
@@ -304,13 +378,18 @@
     <!-- Listos para cierre -->
     {% if listos_cierre %}
     <div class="cierre-section">
-      <div class="cierre-title">&#x2705; Listos para cierre ({{ listos_cierre|length }})</div>
+      <div class="cierre-title">&#x2705; En proceso de cierre ({{ listos_cierre|length }})</div>
       {% for lc in listos_cierre %}
       <div class="cierre-card">
         <div class="cierre-info">
           <div class="cierre-cliente">{{ lc.comprador_nombre or lc.vendedor_nombre or 'Sin cliente' }}</div>
           <div class="cierre-prop">{{ lc.tipo_propiedad }} — {{ lc.direccion }}, {{ lc.ciudad }}</div>
-          <div class="cierre-pct">{{ lc.porcentaje }}% documentos — {{ lc.docs_subidos }}/{{ lc.docs_total }}</div>
+          <div class="cierre-pct">
+            {% if lc.estado == 'esperando_notaria' %}&#x1F3DB;&#xFE0F; Esperando notar&iacute;a
+            {% elif lc.estado == 'en_cierre' %}&#x1F4DD; Promesa firmada
+            {% elif lc.estado == 'en_proceso_inscripcion' %}&#x1F3E6; Cr&eacute;dito en tr&aacute;mite
+            {% else %}{{ lc.porcentaje }}% docs — Listo para cerrar{% endif %}
+          </div>
           {% if lc.tipo_compra %}
           <div class="cierre-meta">{{ lc.tipo_compra }}</div>
           {% endif %}
@@ -319,7 +398,7 @@
           {% if lc.comprador_id %}
           <button class="btn-msg" onclick="generarMensaje({{ lc.comprador_id }})">&#x1F4F2; Mensaje</button>
           {% endif %}
-          <a href="/mis-documentos/{{ lc.id }}" class="btn-cierre" style="text-decoration:none;">&#x1F4CB; Generar cierre</a>
+          <button class="btn-cierre" onclick="abrirCierre({{ lc.id }})">&#x1F4CB; Generar cierre</button>
         </div>
       </div>
       {% endfor %}
@@ -335,8 +414,8 @@
         <div class="tarea-info">
           <div class="tarea-cliente">{{ t.vendedor_nombre }}</div>
           <div class="tarea-prop">{{ t.tipo_propiedad }} — {{ t.direccion }}, {{ t.ciudad }}</div>
-          <div class="tarea-motivo {{ t.prioridad }}">
-            {% if t.prioridad == 'alta' %}&#x26A0;&#xFE0F;{% else %}&#x1F525;{% endif %}
+          <div class="tarea-motivo {{ t.prioridad }}" {% if t.prioridad == 'alta_cierre' %}style="color:#48bb78;"{% endif %}>
+            {% if t.prioridad == 'alta' %}&#x26A0;&#xFE0F;{% elif t.prioridad == 'alta_cierre' %}&#x2705;{% else %}&#x1F525;{% endif %}
             {{ t.motivo }}
           </div>
         </div>
@@ -353,7 +432,7 @@
     <div class="filter-tabs">
       <button class="filter-tab active" onclick="filtrar('todos')">Todos ({{ total_propiedades }})</button>
       <button class="filter-tab" onclick="filtrar('atorado')">Atorados ({{ contadores.atorado }})</button>
-      <button class="filter-tab" onclick="filtrar('listo_para_cerrar')">Listos para cerrar ({{ contadores.listo_para_cerrar }})</button>
+      <button class="filter-tab" onclick="filtrar('cierre')">En cierre ({{ contadores.listo_para_cerrar + contadores.en_cierre + contadores.en_proceso_inscripcion + contadores.esperando_notaria }})</button>
       <button class="filter-tab" onclick="filtrar('casi_listo')">Casi listos ({{ contadores.casi_listo }})</button>
       <button class="filter-tab" onclick="filtrar('en_proceso')">En proceso ({{ contadores.en_proceso }})</button>
       <button class="filter-tab" onclick="filtrar('sin_iniciar')">Sin iniciar ({{ contadores.sin_iniciar }})</button>
@@ -382,7 +461,7 @@
 
         <div class="prop-progress">
           <div class="progress-bar-bg">
-            <div class="progress-bar-fill" style="width:{{ p.porcentaje }}%;background:{% if p.estado == 'completo' %}#68d391{% elif p.estado == 'listo_para_cerrar' %}#48bb78{% elif p.estado == 'atorado' %}#fc8181{% elif p.estado == 'casi_listo' %}#63b3ed{% else %}#c9a227{% endif %};"></div>
+            <div class="progress-bar-fill" style="width:{{ p.porcentaje }}%;background:{% if p.estado == 'completo' %}#68d391{% elif p.estado in ('listo_para_cerrar','en_cierre') %}#48bb78{% elif p.estado == 'esperando_notaria' %}#9f7aea{% elif p.estado == 'en_proceso_inscripcion' %}#f6ad55{% elif p.estado == 'atorado' %}#fc8181{% elif p.estado == 'casi_listo' %}#63b3ed{% else %}#c9a227{% endif %};"></div>
           </div>
           <div class="progress-text">{{ p.porcentaje }}% — {{ p.docs_subidos }}/{{ p.docs_total }} docs</div>
         </div>
@@ -390,18 +469,33 @@
         <div class="prop-status">
           <span class="estado-badge eb-{{ p.estado }}">
             {% if p.estado == 'atorado' %}Atorado
+            {% elif p.estado == 'esperando_notaria' %}Esperando notar&iacute;a
+            {% elif p.estado == 'en_cierre' %}En cierre
+            {% elif p.estado == 'en_proceso_inscripcion' %}Cr&eacute;dito en tr&aacute;mite
             {% elif p.estado == 'listo_para_cerrar' %}Listo para cerrar
             {% elif p.estado == 'casi_listo' %}Casi listo
             {% elif p.estado == 'en_proceso' %}En proceso
             {% elif p.estado == 'completo' %}Completo
             {% else %}Sin iniciar{% endif %}
           </span>
-          {% if p.estado == 'atorado' %}
+          {% if p.estado == 'atorado' and p.dias_inactivo is not none and p.dias_inactivo > 3 %}
+          <div class="prop-alert alert-atorado" style="font-weight:700;">&#x1F6A8; URGENTE: Cliente se est&aacute; enfriando ({{ p.dias_inactivo }}d)</div>
+          {% elif p.estado == 'atorado' %}
           <div class="prop-alert alert-atorado">Cliente requiere atenci&oacute;n</div>
+          {% elif p.estado == 'esperando_notaria' %}
+          <div class="prop-alert" style="color:#9f7aea;font-weight:700;">&#x1F3DB;&#xFE0F; Esperando fecha en notar&iacute;a</div>
+          {% elif p.estado == 'en_cierre' %}
+          <div class="prop-alert" style="color:#48bb78;font-weight:700;">&#x1F4DD; Promesa firmada — en cierre</div>
+          {% elif p.estado == 'en_proceso_inscripcion' %}
+          <div class="prop-alert" style="color:#f6ad55;">&#x1F3E6; Cr&eacute;dito en proceso de autorizaci&oacute;n</div>
           {% elif p.estado == 'listo_para_cerrar' %}
-          <div class="prop-alert" style="color:#48bb78;">&#x1F31F; Momento ideal para cerrar</div>
+          <div class="prop-alert" style="color:#48bb78;font-weight:700;">&#x1F31F; Momento ideal para cerrar</div>
+          {% elif p.estado == 'casi_listo' and p.dias_inactivo is not none and p.dias_inactivo > 5 %}
+          <div class="prop-alert alert-casi">&#x23F3; Sin movimiento hace {{ p.dias_inactivo }} d&iacute;as</div>
           {% elif p.estado == 'casi_listo' %}
           <div class="prop-alert alert-casi">Listo para cerrar pronto</div>
+          {% elif p.estado == 'en_proceso' and p.dias_inactivo is not none and p.dias_inactivo > 7 %}
+          <div class="prop-alert" style="color:#c9a227;">&#x26A0;&#xFE0F; Sin actividad hace {{ p.dias_inactivo }} d&iacute;as</div>
           {% endif %}
         </div>
 
@@ -434,8 +528,8 @@
         {% if p.comprador_id %}
         <button class="btn-msg" onclick="generarMensaje({{ p.comprador_id }})">&#x1F4F2; Mensaje comprador</button>
         {% endif %}
-        {% if p.estado == 'listo_para_cerrar' %}
-        <a href="/mis-documentos/{{ p.id }}" class="btn-cierre" style="text-decoration:none;font-size:11px;padding:7px 12px;">&#x1F4CB; Cerrar operaci&oacute;n</a>
+        {% if p.estado in ('listo_para_cerrar', 'en_cierre', 'en_proceso_inscripcion', 'esperando_notaria') %}
+        <button class="btn-cierre" style="font-size:11px;padding:7px 12px;" onclick="abrirCierre({{ p.id }})">&#x1F4CB; {% if p.estado == 'esperando_notaria' %}Ver cierre{% else %}Cerrar operaci&oacute;n{% endif %}</button>
         {% endif %}
         {% if p.estado == 'atorado' and p.comprador_id %}
         <button class="btn-msg" style="border-color:rgba(252,129,129,.4);color:#fc8181;" onclick="generarMensaje({{ p.comprador_id }},'recuperar')">&#x1F525; Recuperar cliente</button>
@@ -464,6 +558,154 @@
       <div class="modal-actions">
         <button class="btn-copy" onclick="copiarModal();">Copiar mensaje</button>
         <a href="#" class="btn-wa-modal" id="modalWa" target="_blank" onclick="registrarSeguimiento();">&#x1F4AC; Abrir WhatsApp</a>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal cierre -->
+  <div class="modal-overlay" id="cierreOverlay" onclick="if(event.target===this)cerrarCierre();">
+    <div class="modal cierre-modal">
+      <button class="modal-close" onclick="cerrarCierre();">&times;</button>
+      <h3 id="cierreTitle" style="color:#48bb78;">Checklist de cierre</h3>
+      <div class="modal-meta" id="cierreMeta"></div>
+      <div class="cierre-progress-bar"><div class="cierre-progress-fill" id="cierreProgressFill"></div></div>
+      <div class="cierre-pct-text" id="cierrePctText"></div>
+      <div id="cierreChecklist">Cargando...</div>
+
+      <!-- Datos de cierre -->
+      <div class="cierre-form-section">
+        <div class="cierre-form-title" onclick="toggleCierreForm()">
+          <span class="toggle-arrow" id="cierreFormArrow">&#x25B6;</span>
+          &#x1F4DD; Datos del cierre
+        </div>
+        <div id="cierreFormBody" style="display:none;">
+
+          <!-- Promesa de compraventa -->
+          <div style="font-size:12px;color:rgba(255,255,255,.4);font-weight:600;margin:10px 0 6px;">Promesa de compraventa</div>
+          <div class="cierre-form-grid">
+            <div class="cf-field">
+              <label>Fecha firma promesa</label>
+              <input type="date" class="cf-input" id="cf_promesa_fecha" />
+            </div>
+            <div class="cf-field">
+              <label>Monto promesa ($)</label>
+              <input type="text" class="cf-input" id="cf_promesa_monto" placeholder="Ej: 500,000" inputmode="numeric" />
+            </div>
+          </div>
+          <div class="cierre-form-grid cols-1" style="margin-top:8px;">
+            <div class="cf-field">
+              <label>Notas promesa</label>
+              <input type="text" class="cf-input" id="cf_promesa_notas" placeholder="Condiciones, acuerdos..." />
+            </div>
+          </div>
+
+          <!-- Forma de pago -->
+          <div style="font-size:12px;color:rgba(255,255,255,.4);font-weight:600;margin:14px 0 6px;">Forma de pago</div>
+          <div class="cierre-form-grid">
+            <div class="cf-field">
+              <label>Tipo de pago</label>
+              <select class="cf-input" id="cf_forma_pago">
+                <option value="">Seleccionar...</option>
+                <option value="Contado">Contado</option>
+                <option value="Cr&eacute;dito Infonavit">Cr&eacute;dito Infonavit</option>
+                <option value="Cr&eacute;dito ISSEG">Cr&eacute;dito ISSEG</option>
+                <option value="Cr&eacute;dito bancario">Cr&eacute;dito bancario</option>
+                <option value="Transferencia">Transferencia</option>
+                <option value="Mixto">Mixto (cr&eacute;dito + contado)</option>
+              </select>
+            </div>
+            <div class="cf-field">
+              <label>Banco (si aplica)</label>
+              <input type="text" class="cf-input" id="cf_banco" placeholder="Ej: Banorte, HSBC..." />
+            </div>
+            <div class="cf-field">
+              <label>Enganche ($)</label>
+              <input type="text" class="cf-input" id="cf_enganche_monto" placeholder="Ej: 200,000" inputmode="numeric" />
+            </div>
+            <div class="cf-field">
+              <label>Monto total operaci&oacute;n ($)</label>
+              <input type="text" class="cf-input" id="cf_monto_total" placeholder="Ej: 3,500,000" inputmode="numeric" />
+            </div>
+          </div>
+
+          <!-- Notar&iacute;a -->
+          <div style="font-size:12px;color:rgba(255,255,255,.4);font-weight:600;margin:14px 0 6px;">Notar&iacute;a</div>
+          <div class="cierre-form-grid">
+            <div class="cf-field">
+              <label>Nombre notar&iacute;a</label>
+              <input type="text" class="cf-input" id="cf_notaria_nombre" placeholder="Ej: Notar&iacute;a 15 de Le&oacute;n" />
+            </div>
+            <div class="cf-field">
+              <label>Contacto notar&iacute;a</label>
+              <input type="text" class="cf-input" id="cf_notaria_contacto" placeholder="Tel o email" />
+            </div>
+          </div>
+          <div class="cierre-form-grid cols-1" style="margin-top:8px;">
+            <div class="cf-field">
+              <label>Direcci&oacute;n notar&iacute;a</label>
+              <input type="text" class="cf-input" id="cf_notaria_direccion" placeholder="Direcci&oacute;n completa" />
+            </div>
+          </div>
+
+          <!-- Fecha escrituraci&oacute;n -->
+          <div style="font-size:12px;color:rgba(255,255,255,.4);font-weight:600;margin:14px 0 6px;">Escrituraci&oacute;n</div>
+          <div class="cierre-form-grid">
+            <div class="cf-field">
+              <label>Fecha tentativa escrituraci&oacute;n</label>
+              <input type="date" class="cf-input" id="cf_fecha_escrituracion" />
+            </div>
+            <div class="cf-field">
+              <label>Notas adicionales</label>
+              <input type="text" class="cf-input" id="cf_notas_cierre" placeholder="Observaciones..." />
+            </div>
+          </div>
+
+          <button class="btn-save-cierre" onclick="guardarDatosCierre();">&#x1F4BE; Guardar datos de cierre</button>
+          <div class="cf-saved" id="cfSaved">&#x2705; Datos guardados correctamente</div>
+        </div>
+      </div>
+
+      <!-- Gastos de cierre -->
+      <div class="cierre-form-section">
+        <div class="cierre-form-title" onclick="toggleGastosForm()">
+          <span class="toggle-arrow" id="gastosFormArrow">&#x25B6;</span>
+          &#x1F4B0; Gastos de cierre
+        </div>
+        <div id="gastosFormBody" style="display:none;">
+
+          <!-- Gastos vendedor -->
+          <div style="font-size:12px;color:#fc8181;font-weight:600;margin:10px 0 6px;">Gastos del vendedor</div>
+          <div id="gastosVendedorFields"></div>
+          <div style="text-align:right;font-size:13px;color:#fc8181;font-weight:700;margin-top:6px;">
+            Total vendedor: $<span id="totalGastosVendedor">0</span>
+          </div>
+
+          <div style="height:1px;background:rgba(255,255,255,.08);margin:14px 0;"></div>
+
+          <!-- Gastos comprador -->
+          <div style="font-size:12px;color:#63b3ed;font-weight:600;margin:0 0 6px;">Gastos del comprador</div>
+          <div id="gastosCompradorFields"></div>
+          <div style="text-align:right;font-size:13px;color:#63b3ed;font-weight:700;margin-top:6px;">
+            Total comprador: $<span id="totalGastosComprador">0</span>
+          </div>
+
+          <div style="height:1px;background:rgba(255,255,255,.08);margin:14px 0;"></div>
+          <div style="text-align:right;font-size:14px;color:#c9a227;font-weight:700;">
+            Total general: $<span id="totalGastosGeneral">0</span>
+          </div>
+
+          <button class="btn-save-cierre" onclick="guardarGastosCierre();" style="margin-top:12px;">&#x1F4BE; Guardar gastos</button>
+          <div class="cf-saved" id="gastosSaved">&#x2705; Gastos guardados correctamente</div>
+        </div>
+      </div>
+
+      <!-- Mensaje WhatsApp -->
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08);">
+        <div class="modal-text" id="cierreMensaje" style="margin-bottom:12px;"></div>
+        <div class="modal-actions">
+          <button class="btn-copy" onclick="copiarCierreMensaje();">Copiar mensaje</button>
+          <a href="#" class="btn-wa-modal" id="cierreWa" target="_blank">&#x1F4AC; Abrir WhatsApp</a>
+        </div>
       </div>
     </div>
   </div>
@@ -497,16 +739,19 @@
     setTimeout(function() { toast.style.display = 'none'; }, 2000);
   }
 
+  var ESTADOS_CIERRE = ['listo_para_cerrar', 'en_cierre', 'en_proceso_inscripcion', 'esperando_notaria'];
+
   function filtrar(estado) {
     document.querySelectorAll('.filter-tab').forEach(function(t) { t.classList.remove('active'); });
     event.target.classList.add('active');
 
     document.querySelectorAll('.prop-row').forEach(function(row) {
-      if (estado === 'todos' || row.dataset.estado === estado) {
-        row.style.display = '';
-      } else {
-        row.style.display = 'none';
-      }
+      var e = row.dataset.estado;
+      var show = false;
+      if (estado === 'todos') show = true;
+      else if (estado === 'cierre') show = ESTADOS_CIERRE.indexOf(e) !== -1;
+      else show = (e === estado);
+      row.style.display = show ? '' : 'none';
     });
   }
 
@@ -595,9 +840,271 @@
     }).catch(function() {});
   }
 
+  // ── Modal cierre ──
+  var cierrePropId = null;
+  var cierreMensajeActual = '';
+
+  function abrirCierre(propId) {
+    cierrePropId = propId;
+    var overlay = document.getElementById('cierreOverlay');
+    document.getElementById('cierreChecklist').innerHTML = 'Cargando...';
+    document.getElementById('cierreMensaje').textContent = '';
+    document.getElementById('cierreWa').style.display = 'none';
+    overlay.classList.add('open');
+
+    fetch('/api/generar-cierre/' + propId)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.error) {
+        document.getElementById('cierreChecklist').innerHTML = '<p style="color:#fc8181;">Error: ' + data.error + '</p>';
+        return;
+      }
+
+      // Título y meta
+      document.getElementById('cierreTitle').textContent = 'Cierre: ' + data.propiedad;
+      var meta = '';
+      if (data.vendedor) meta += '<span>Vendedor: ' + data.vendedor + '</span>';
+      if (data.comprador) meta += '<span>Comprador: ' + data.comprador + '</span>';
+      if (data.tipo_compra) meta += '<span>' + data.tipo_compra + '</span>';
+      document.getElementById('cierreMeta').innerHTML = meta;
+
+      // Progress
+      document.getElementById('cierreProgressFill').style.width = data.porcentaje_cierre + '%';
+      document.getElementById('cierrePctText').textContent = data.completados + ' de ' + data.total + ' pasos (' + data.porcentaje_cierre + '%)';
+
+      // Checklist agrupado por fase
+      var html = '';
+      var faseActual = 0;
+      data.checklist.forEach(function(item) {
+        if (item.fase !== faseActual) {
+          if (faseActual > 0) html += '</div>';
+          faseActual = item.fase;
+          html += '<div class="cierre-fase"><div class="cierre-fase-title">Fase ' + item.fase + ': ' + item.fase_nombre + '</div>';
+        }
+        var doneClass = item.completado ? ' done' : '';
+        var checkIcon = item.completado ? '&#x2705;' : '';
+        html += '<div class="cierre-item' + doneClass + '" onclick="toggleCierreItem(this,\'' + item.clave + '\',' + !item.completado + ')">';
+        html += '<div class="cierre-check">' + checkIcon + '</div>';
+        html += '<div class="cierre-label">' + item.label + '</div>';
+        html += '</div>';
+      });
+      if (faseActual > 0) html += '</div>';
+      document.getElementById('cierreChecklist').innerHTML = html;
+
+      // Mensaje
+      cierreMensajeActual = data.mensaje_cierre;
+      document.getElementById('cierreMensaje').textContent = data.mensaje_cierre;
+      document.getElementById('cierreWa').href = 'https://wa.me/?text=' + encodeURIComponent(data.mensaje_cierre);
+      document.getElementById('cierreWa').style.display = 'inline-flex';
+
+      // Poblar formulario de datos si existen
+      var d = data.datos || {};
+      document.getElementById('cf_promesa_fecha').value = d.promesa_fecha || '';
+      document.getElementById('cf_promesa_monto').value = d.promesa_monto || '';
+      document.getElementById('cf_promesa_notas').value = d.promesa_notas || '';
+      document.getElementById('cf_forma_pago').value = d.forma_pago || '';
+      document.getElementById('cf_banco').value = d.banco || '';
+      document.getElementById('cf_enganche_monto').value = d.enganche_monto || '';
+      document.getElementById('cf_monto_total').value = d.monto_total || '';
+      document.getElementById('cf_notaria_nombre').value = d.notaria_nombre || '';
+      document.getElementById('cf_notaria_contacto').value = d.notaria_contacto || '';
+      document.getElementById('cf_notaria_direccion').value = d.notaria_direccion || '';
+      document.getElementById('cf_fecha_escrituracion').value = d.fecha_escrituracion || '';
+      document.getElementById('cf_notas_cierre').value = d.notas_cierre || '';
+
+      // Si ya hay datos guardados, abrir el formulario automáticamente
+      if (d.promesa_fecha || d.forma_pago || d.notaria_nombre || d.fecha_escrituracion) {
+        document.getElementById('cierreFormBody').style.display = 'block';
+        document.getElementById('cierreFormArrow').classList.add('open');
+      } else {
+        document.getElementById('cierreFormBody').style.display = 'none';
+        document.getElementById('cierreFormArrow').classList.remove('open');
+      }
+      document.getElementById('cfSaved').style.display = 'none';
+
+      // Renderizar gastos
+      var gv = data.gastos_vendedor_template || [];
+      var gc = data.gastos_comprador_template || [];
+      var savedGastos = data.gastos || {};
+      renderGastosFields('gastosVendedorFields', gv, savedGastos.vendedor || {});
+      renderGastosFields('gastosCompradorFields', gc, savedGastos.comprador || {});
+      recalcGastos();
+
+      // Si hay gastos guardados, abrir sección
+      if (savedGastos.total_vendedor || savedGastos.total_comprador) {
+        document.getElementById('gastosFormBody').style.display = 'block';
+        document.getElementById('gastosFormArrow').classList.add('open');
+      } else {
+        document.getElementById('gastosFormBody').style.display = 'none';
+        document.getElementById('gastosFormArrow').classList.remove('open');
+      }
+      document.getElementById('gastosSaved').style.display = 'none';
+    })
+    .catch(function() {
+      document.getElementById('cierreChecklist').innerHTML = '<p style="color:#fc8181;">Error de conexi\u00f3n</p>';
+    });
+  }
+
+  function toggleCierreItem(el, clave, completado) {
+    // Toggle visual inmediato
+    if (completado) {
+      el.classList.add('done');
+      el.querySelector('.cierre-check').innerHTML = '&#x2705;';
+    } else {
+      el.classList.remove('done');
+      el.querySelector('.cierre-check').innerHTML = '';
+    }
+
+    // Guardar en backend
+    fetch('/api/generar-cierre/' + cierrePropId + '/actualizar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clave: clave, completado: completado }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        // Actualizar progress
+        var items = document.querySelectorAll('#cierreChecklist .cierre-item');
+        var total = items.length;
+        var done = document.querySelectorAll('#cierreChecklist .cierre-item.done').length;
+        var pct = Math.round(done / total * 100);
+        document.getElementById('cierreProgressFill').style.width = pct + '%';
+        document.getElementById('cierrePctText').textContent = done + ' de ' + total + ' pasos (' + pct + '%)';
+      }
+    })
+    .catch(function() {});
+  }
+
+  function toggleCierreForm() {
+    var body = document.getElementById('cierreFormBody');
+    var arrow = document.getElementById('cierreFormArrow');
+    if (body.style.display === 'none') {
+      body.style.display = 'block';
+      arrow.classList.add('open');
+    } else {
+      body.style.display = 'none';
+      arrow.classList.remove('open');
+    }
+  }
+
+  function guardarDatosCierre() {
+    var datos = {
+      promesa_fecha: document.getElementById('cf_promesa_fecha').value,
+      promesa_monto: document.getElementById('cf_promesa_monto').value,
+      promesa_notas: document.getElementById('cf_promesa_notas').value,
+      forma_pago: document.getElementById('cf_forma_pago').value,
+      banco: document.getElementById('cf_banco').value,
+      enganche_monto: document.getElementById('cf_enganche_monto').value,
+      monto_total: document.getElementById('cf_monto_total').value,
+      notaria_nombre: document.getElementById('cf_notaria_nombre').value,
+      notaria_contacto: document.getElementById('cf_notaria_contacto').value,
+      notaria_direccion: document.getElementById('cf_notaria_direccion').value,
+      fecha_escrituracion: document.getElementById('cf_fecha_escrituracion').value,
+      notas_cierre: document.getElementById('cf_notas_cierre').value,
+    };
+
+    fetch('/api/generar-cierre/' + cierrePropId + '/datos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datos),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        var saved = document.getElementById('cfSaved');
+        saved.style.display = 'block';
+        setTimeout(function() { saved.style.display = 'none'; }, 3000);
+        // Recargar checklist para reflejar items auto-marcados
+        abrirCierre(cierrePropId);
+      }
+    })
+    .catch(function() {});
+  }
+
+  // ── Gastos de cierre ──
+  function toggleGastosForm() {
+    var body = document.getElementById('gastosFormBody');
+    var arrow = document.getElementById('gastosFormArrow');
+    if (body.style.display === 'none') {
+      body.style.display = 'block';
+      arrow.classList.add('open');
+    } else {
+      body.style.display = 'none';
+      arrow.classList.remove('open');
+    }
+  }
+
+  function renderGastosFields(containerId, template, savedData) {
+    var html = '<div class="cierre-form-grid">';
+    template.forEach(function(g) {
+      var val = (savedData && savedData[g.clave]) || '';
+      html += '<div class="cf-field">';
+      html += '<label>' + g.label + '</label>';
+      html += '<input type="text" class="cf-input gasto-input" data-rol="' + containerId + '" data-clave="' + g.clave + '" value="' + val + '" placeholder="$0" inputmode="numeric" onchange="recalcGastos()" oninput="recalcGastos()" />';
+      html += '</div>';
+    });
+    html += '</div>';
+    document.getElementById(containerId).innerHTML = html;
+  }
+
+  function recalcGastos() {
+    var totalV = 0, totalC = 0;
+    document.querySelectorAll('#gastosVendedorFields .gasto-input').forEach(function(inp) {
+      var n = parseFloat(inp.value.replace(/,/g, '')) || 0;
+      totalV += n;
+    });
+    document.querySelectorAll('#gastosCompradorFields .gasto-input').forEach(function(inp) {
+      var n = parseFloat(inp.value.replace(/,/g, '')) || 0;
+      totalC += n;
+    });
+    document.getElementById('totalGastosVendedor').textContent = totalV.toLocaleString('es-MX');
+    document.getElementById('totalGastosComprador').textContent = totalC.toLocaleString('es-MX');
+    document.getElementById('totalGastosGeneral').textContent = (totalV + totalC).toLocaleString('es-MX');
+  }
+
+  function guardarGastosCierre() {
+    var vendedor = {}, comprador = {};
+    document.querySelectorAll('#gastosVendedorFields .gasto-input').forEach(function(inp) {
+      vendedor[inp.dataset.clave] = inp.value;
+    });
+    document.querySelectorAll('#gastosCompradorFields .gasto-input').forEach(function(inp) {
+      comprador[inp.dataset.clave] = inp.value;
+    });
+
+    fetch('/api/generar-cierre/' + cierrePropId + '/gastos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ vendedor: vendedor, comprador: comprador }),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        var saved = document.getElementById('gastosSaved');
+        saved.style.display = 'block';
+        setTimeout(function() { saved.style.display = 'none'; }, 3000);
+        // Recargar cierre para actualizar checklist (gastos_calculados)
+        abrirCierre(cierrePropId);
+      }
+    })
+    .catch(function() {});
+  }
+
+  function cerrarCierre() {
+    document.getElementById('cierreOverlay').classList.remove('open');
+  }
+
+  function copiarCierreMensaje() {
+    if (!cierreMensajeActual) return;
+    navigator.clipboard.writeText(cierreMensajeActual).then(function() {
+      cerrarCierre();
+      showToast();
+    });
+  }
+
   // Cerrar con Escape
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') cerrarModal();
+    if (e.key === 'Escape') { cerrarModal(); cerrarCierre(); }
   });
   </script>
 </body>
