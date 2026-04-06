@@ -1273,6 +1273,9 @@ SMTP_USER = os.getenv("SMTP_USER", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SMTP_FROM_NAME = os.getenv("SMTP_FROM_NAME", "iRealEstateMxPro")
 N8N_WEBHOOK_NOTIFICACIONES = os.getenv("N8N_WEBHOOK_NOTIFICACIONES", "")
+WAHA_API_URL = os.getenv("WAHA_API_URL", "https://wa.irealestatemx.cloud")
+WAHA_API_KEY = os.getenv("WAHA_API_KEY", "")
+WAHA_SESSION = os.getenv("WAHA_SESSION", "default")
 
 
 # ─── Mensajes de notificación por tipo ─────────────────────────────
@@ -1510,44 +1513,81 @@ async def enviar_email_notificacion(to_email: str, to_name: str, asunto: str, cu
         return False
 
 
-async def enviar_whatsapp_n8n(tipo: str, destinatario: dict, metadata: dict):
-    """Dispara webhook de n8n para enviar WhatsApp."""
+def _formatear_telefono_mx(telefono: str) -> str:
+    """Formatea teléfono mexicano para WAHA: 521XXXXXXXXXX@c.us"""
+    tel = "".join(c for c in str(telefono) if c.isdigit())
+    # Si ya tiene código de país 52
+    if tel.startswith("52") and len(tel) >= 12:
+        return f"{tel}@c.us"
+    # Si tiene 10 dígitos (número mexicano sin código)
+    if len(tel) == 10:
+        return f"52{tel}@c.us"
+    # Si tiene 1+10 dígitos (con 1 de larga distancia viejo)
+    if len(tel) == 11 and tel.startswith("1"):
+        return f"52{tel[1:]}@c.us"
+    # Fallback: asumir que es válido
+    return f"{tel}@c.us"
+
+
+async def enviar_whatsapp_waha(tipo: str, destinatario: dict, metadata: dict):
+    """Envía WhatsApp directo vía WAHA (WhatsApp HTTP API)."""
     import httpx
 
-    if not N8N_WEBHOOK_NOTIFICACIONES:
-        print(f"[WHATSAPP] Webhook n8n no configurado. Tipo: {tipo}")
+    if not WAHA_API_URL or not WAHA_API_KEY:
+        print(f"[WAHA] No configurado. Tipo: {tipo}")
         return False
 
+    # Construir mensaje desde plantilla
     plantilla = NOTIF_MENSAJES.get(tipo, {})
     mensaje = plantilla.get("whatsapp", "")
     if mensaje:
         try:
             mensaje = mensaje.format(**metadata)
-        except KeyError:
-            pass
+        except KeyError as e:
+            print(f"[WAHA] Error formateando mensaje {tipo}: {e}")
+
+    if not mensaje:
+        print(f"[WAHA] Sin mensaje para tipo: {tipo}")
+        return False
 
     telefono = destinatario.get("telefono", "")
     if not telefono:
-        print(f"[WHATSAPP] Usuario {destinatario.get('nombre', '')} sin teléfono. Tipo: {tipo}")
+        print(f"[WAHA] Usuario {destinatario.get('nombre', '')} sin teléfono. Tipo: {tipo}")
         return False
 
+    chat_id = _formatear_telefono_mx(telefono)
+
     payload = {
-        "tipo": tipo,
-        "destinatario_nombre": destinatario.get("nombre", ""),
-        "destinatario_email": destinatario.get("email", ""),
-        "destinatario_telefono": telefono,
-        "mensaje": mensaje,
-        "metadata": {**metadata, "telefono_destino": telefono},
+        "chatId": chat_id,
+        "text": mensaje,
+        "session": WAHA_SESSION,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {WAHA_API_KEY}",
+        "Content-Type": "application/json",
     }
 
     try:
-        async with httpx.AsyncClient(timeout=10) as client:
-            resp = await client.post(N8N_WEBHOOK_NOTIFICACIONES, json=payload)
-            print(f"[WHATSAPP] Webhook n8n respondió {resp.status_code} para {tipo}")
-            return resp.status_code < 400
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.post(
+                f"{WAHA_API_URL}/api/sendText",
+                json=payload,
+                headers=headers,
+            )
+            if resp.status_code < 400:
+                print(f"[WAHA] ✓ Enviado a {chat_id} ({destinatario.get('nombre', '')}). Tipo: {tipo}")
+                return True
+            else:
+                print(f"[WAHA] Error {resp.status_code}: {resp.text[:200]}")
+                return False
     except Exception as e:
-        print(f"[WHATSAPP] Error webhook: {e}")
+        print(f"[WAHA] Error conexión: {e}")
         return False
+
+
+# Alias para compatibilidad con código existente
+enviar_whatsapp_n8n = enviar_whatsapp_waha
 
 
 async def disparar_notificaciones(tipo: str, user_id: int, propiedad_id: int, metadata: dict):
