@@ -635,26 +635,26 @@
 
         <div class="wz-card">
           <h3>Espacios y medidas</h3>
-          <div class="wz-grid wz-grid-5">
-            <div class="wz-field">
+          <div class="wz-grid wz-grid-5" id="gridCaracteristicas">
+            <div class="wz-field field-no-terreno">
               <label>Recámaras</label>
               <input type="number" name="recamaras" class="wz-input" min="0" max="20" placeholder="0" />
             </div>
-            <div class="wz-field">
+            <div class="wz-field field-no-terreno">
               <label>Baños</label>
               <input type="number" name="banos" class="wz-input" min="0" max="20" step="0.5" placeholder="0" />
             </div>
-            <div class="wz-field">
+            <div class="wz-field field-no-terreno">
               <label>Estac.</label>
               <input type="number" name="estacionamientos" class="wz-input" min="0" max="10" placeholder="0" />
             </div>
             <div class="wz-field">
               <label>m² Construidos</label>
-              <input type="number" name="metros_construidos" class="wz-input" min="0" placeholder="0" />
+              <input type="number" name="metros_construidos" class="wz-input" min="0" step="any" placeholder="0" />
             </div>
             <div class="wz-field">
               <label>m² Terreno</label>
-              <input type="number" name="metros_terreno" class="wz-input" min="0" placeholder="0" />
+              <input type="number" name="metros_terreno" class="wz-input" min="0" step="any" placeholder="0" />
             </div>
           </div>
         </div>
@@ -840,7 +840,7 @@
           <h3>Fotos por escena del video (opcional)</h3>
           <p style="font-size:12px;color:var(--gray-500);margin-bottom:16px;">Si quieres asignar una foto específica a cada escena del video, súbelas aquí. Si no, usaremos las fotos principales.</p>
 
-          <div class="scene-card">
+          <div class="scene-card scene-no-terreno">
             <div>
               <div class="scene-header"><div class="scene-number">1</div><div class="scene-title">Fachada</div></div>
               <textarea name="scene_fachada_text" class="scene-textarea" placeholder="Texto del guión para la fachada (se generará automáticamente si lo dejas vacío)"></textarea>
@@ -852,7 +852,7 @@
             </div>
           </div>
 
-          <div class="scene-card">
+          <div class="scene-card scene-no-terreno">
             <div>
               <div class="scene-header"><div class="scene-number">2</div><div class="scene-title">Sala / Estancia</div></div>
               <textarea name="scene_sala_text" class="scene-textarea" placeholder="Texto del guión para la sala..."></textarea>
@@ -864,7 +864,7 @@
             </div>
           </div>
 
-          <div class="scene-card">
+          <div class="scene-card scene-no-terreno">
             <div>
               <div class="scene-header"><div class="scene-number">3</div><div class="scene-title">Cocina</div></div>
               <textarea name="scene_cocina_text" class="scene-textarea" placeholder="Texto del guión para la cocina..."></textarea>
@@ -876,7 +876,7 @@
             </div>
           </div>
 
-          <div class="scene-card">
+          <div class="scene-card scene-no-terreno">
             <div>
               <div class="scene-header"><div class="scene-number">4</div><div class="scene-title">Recámara Principal</div></div>
               <textarea name="scene_recamara_text" class="scene-textarea" placeholder="Texto del guión para la recámara principal..."></textarea>
@@ -888,7 +888,7 @@
             </div>
           </div>
 
-          <div class="scene-card">
+          <div class="scene-card scene-no-terreno">
             <div>
               <div class="scene-header"><div class="scene-number">5</div><div class="scene-title">Baño / Espacios</div></div>
               <textarea name="scene_bano_text" class="scene-textarea" placeholder="Texto del guión para baños u otros espacios destacados..."></textarea>
@@ -1381,6 +1381,31 @@
         e.preventDefault(); this.style.borderColor = '';
         if (e.dataTransfer.files.length) {
           addPhotos(e.dataTransfer.files);
+        }
+      });
+    }
+
+    // ═══════ TERRENO TOGGLE ═══════
+    var tipoSelect = document.querySelector('select[name="tipo_propiedad"]');
+    if (tipoSelect) {
+      tipoSelect.addEventListener('change', function() {
+        var esTerreno = this.value === 'Terreno';
+        // Ocultar campos de recámaras, baños, estacionamientos
+        document.querySelectorAll('.field-no-terreno').forEach(function(el) {
+          el.style.display = esTerreno ? 'none' : '';
+          // Limpiar valor para que no envíe datos
+          var input = el.querySelector('input');
+          if (input && esTerreno) input.value = '';
+        });
+        // Ocultar escenas excepto cierre
+        document.querySelectorAll('.scene-no-terreno').forEach(function(el) {
+          el.style.display = esTerreno ? 'none' : '';
+        });
+        // Cambiar grid de 5 a 2 columnas
+        var grid = document.getElementById('gridCaracteristicas');
+        if (grid) {
+          grid.classList.remove('wz-grid-5', 'wz-grid-2');
+          grid.classList.add(esTerreno ? 'wz-grid-2' : 'wz-grid-5');
         }
       });
     }
