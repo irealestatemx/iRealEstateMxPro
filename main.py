@@ -1670,7 +1670,8 @@ async def dashboard(request: Request, agente: Optional[str] = None):
             props = await get_properties_by_user(agente_id)
         else:
             props = await get_all_properties(active_only=False, limit=100)
-        agents = await get_all_users()
+        all_users = await get_all_users()
+        agents = [u for u in all_users if u["rol"] in ("agente", "admin")]
     else:
         props = await get_properties_by_user(user["id"])
         agents = []
