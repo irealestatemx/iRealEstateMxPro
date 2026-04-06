@@ -2038,8 +2038,8 @@ async def api_docs_pendientes(request: Request):
     return JSONResponse({"ok": True, "propiedades": resumen})
 
 
-ESTADO_ORDEN = {"atorado": 0, "casi_listo": 1, "en_proceso": 2, "sin_iniciar": 3, "completo": 4}
-PRIORIDAD_ORDEN = {"alta": 0, "media": 1, "normal": 2, "baja": 3, "ninguna": 4}
+ESTADO_ORDEN = {"atorado": 0, "listo_para_cerrar": 1, "casi_listo": 2, "en_proceso": 3, "sin_iniciar": 4, "completo": 5}
+PRIORIDAD_ORDEN = {"alta": 0, "alta_cierre": 1, "media": 2, "normal": 3, "baja": 4, "ninguna": 5}
 
 
 def calcular_estado_propiedad(docs_subidos, docs_rechazados, total_obligatorios):
@@ -2051,6 +2051,8 @@ def calcular_estado_propiedad(docs_subidos, docs_rechazados, total_obligatorios)
     porcentaje = round(docs_subidos / total_obligatorios * 100) if total_obligatorios > 0 else 0
     if porcentaje >= 100:
         return "completo"
+    if porcentaje >= 90 and docs_rechazados == 0:
+        return "listo_para_cerrar"
     if porcentaje > 80:
         return "casi_listo"
     return "en_proceso"
@@ -2060,6 +2062,8 @@ def calcular_prioridad(estado):
     """Calcula la prioridad de contacto basada en el estado."""
     if estado == "atorado":
         return "alta"
+    if estado == "listo_para_cerrar":
+        return "alta_cierre"
     if estado == "casi_listo":
         return "media"
     if estado == "en_proceso":
@@ -2075,6 +2079,7 @@ def generar_mensaje_seguimiento(estado, nombre, propiedad):
     propiedad = propiedad or "tu propiedad"
     mensajes = {
         "atorado": f"Hola {nombre}, vi que uno de tus documentos necesita una corrección para avanzar con {propiedad}. ¿Te puedo ayudar a revisarlo? 👍",
+        "listo_para_cerrar": f"Hola {nombre}, ya tenemos todo listo para avanzar con la firma de {propiedad}. Estamos en etapa final, solo falta coordinar firma de promesa y fecha en notaría. ¿Te parece si lo agendamos esta semana? 🚀",
         "casi_listo": f"Hola {nombre}, ya casi terminamos tu proceso para {propiedad}. Solo falta un paso para avanzar con tu cierre 🙌",
         "en_proceso": f"Hola {nombre}, ¿cómo vas con tus documentos para {propiedad}? Te ayudo a avanzar para asegurar tu proceso 👍",
         "sin_iniciar": f"Hola {nombre}, te recuerdo que necesitamos tus documentos para iniciar el proceso de {propiedad}. ¿Cuándo puedes enviarlos? 📄",
@@ -2247,7 +2252,7 @@ async def dashboard_asesor(request: Request):
     seguimientos = await get_ultimo_seguimiento_por_propiedad(prop_ids)
 
     propiedades = []
-    contadores = {"sin_iniciar": 0, "en_proceso": 0, "casi_listo": 0, "atorado": 0, "completo": 0}
+    contadores = {"sin_iniciar": 0, "en_proceso": 0, "casi_listo": 0, "atorado": 0, "listo_para_cerrar": 0, "completo": 0}
 
     for p in props_raw:
         subidos = p["docs_subidos"] or 0
@@ -2265,6 +2270,8 @@ async def dashboard_asesor(request: Request):
         # Motivo para tareas de hoy
         if estado == "atorado":
             motivo = f"{rechazados} documento(s) rechazado(s)"
+        elif estado == "listo_para_cerrar":
+            motivo = "Momento ideal para cerrar"
         elif estado == "casi_listo":
             motivo = "Listo para cerrar pronto"
         elif estado == "en_proceso":
@@ -2329,14 +2336,18 @@ async def dashboard_asesor(request: Request):
         x["ultimo_movimiento"] if x["ultimo_movimiento"] != "Sin actividad" else "0000",
     ))
 
-    # Tareas de hoy: solo prioridad alta y media
-    tareas_hoy = [p for p in propiedades if p["prioridad"] in ("alta", "media")]
+    # Tareas de hoy: prioridad alta, alta_cierre y media
+    tareas_hoy = [p for p in propiedades if p["prioridad"] in ("alta", "alta_cierre", "media")]
+
+    # Listos para cerrar (sección prioritaria)
+    listos_cierre = [p for p in propiedades if p["estado"] == "listo_para_cerrar"]
 
     notif_count = await contar_notificaciones_no_leidas(user["id"])
 
     return templates.TemplateResponse(request=request, name="dashboard_asesor.html", context={
         "user": user,
         "propiedades": propiedades,
+        "listos_cierre": listos_cierre,
         "tareas_hoy": tareas_hoy,
         "contadores": contadores,
         "total_propiedades": len(propiedades),

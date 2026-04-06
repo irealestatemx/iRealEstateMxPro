@@ -71,6 +71,7 @@
     }
     .prop-row:hover { border-color: rgba(201,162,39,.25); }
     .prop-row.st-atorado { border-left: 4px solid #fc8181; }
+    .prop-row.st-listo_para_cerrar { border-left: 4px solid #48bb78; box-shadow: 0 0 12px rgba(72,187,120,.1); }
     .prop-row.st-casi_listo { border-left: 4px solid #63b3ed; }
     .prop-row.st-en_proceso { border-left: 4px solid #c9a227; }
     .prop-row.st-completo { border-left: 4px solid #68d391; }
@@ -96,10 +97,37 @@
       border-radius: 12px; text-transform: uppercase; letter-spacing: .3px;
     }
     .eb-atorado { background: rgba(252,129,129,.15); color: #fc8181; }
+    .eb-listo_para_cerrar { background: rgba(72,187,120,.2); color: #48bb78; font-weight: 800; }
     .eb-casi_listo { background: rgba(99,179,237,.15); color: #63b3ed; }
     .eb-en_proceso { background: rgba(201,162,39,.15); color: #c9a227; }
     .eb-completo { background: rgba(104,211,145,.15); color: #68d391; }
     .eb-sin_iniciar { background: rgba(255,255,255,.06); color: rgba(255,255,255,.35); }
+
+    /* Sección listos para cierre */
+    .cierre-section {
+      background: linear-gradient(135deg, rgba(72,187,120,.08), rgba(72,187,120,.02));
+      border: 1px solid rgba(72,187,120,.25); border-radius: 14px;
+      padding: 20px 24px; margin-bottom: 28px;
+    }
+    .cierre-title { font-size: 16px; font-weight: 700; color: #48bb78; margin-bottom: 14px; }
+    .cierre-card {
+      background: #1a1a1a; border: 1px solid rgba(72,187,120,.2); border-radius: 10px;
+      padding: 14px 18px; margin-bottom: 10px; display: flex; align-items: center;
+      gap: 14px; flex-wrap: wrap; border-left: 4px solid #48bb78;
+    }
+    .cierre-info { flex: 1; min-width: 180px; }
+    .cierre-cliente { font-size: 14px; font-weight: 600; color: #fff; }
+    .cierre-prop { font-size: 12px; color: rgba(255,255,255,.4); }
+    .cierre-pct { font-size: 12px; color: #48bb78; font-weight: 600; margin-top: 3px; }
+    .cierre-meta { font-size: 10px; color: rgba(255,255,255,.3); }
+    .cierre-actions { display: flex; gap: 8px; flex-shrink: 0; flex-wrap: wrap; }
+    .btn-cierre {
+      padding: 8px 16px; border: none; border-radius: 8px;
+      font-size: 12px; font-weight: 700; cursor: pointer; font-family: 'Inter', sans-serif;
+      background: #48bb78; color: #000; transition: background .2s;
+    }
+    .btn-cierre:hover { background: #38a169; }
+    .tarea-card.pr-alta_cierre { border-left: 4px solid #48bb78; }
 
     .prop-alert { font-size: 11px; margin-top: 4px; }
     .alert-atorado { color: #fc8181; }
@@ -263,11 +291,40 @@
         <div class="num c-gray">{{ contadores.sin_iniciar }}</div>
         <div class="lbl">Sin iniciar</div>
       </div>
+      <div class="stat-card" style="border-color:rgba(72,187,120,.3);">
+        <div class="num" style="color:#48bb78;">{{ contadores.listo_para_cerrar }}</div>
+        <div class="lbl">Cierres potenciales</div>
+      </div>
       <div class="stat-card">
         <div class="num c-green">{{ contadores.completo }}</div>
         <div class="lbl">Completos</div>
       </div>
     </div>
+
+    <!-- Listos para cierre -->
+    {% if listos_cierre %}
+    <div class="cierre-section">
+      <div class="cierre-title">&#x2705; Listos para cierre ({{ listos_cierre|length }})</div>
+      {% for lc in listos_cierre %}
+      <div class="cierre-card">
+        <div class="cierre-info">
+          <div class="cierre-cliente">{{ lc.comprador_nombre or lc.vendedor_nombre or 'Sin cliente' }}</div>
+          <div class="cierre-prop">{{ lc.tipo_propiedad }} — {{ lc.direccion }}, {{ lc.ciudad }}</div>
+          <div class="cierre-pct">{{ lc.porcentaje }}% documentos — {{ lc.docs_subidos }}/{{ lc.docs_total }}</div>
+          {% if lc.tipo_compra %}
+          <div class="cierre-meta">{{ lc.tipo_compra }}</div>
+          {% endif %}
+        </div>
+        <div class="cierre-actions">
+          {% if lc.comprador_id %}
+          <button class="btn-msg" onclick="generarMensaje({{ lc.comprador_id }})">&#x1F4F2; Mensaje</button>
+          {% endif %}
+          <a href="/mis-documentos/{{ lc.id }}" class="btn-cierre" style="text-decoration:none;">&#x1F4CB; Generar cierre</a>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
 
     <!-- Tareas de hoy -->
     {% if tareas_hoy %}
@@ -296,6 +353,7 @@
     <div class="filter-tabs">
       <button class="filter-tab active" onclick="filtrar('todos')">Todos ({{ total_propiedades }})</button>
       <button class="filter-tab" onclick="filtrar('atorado')">Atorados ({{ contadores.atorado }})</button>
+      <button class="filter-tab" onclick="filtrar('listo_para_cerrar')">Listos para cerrar ({{ contadores.listo_para_cerrar }})</button>
       <button class="filter-tab" onclick="filtrar('casi_listo')">Casi listos ({{ contadores.casi_listo }})</button>
       <button class="filter-tab" onclick="filtrar('en_proceso')">En proceso ({{ contadores.en_proceso }})</button>
       <button class="filter-tab" onclick="filtrar('sin_iniciar')">Sin iniciar ({{ contadores.sin_iniciar }})</button>
@@ -324,7 +382,7 @@
 
         <div class="prop-progress">
           <div class="progress-bar-bg">
-            <div class="progress-bar-fill" style="width:{{ p.porcentaje }}%;background:{% if p.estado == 'completo' %}#68d391{% elif p.estado == 'atorado' %}#fc8181{% elif p.estado == 'casi_listo' %}#63b3ed{% else %}#c9a227{% endif %};"></div>
+            <div class="progress-bar-fill" style="width:{{ p.porcentaje }}%;background:{% if p.estado == 'completo' %}#68d391{% elif p.estado == 'listo_para_cerrar' %}#48bb78{% elif p.estado == 'atorado' %}#fc8181{% elif p.estado == 'casi_listo' %}#63b3ed{% else %}#c9a227{% endif %};"></div>
           </div>
           <div class="progress-text">{{ p.porcentaje }}% — {{ p.docs_subidos }}/{{ p.docs_total }} docs</div>
         </div>
@@ -332,6 +390,7 @@
         <div class="prop-status">
           <span class="estado-badge eb-{{ p.estado }}">
             {% if p.estado == 'atorado' %}Atorado
+            {% elif p.estado == 'listo_para_cerrar' %}Listo para cerrar
             {% elif p.estado == 'casi_listo' %}Casi listo
             {% elif p.estado == 'en_proceso' %}En proceso
             {% elif p.estado == 'completo' %}Completo
@@ -339,6 +398,8 @@
           </span>
           {% if p.estado == 'atorado' %}
           <div class="prop-alert alert-atorado">Cliente requiere atenci&oacute;n</div>
+          {% elif p.estado == 'listo_para_cerrar' %}
+          <div class="prop-alert" style="color:#48bb78;">&#x1F31F; Momento ideal para cerrar</div>
           {% elif p.estado == 'casi_listo' %}
           <div class="prop-alert alert-casi">Listo para cerrar pronto</div>
           {% endif %}
@@ -367,8 +428,14 @@
         </div>
 
         <a href="/mis-documentos/{{ p.id }}" class="btn-ver">Ver docs</a>
+        {% if p.vendedor_nombre and p.vendedor_nombre != 'Sin asignar' and p.estado != 'completo' %}
+        <button class="btn-msg" style="border-color:rgba(201,162,39,.3);color:#c9a227;" onclick="mensajeVendedor({{ loop.index0 }})">&#x1F4F2; Mensaje vendedor</button>
+        {% endif %}
         {% if p.comprador_id %}
         <button class="btn-msg" onclick="generarMensaje({{ p.comprador_id }})">&#x1F4F2; Mensaje comprador</button>
+        {% endif %}
+        {% if p.estado == 'listo_para_cerrar' %}
+        <a href="/mis-documentos/{{ p.id }}" class="btn-cierre" style="text-decoration:none;font-size:11px;padding:7px 12px;">&#x1F4CB; Cerrar operaci&oacute;n</a>
         {% endif %}
         {% if p.estado == 'atorado' and p.comprador_id %}
         <button class="btn-msg" style="border-color:rgba(252,129,129,.4);color:#fc8181;" onclick="generarMensaje({{ p.comprador_id }},'recuperar')">&#x1F525; Recuperar cliente</button>
@@ -402,10 +469,17 @@
   </div>
 
   <script>
-  // Mensajes sugeridos generados por el backend
+  // Mensajes sugeridos generados por el backend (tareas de hoy)
   var mensajes = [
     {% for t in tareas_hoy %}
     {{ t.mensaje_sugerido | tojson }},
+    {% endfor %}
+  ];
+
+  // Datos de vendedores para mensajes
+  var vendedoresData = [
+    {% for p in propiedades %}
+    { nombre: {{ p.vendedor_nombre | tojson }}, mensaje: {{ p.mensaje_sugerido | tojson }}, estado: {{ p.estado | tojson }} },
     {% endfor %}
   ];
 
@@ -477,6 +551,26 @@
     .catch(function() {
       text.textContent = 'Error de conexi\u00f3n';
     });
+  }
+
+  function mensajeVendedor(idx) {
+    var v = vendedoresData[idx];
+    if (!v || !v.mensaje) return;
+
+    var overlay = document.getElementById('modalOverlay');
+    var text = document.getElementById('modalText');
+    var meta = document.getElementById('modalMeta');
+    var title = document.getElementById('modalTitle');
+    var wa = document.getElementById('modalWa');
+
+    mensajeActual = v.mensaje;
+    mensajeData = {};
+    title.textContent = 'Mensaje para ' + v.nombre;
+    meta.innerHTML = '<span>Vendedor</span><span>Estado: ' + v.estado + '</span>';
+    text.textContent = v.mensaje;
+    wa.href = 'https://wa.me/?text=' + encodeURIComponent(v.mensaje);
+    wa.style.display = 'inline-flex';
+    overlay.classList.add('open');
   }
 
   function cerrarModal() {
