@@ -4500,7 +4500,7 @@ async def seleccionar_propiedad_page(request: Request, agente_id: Optional[int] 
     if user["rol"] not in ("vendedor", "comprador"):
         return RedirectResponse("/dashboard", status_code=302)
 
-    agentes = await get_users_by_rol("agente")
+    agentes = await get_users_by_rol("agente") + await get_users_by_rol("admin")
     propiedades = []
 
     if agente_id:
