@@ -4091,7 +4091,7 @@ DESARROLLOS_DATA = {
         "tipo": "Casas nuevas",
         "precio_desde": "$2,990,000 MXN",
         "unidades": "",
-        "imagen": "/static/uploads/carcamos-hero.jpg",  # Subir imagen 800x400
+        "imagen": "/static/img/carcamos-hero.jpg",
         "descripcion_corta": "Casas nuevas residenciales en zona de alta plusvalía cerca de ALAÏA.",
         "descripcion": "Cárcamos Residencial es un desarrollo de casas nuevas residenciales ubicado en una de las zonas con mayor crecimiento y plusvalía en Guanajuato.\n\nIdeal para familias y profesionistas que buscan un hogar con concepto moderno y funcional, con opción de personalización de acabados.",
         "diferenciales": [
@@ -4111,7 +4111,7 @@ DESARROLLOS_DATA = {
         "tipo": "24 casas exclusivas",
         "precio_desde": "Consultar",
         "unidades": "24",
-        "imagen": "/static/uploads/fresno-hero.jpg",  # Subir imagen 800x400
+        "imagen": "/static/img/fresno-hero.png",
         "descripcion_corta": "Desarrollo exclusivo de solo 24 casas con gimnasio y áreas verdes.",
         "descripcion": "Privada del Fresno es un desarrollo exclusivo de solo 24 casas, lo que garantiza baja densidad y alta plusvalía.\n\nCuenta con amenidades como gimnasio y áreas verdes. Esquemas de preventa con enganches accesibles y posibilidad de elegir acabados.\n\nEntrega aproximada en 7 meses con seguimiento de obra mensual.",
         "diferenciales": [
