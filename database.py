@@ -733,13 +733,19 @@ async def delete_user(user_id: int):
 
 
 async def delete_user_permanent(user_id: int):
-    """Elimina un usuario permanentemente. También limpia sus prospectos."""
-    # Desasociar prospectos del referido (poner referido_id = NULL)
-    query_prospectos = "UPDATE prospectos SET referido_id = NULL WHERE referido_id = :id"
-    await database.execute(query=query_prospectos, values={"id": user_id})
+    """Elimina un usuario permanentemente. Limpia todas las FK que lo referencian."""
+    v = {"id": user_id}
+    # Desasociar prospectos
+    await database.execute("UPDATE prospectos SET referido_id = NULL WHERE referido_id = :id", values=v)
+    await database.execute("UPDATE prospectos SET agente_id = NULL WHERE agente_id = :id", values=v)
+    # Desasociar propiedades
+    await database.execute("UPDATE propiedades SET user_id = NULL WHERE user_id = :id", values=v)
+    await database.execute("UPDATE propiedades SET vendedor_id = NULL WHERE vendedor_id = :id", values=v)
+    await database.execute("UPDATE propiedades SET comprador_id = NULL WHERE comprador_id = :id", values=v)
+    # Eliminar notificaciones del usuario
+    await database.execute("DELETE FROM notificaciones WHERE user_id = :id", values=v)
     # Eliminar usuario
-    query = "DELETE FROM usuarios WHERE id = :id"
-    await database.execute(query=query, values={"id": user_id})
+    await database.execute("DELETE FROM usuarios WHERE id = :id", values=v)
 
 
 async def count_users() -> int:
