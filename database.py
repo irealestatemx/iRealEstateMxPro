@@ -235,6 +235,14 @@ async def init_db():
             await database.execute(idx)
         except Exception:
             pass
+    # Tabla de configuración del sitio (key-value JSONB)
+    await database.execute("""
+    CREATE TABLE IF NOT EXISTS site_config (
+        clave   VARCHAR(100) PRIMARY KEY,
+        valor   JSONB DEFAULT '{}',
+        updated_at TIMESTAMP DEFAULT NOW()
+    );
+    """)
 
 
 async def close_db():
@@ -417,9 +425,15 @@ async def set_tipo_compra(propiedad_id: int, tipo_compra: str):
     await database.execute(query=query, values={"id": propiedad_id, "tipo_compra": tipo_compra})
 
 
-async def get_all_properties(active_only: bool = True, limit: int = 50, offset: int = 0):
+async def get_all_properties(active_only: bool = True, limit: int = 50, offset: int = 0,
+                             publicada_web: bool = None):
     """Lista propiedades, las mas recientes primero."""
-    where = "WHERE activa = TRUE" if active_only else ""
+    conditions = []
+    if active_only:
+        conditions.append("activa = TRUE")
+    if publicada_web is not None:
+        conditions.append(f"publicada_web = {'TRUE' if publicada_web else 'FALSE'}")
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
     query = f"""
     SELECT * FROM propiedades {where}
     ORDER BY created_at DESC
@@ -445,9 +459,12 @@ async def get_property_by_session(session_id: str):
 
 async def search_properties(ciudad: str = None, operacion: str = None,
                             tipo: str = None, precio_min: float = None,
-                            precio_max: float = None, limit: int = 20):
+                            precio_max: float = None, limit: int = 20,
+                            publicada_web: bool = None):
     """Busca propiedades con filtros. Ideal para el chatbot de WhatsApp."""
     conditions = ["activa = TRUE"]
+    if publicada_web is not None:
+        conditions.append(f"publicada_web = {'TRUE' if publicada_web else 'FALSE'}")
     values = {"limit": limit}
 
     if ciudad:
@@ -510,9 +527,14 @@ async def toggle_property(prop_id: int, active: bool):
     await database.execute(query=query, values={"activa": active, "id": prop_id})
 
 
-async def count_properties(active_only: bool = True) -> int:
+async def count_properties(active_only: bool = True, publicada_web: bool = None) -> int:
     """Cuenta total de propiedades."""
-    where = "WHERE activa = TRUE" if active_only else ""
+    conditions = []
+    if active_only:
+        conditions.append("activa = TRUE")
+    if publicada_web is not None:
+        conditions.append(f"publicada_web = {'TRUE' if publicada_web else 'FALSE'}")
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
     query = f"SELECT COUNT(*) as total FROM propiedades {where}"
     row = await database.fetch_one(query=query)
     return row._mapping["total"] if row else 0
@@ -943,6 +965,53 @@ async def update_cita_chatbot(cita_id: int, updates: dict):
     query = f"UPDATE citas_chatbot SET {set_clause} WHERE id = :id"
     await database.execute(query=query, values=fields)
     return True
+
+
+# ─── Configuración del sitio ───
+
+async def get_site_config(clave: str, default=None):
+    """Obtiene un valor de configuración del sitio."""
+    query = "SELECT valor FROM site_config WHERE clave = :clave"
+    row = await database.fetch_one(query=query, values={"clave": clave})
+    if row:
+        val = row._mapping["valor"]
+        if isinstance(val, str):
+            import json as _j
+            try:
+                return _j.loads(val)
+            except Exception:
+                return val
+        return val
+    return default
+
+
+async def set_site_config(clave: str, valor):
+    """Guarda un valor de configuración del sitio (upsert)."""
+    import json as _j
+    valor_json = _j.dumps(valor, ensure_ascii=False)
+    query = """
+    INSERT INTO site_config (clave, valor, updated_at) VALUES (:clave, CAST(:valor AS jsonb), NOW())
+    ON CONFLICT (clave) DO UPDATE SET valor = CAST(:valor AS jsonb), updated_at = NOW()
+    """
+    await database.execute(query=query, values={"clave": clave, "valor": valor_json})
+
+
+async def get_all_site_config() -> dict:
+    """Obtiene toda la configuración del sitio como dict."""
+    query = "SELECT clave, valor FROM site_config ORDER BY clave"
+    rows = await database.fetch_all(query=query)
+    config = {}
+    for r in rows:
+        m = r._mapping
+        val = m["valor"]
+        if isinstance(val, str):
+            import json as _j
+            try:
+                val = _j.loads(val)
+            except Exception:
+                pass
+        config[m["clave"]] = val
+    return config
 
 
 # ─── Documentos ───

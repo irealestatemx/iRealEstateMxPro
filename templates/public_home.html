@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>iRealEstateMx — Inmobiliaria en Guanajuato</title>
-  <meta name="description" content="Compra, venta y renta de propiedades en Guanajuato. Casas, departamentos y terrenos con asesoría legal completa. Más de 650 operaciones exitosas."/>
+  <title>{{ c.seo_titulo }}</title>
+  <meta name="description" content="{{ c.seo_descripcion }}"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/static/css/public.css"/>
@@ -30,8 +30,8 @@
 
 <!-- ─── Hero ─── -->
 <section class="hero">
-  <h1>Tu <span>hogar ideal</span> en Guanajuato</h1>
-  <p>Compra, venta y renta de propiedades con asesoría legal completa y acompañamiento de inicio a fin.</p>
+  <h1>{{ c.hero_titulo|replace('{gold}', '<span>')|replace('{/gold}', '</span>')|safe }}</h1>
+  <p>{{ c.hero_subtitulo }}</p>
   <form class="search-bar" action="/propiedades" method="GET">
     <select name="operacion">
       <option value="">Tipo de operación</option>
@@ -47,9 +47,9 @@
     </select>
     <select name="ciudad">
       <option value="">Ciudad</option>
-      <option value="guanajuato">Guanajuato</option>
-      <option value="leon">León</option>
-      <option value="irapuato">Irapuato</option>
+      {% for ciudad in c.ciudades.split(',') %}
+      <option value="{{ ciudad.strip()|lower }}">{{ ciudad.strip() }}</option>
+      {% endfor %}
     </select>
     <button type="submit" class="btn-search">Buscar</button>
   </form>
@@ -149,21 +149,21 @@
       <div>
         <h2 class="section-title">Sobre iRealEstateMx</h2>
         <div class="about-text">
-          <p>Somos una empresa de asesores inmobiliarios certificados en Guanajuato, especializados en compra, venta y renta de propiedades con acompañamiento legal completo.</p>
-          <p>Con más de 15 años de experiencia en bienes raíces y derecho inmobiliario, ofrecemos certeza jurídica, contratos claros y estrategias de inversión personalizadas.</p>
+          <p>{{ c.empresa_desc1 }}</p>
+          <p>{{ c.empresa_desc2 }}</p>
         </div>
         <div class="about-stats">
-          <div class="stat-box"><span class="stat-number">650+</span><span class="stat-label">Operaciones exitosas</span></div>
-          <div class="stat-box"><span class="stat-number">15+</span><span class="stat-label">Años de experiencia</span></div>
-          <div class="stat-box"><span class="stat-number">100%</span><span class="stat-label">Respaldo legal</span></div>
-          <div class="stat-box"><span class="stat-number">3</span><span class="stat-label">Ciudades activas</span></div>
+          <div class="stat-box"><span class="stat-number">{{ c.stat1_num }}</span><span class="stat-label">{{ c.stat1_label }}</span></div>
+          <div class="stat-box"><span class="stat-number">{{ c.stat2_num }}</span><span class="stat-label">{{ c.stat2_label }}</span></div>
+          <div class="stat-box"><span class="stat-number">{{ c.stat3_num }}</span><span class="stat-label">{{ c.stat3_label }}</span></div>
+          <div class="stat-box"><span class="stat-number">{{ c.stat4_num }}</span><span class="stat-label">{{ c.stat4_label }}</span></div>
         </div>
       </div>
       <div class="agente-card">
-        <img src="/static/uploads/esteban.jpg" alt="Esteban Castellanos" onerror="this.style.display='none'"/>
-        <h3>Esteban Castellanos</h3>
-        <div class="agente-rol">CEO / Fundador</div>
-        <p>Abogado especialista en bienes raíces. Más de 650 operaciones cerradas exitosamente. Especialista en preventas y estrategias de inversión.</p>
+        <img src="/static/uploads/esteban.jpg" alt="{{ c.agente_nombre }}" onerror="this.style.display='none'"/>
+        <h3>{{ c.agente_nombre }}</h3>
+        <div class="agente-rol">{{ c.agente_cargo }}</div>
+        <p>{{ c.agente_bio }}</p>
       </div>
     </div>
   </div>
@@ -212,11 +212,11 @@
 <!-- ─── CTA ─── -->
 <section class="section" id="contacto">
   <div class="cta-section">
-    <h2 class="section-title" style="margin-bottom:12px">¿Listo para invertir?</h2>
-    <p style="color:var(--text-dim);margin-bottom:24px;font-size:15px">Agenda una visita o solicita información sin compromiso</p>
-    <a href="https://wa.me/524737365219?text=Hola%20Esteban%2C%20me%20interesa%20información%20sobre%20sus%20propiedades" class="btn-cta" target="_blank">
+    <h2 class="section-title" style="margin-bottom:12px">{{ c.cta_titulo }}</h2>
+    <p style="color:var(--text-dim);margin-bottom:24px;font-size:15px">{{ c.cta_subtitulo }}</p>
+    <a href="https://wa.me/{{ c.whatsapp }}?text={{ c.wa_mensaje|urlencode }}" class="btn-cta" target="_blank">
       <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.612.616l4.523-1.471A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.312-.726-5.994-1.956l-.418-.306-2.685.873.896-2.632-.336-.432A9.96 9.96 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
-      Contactar por WhatsApp
+      {{ c.cta_boton }}
     </a>
   </div>
 </section>
@@ -226,9 +226,9 @@
   <div class="footer-inner">
     <div>
       <img src="/static/logo-full.png" alt="iRealEstateMx" style="height:32px;margin-bottom:16px;filter:brightness(2)"/>
-      <p>Asesores inmobiliarios certificados en Guanajuato. Compra, venta y renta con respaldo legal completo.</p>
-      <p style="margin-top:12px">Tel: <a href="tel:+524737365219">473 736 5219</a></p>
-      <p>Email: <a href="mailto:irealestatemx@gmail.com">irealestatemx@gmail.com</a></p>
+      <p>{{ c.footer_texto }}</p>
+      <p style="margin-top:12px">Tel: <a href="tel:+52{{ c.telefono }}">{{ c.telefono }}</a></p>
+      <p>Email: <a href="mailto:{{ c.email }}">{{ c.email }}</a></p>
     </div>
     <div>
       <h4>Propiedades</h4>
@@ -255,12 +255,12 @@
   </div>
   <div class="footer-bottom">
     <span>&copy; 2026 iRealEstateMx. Todos los derechos reservados.</span>
-    <span>Guanajuato, León e Irapuato</span>
+    <span>{{ c.footer_zonas }}</span>
   </div>
 </footer>
 
 <!-- ─── WhatsApp Float ─── -->
-<a href="https://wa.me/524737365219?text=Hola%2C%20me%20interesa%20información%20sobre%20sus%20propiedades" class="wa-float" target="_blank" title="WhatsApp">
+<a href="https://wa.me/{{ c.whatsapp }}?text={{ c.wa_mensaje|urlencode }}" class="wa-float" target="_blank" title="WhatsApp">
   <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.612.616l4.523-1.471A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.312-.726-5.994-1.956l-.418-.306-2.685.873.896-2.632-.336-.432A9.96 9.96 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
 </a>
 

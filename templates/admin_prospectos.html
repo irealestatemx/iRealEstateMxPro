@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>iRealEstateMxPro — Prospectos</title>
+  <title>iRealEstateMxPro — Prospectos y Citas</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
   <style>
@@ -30,28 +30,41 @@
       .topbar-nav { display:none; width:100%; flex-direction:column; gap:0; padding-top:12px; border-top:1px solid rgba(255,255,255,.1); margin-top:12px; }
       .topbar-nav.open { display:flex; }
       .topbar-nav a, .topbar-nav span { padding:10px 0; font-size:15px; }
-      .topbar-nav a.active { border-bottom:none; border-left:3px solid #c9a227; padding-left:10px; }
     }
-    .container { max-width: 1200px; margin: 24px auto; padding: 0 20px; }
-    .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
-    .page-header h1 { font-size: 24px; color: #c9a227; font-family: 'Playfair Display', serif; }
-    .filter-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-    .filter-bar select {
-      padding: 8px 14px; border: 1px solid rgba(201,162,39,.2); border-radius: 8px;
-      font-size: 14px; font-family: 'Inter', sans-serif; background: #1a1a1a; color: #e0e0e0;
+    .container { max-width: 1300px; margin: 24px auto; padding: 0 20px; }
+
+    /* ─── Tabs ─── */
+    .tabs { display: flex; gap: 0; margin-bottom: 24px; border-bottom: 2px solid rgba(201,162,39,.15); }
+    .tab {
+      padding: 12px 24px; font-size: 14px; font-weight: 600; cursor: pointer;
+      color: rgba(255,255,255,.5); border-bottom: 3px solid transparent; transition: all .2s;
+      background: none; border-top: none; border-left: none; border-right: none;
+      font-family: 'Inter', sans-serif;
     }
-    .stats-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
+    .tab:hover { color: #c9a227; }
+    .tab.active { color: #c9a227; border-bottom-color: #c9a227; }
+    .tab-badge {
+      background: rgba(201,162,39,.2); color: #c9a227; font-size: 11px; font-weight: 700;
+      padding: 2px 8px; border-radius: 10px; margin-left: 6px;
+    }
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ─── Stats ─── */
+    .stats-row { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
     .stat-card {
-      background: #1a1a1a; border: 1px solid rgba(201,162,39,.15); border-radius: 10px; padding: 16px 24px;
-      flex: 1; min-width: 110px;
+      background: #1a1a1a; border: 1px solid rgba(201,162,39,.15); border-radius: 10px; padding: 14px 20px;
+      flex: 1; min-width: 100px;
     }
-    .stat-card .num { font-size: 28px; font-weight: 700; color: #c9a227; }
-    .stat-card .lbl { font-size: 12px; color: rgba(255,255,255,.4); margin-top: 2px; }
+    .stat-card .num { font-size: 26px; font-weight: 700; color: #c9a227; }
+    .stat-card .lbl { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 2px; }
+
+    /* ─── Cards & Tables ─── */
     .card {
       background: #1a1a1a; border: 1px solid rgba(201,162,39,.1); border-radius: 12px;
       padding: 24px; margin-bottom: 24px;
     }
-    .card h2 { font-size: 18px; color: #c9a227; margin-bottom: 16px; }
+    .card h2 { font-size: 18px; color: #c9a227; margin-bottom: 16px; font-family: 'Playfair Display', serif; }
     table { width: 100%; border-collapse: collapse; }
     th {
       text-align: left; font-size: 11px; font-weight: 600;
@@ -62,6 +75,9 @@
       padding: 10px; font-size: 13px;
       border-bottom: 1px solid rgba(255,255,255,.05); color: #e0e0e0;
     }
+    tr:hover { background: rgba(201,162,39,.03); }
+
+    /* ─── Badges ─── */
     .badge {
       display: inline-block; padding: 3px 10px; border-radius: 20px;
       font-size: 10px; font-weight: 600;
@@ -73,9 +89,22 @@
     .badge-en_negociacion { background: rgba(85,60,154,.3); color: #b794f4; }
     .badge-venta_cerrada { background: rgba(201,162,39,.2); color: #c9a227; }
     .badge-perdido { background: rgba(192,57,43,.2); color: #e74c3c; }
-    .form-row {
-      display: flex; gap: 12px; flex-wrap: wrap; align-items: end;
+    .badge-chatbot { background: rgba(37,211,102,.15); color: #25d366; }
+    .badge-referido { background: rgba(99,179,237,.15); color: #63b3ed; }
+    .badge-manual { background: rgba(255,255,255,.1); color: rgba(255,255,255,.5); }
+    .badge-pendiente { background: rgba(201,162,39,.15); color: #c9a227; }
+    .badge-confirmada { background: rgba(34,84,61,.3); color: #68d391; }
+    .badge-cancelada { background: rgba(192,57,43,.2); color: #e74c3c; }
+    .badge-completada { background: rgba(201,162,39,.2); color: #c9a227; }
+
+    /* ─── Forms ─── */
+    .filter-bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .filter-bar select, .filter-bar input {
+      padding: 8px 14px; border: 1px solid rgba(201,162,39,.2); border-radius: 8px;
+      font-size: 13px; font-family: 'Inter', sans-serif; background: #1a1a1a; color: #e0e0e0;
     }
+    .filter-bar select:focus, .filter-bar input:focus { border-color: #c9a227; outline: none; }
+    .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
     .form-row .fg { flex: 1; min-width: 130px; }
     .form-row label {
       display: block; font-size: 12px; font-weight: 600;
@@ -86,9 +115,9 @@
       border-radius: 8px; font-size: 14px; font-family: 'Inter', sans-serif;
       background: #111; color: #e0e0e0;
     }
-    .form-row input:focus, .form-row select:focus, .form-row textarea:focus {
-      border-color: #c9a227; outline: none;
-    }
+    .form-row input:focus, .form-row select:focus { border-color: #c9a227; outline: none; }
+
+    /* ─── Buttons ─── */
     .btn-add {
       padding: 10px 24px; background: linear-gradient(135deg, #c9a227, #d4af37);
       color: #1a3c5e; border: none; border-radius: 8px;
@@ -105,79 +134,109 @@
     .btn-save:hover { background: #d4af37; }
     .btn-delete { background: #c0392b; color: #fff; }
     .btn-delete:hover { background: #e74c3c; }
+    .btn-wa {
+      display: inline-flex; align-items: center; gap: 4px;
+      padding: 5px 10px; background: #25d366; color: #fff; border: none;
+      border-radius: 6px; font-size: 11px; font-weight: 600; cursor: pointer;
+      text-decoration: none; font-family: 'Inter', sans-serif;
+    }
+    .btn-wa:hover { background: #20bd5a; }
     .estado-select {
       padding: 4px 8px; border: 1px solid rgba(201,162,39,.2); border-radius: 6px;
       font-size: 12px; font-family: 'Inter', sans-serif; background: #111; color: #e0e0e0;
     }
     .notas-input {
       padding: 4px 8px; border: 1px solid rgba(201,162,39,.2); border-radius: 6px;
-      font-size: 12px; font-family: 'Inter', sans-serif; width: 100%; min-width: 120px;
+      font-size: 12px; font-family: 'Inter', sans-serif; width: 100%; min-width: 100px;
       background: #111; color: #e0e0e0;
     }
     .empty-state {
       text-align: center; padding: 60px 20px; color: rgba(255,255,255,.35);
     }
     .empty-state h2 { font-size: 20px; margin-bottom: 8px; color: rgba(255,255,255,.5); }
-    /* ─── Barra de acciones masivas ─── */
+
+    /* ─── Detalle / Historial ─── */
+    .detail-overlay {
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 200;
+      align-items: center; justify-content: center;
+    }
+    .detail-overlay.open { display: flex; }
+    .detail-panel {
+      background: #1a1a1a; border: 1px solid rgba(201,162,39,.2); border-radius: 16px;
+      width: 90%; max-width: 600px; max-height: 80vh; overflow-y: auto; padding: 28px;
+    }
+    .detail-panel h3 { color: #c9a227; font-size: 18px; margin-bottom: 16px; }
+    .detail-field { margin-bottom: 12px; }
+    .detail-field .fl { font-size: 11px; color: rgba(255,255,255,.4); text-transform: uppercase; margin-bottom: 2px; }
+    .detail-field .fv { font-size: 14px; color: #e0e0e0; }
+    .historial-item {
+      background: #111; border: 1px solid rgba(255,255,255,.05); border-radius: 8px;
+      padding: 12px; margin-bottom: 8px;
+    }
+    .historial-item .hi-tipo {
+      font-size: 11px; font-weight: 600; color: #c9a227; text-transform: uppercase; margin-bottom: 4px;
+    }
+    .historial-item .hi-msg { font-size: 13px; color: rgba(255,255,255,.7); line-height: 1.4; }
+    .historial-item .hi-fecha { font-size: 11px; color: rgba(255,255,255,.3); margin-top: 4px; }
+    .close-detail {
+      position: absolute; top: 16px; right: 20px; background: none; border: none;
+      color: rgba(255,255,255,.5); font-size: 24px; cursor: pointer;
+    }
+    .close-detail:hover { color: #c9a227; }
+
+    /* ─── Bulk bar ─── */
     .bulk-bar {
-      display: none;
-      position: sticky; top: 0; z-index: 100;
+      display: none; position: sticky; top: 0; z-index: 100;
       background: linear-gradient(135deg, #1a1a1a, #222);
-      border: 1px solid rgba(201,162,39,.2);
-      color: #e0e0e0;
-      padding: 12px 20px;
-      border-radius: 10px;
-      margin-bottom: 16px;
-      align-items: center; gap: 12px;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.2);
-      flex-wrap: wrap;
-      animation: slideDown 0.2s ease;
+      border: 1px solid rgba(201,162,39,.2); color: #e0e0e0;
+      padding: 12px 20px; border-radius: 10px; margin-bottom: 16px;
+      align-items: center; gap: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+      flex-wrap: wrap; animation: slideDown 0.2s ease;
     }
     .bulk-bar.active { display: flex; }
-    @keyframes slideDown {
-      from { opacity: 0; transform: translateY(-10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
+    @keyframes slideDown { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
     .bulk-bar .count {
-      font-size: 14px; font-weight: 700;
-      background: #c9a227; color: #1a3c5e;
+      font-size: 14px; font-weight: 700; background: #c9a227; color: #1a3c5e;
       padding: 4px 12px; border-radius: 20px;
-      min-width: 28px; text-align: center;
     }
-    .bulk-bar .label { font-size: 13px; font-weight: 500; }
     .bulk-bar select {
-      padding: 7px 12px; border: 2px solid rgba(255,255,255,0.3);
-      border-radius: 8px; font-size: 13px; font-family: 'Inter', sans-serif;
-      background: rgba(255,255,255,0.1); color: #fff;
+      padding: 7px 12px; border: 2px solid rgba(255,255,255,0.3); border-radius: 8px;
+      font-size: 13px; font-family: 'Inter', sans-serif; background: rgba(255,255,255,0.1); color: #fff;
     }
     .bulk-bar select option { color: #1a3c5e; background: #fff; }
-    .bulk-bar .btn-bulk {
-      padding: 8px 18px; border: none; border-radius: 8px;
-      font-size: 13px; font-weight: 700; cursor: pointer;
-      font-family: 'Inter', sans-serif;
-    }
+    .btn-bulk { padding: 8px 18px; border: none; border-radius: 8px; font-size: 13px; font-weight: 700; cursor: pointer; font-family: 'Inter', sans-serif; }
     .btn-bulk-apply { background: #c9a227; color: #1a3c5e; }
-    .btn-bulk-apply:hover { background: #d4af37; }
     .btn-bulk-cancel { background: rgba(255,255,255,0.15); color: #e2e8f0; }
-    .btn-bulk-cancel:hover { background: rgba(255,255,255,0.25); }
-    /* Checkbox styling */
     .cb-col { width: 36px; text-align: center; }
-    .row-cb, .select-all-cb {
-      width: 17px; height: 17px; cursor: pointer;
-      accent-color: #c9a227;
-    }
+    .row-cb, .select-all-cb { width: 17px; height: 17px; cursor: pointer; accent-color: #c9a227; }
     tr.selected-row { background: rgba(201,162,39,.08) !important; }
+
+    /* ─── Citas grid ─── */
+    .cita-card {
+      background: #1a1a1a; border: 1px solid rgba(201,162,39,.1); border-radius: 12px;
+      padding: 18px; display: flex; justify-content: space-between; align-items: center;
+      gap: 16px; flex-wrap: wrap;
+    }
+    .cita-card + .cita-card { margin-top: 12px; }
+    .cita-info h4 { font-size: 15px; color: #fff; margin-bottom: 4px; }
+    .cita-info p { font-size: 13px; color: rgba(255,255,255,.5); }
+    .cita-meta { text-align: right; min-width: 120px; }
+    .cita-fecha { font-size: 15px; font-weight: 700; color: #c9a227; }
+    .cita-hora { font-size: 13px; color: rgba(255,255,255,.5); }
+    .cita-actions { display: flex; gap: 6px; margin-top: 8px; }
+
     @media (max-width: 768px) {
-      .topbar { padding: 12px 16px; }
       td, th { padding: 6px 4px; font-size: 11px; }
-      .bulk-bar { padding: 10px 12px; }
-      .bulk-bar .label { display: none; }
+      .cita-card { flex-direction: column; align-items: flex-start; }
+      .cita-meta { text-align: left; }
+      .tabs { overflow-x: auto; }
+      .tab { padding: 10px 16px; font-size: 13px; white-space: nowrap; }
     }
   </style>
 </head>
 <body>
   <div class="topbar">
-    <img src="/static/img/logo-header.png" alt="iRealEstateMx" class="topbar-logo" />
+    <img src="/static/logo-header.png" alt="iRealEstateMx" class="topbar-logo" />
     <button class="hamburger" onclick="this.classList.toggle('open');document.querySelector('.topbar-nav').classList.toggle('open');" aria-label="Menu">
       <span></span><span></span><span></span>
     </button>
@@ -185,196 +244,344 @@
       <a href="/">Nueva Propiedad</a>
       <a href="/dashboard">Propiedades</a>
       <a href="/admin/prospectos" class="active">Prospectos</a>
-      <a href="/admin/usuarios">Usuarios</a>
+      <a href="/admin/desarrollos">Desarrollos</a>
+      {% if user.rol == 'admin' %}<a href="/admin/config">Configuración</a>{% endif %}
+      {% if user.rol == 'admin' %}<a href="/admin/usuarios">Usuarios</a>{% endif %}
       <span class="topbar-user">{{ user.nombre }}</span>
       <a href="/logout">Salir</a>
     </div>
   </div>
 
   <div class="container">
-    <div class="page-header">
-      <h1>Gestion de Prospectos</h1>
-      <div class="filter-bar">
-        <form method="get" action="/admin/prospectos" style="display:flex;gap:8px;">
-          <select name="referido" onchange="this.form.submit()">
-            <option value="">Todos los referidos</option>
-            {% for r in referidos %}
-            <option value="{{ r.id }}" {{ 'selected' if selected_referido == r.id }}>{{ r.nombre }} ({{ r.prefijo_whatsapp or '—' }})</option>
-            {% endfor %}
+    <!-- ─── Tabs ─── -->
+    <div class="tabs">
+      <button class="tab active" onclick="switchTab('prospectos')">
+        Prospectos <span class="tab-badge">{{ counts.get('total', 0) }}</span>
+      </button>
+      <button class="tab" onclick="switchTab('citas')">
+        Citas <span class="tab-badge">{{ citas|length }}</span>
+      </button>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════ -->
+    <!-- TAB: PROSPECTOS                                     -->
+    <!-- ════════════════════════════════════════════════════ -->
+    <div class="tab-content active" id="tab-prospectos">
+
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="stat-card"><div class="num">{{ counts.get('total', 0) }}</div><div class="lbl">Total</div></div>
+        <div class="stat-card"><div class="num">{{ counts.get('nuevo', 0) }}</div><div class="lbl">Nuevos</div></div>
+        <div class="stat-card"><div class="num">{{ counts.get('cita_agendada', 0) + counts.get('cita_asistio', 0) }}</div><div class="lbl">Citas</div></div>
+        <div class="stat-card"><div class="num">{{ counts.get('en_negociacion', 0) }}</div><div class="lbl">Negociación</div></div>
+        <div class="stat-card"><div class="num">{{ counts.get('venta_cerrada', 0) }}</div><div class="lbl">Ventas</div></div>
+      </div>
+
+      <!-- Filtros -->
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+        <h1 style="font-size:22px;color:#c9a227;font-family:'Playfair Display',serif">Prospectos</h1>
+        <form method="get" action="/admin/prospectos" class="filter-bar">
+          <select name="fuente" onchange="this.form.submit()">
+            <option value="">Todas las fuentes</option>
+            <option value="chatbot" {{ 'selected' if selected_fuente == 'chatbot' }}>Chatbot</option>
+            <option value="referido" {{ 'selected' if selected_fuente == 'referido' }}>Referido</option>
+            <option value="manual" {{ 'selected' if selected_fuente == 'manual' }}>Manual</option>
           </select>
           <select name="estado" onchange="this.form.submit()">
             <option value="">Todos los estados</option>
             <option value="nuevo" {{ 'selected' if selected_estado == 'nuevo' }}>Nuevo</option>
             <option value="contactado" {{ 'selected' if selected_estado == 'contactado' }}>Contactado</option>
             <option value="cita_agendada" {{ 'selected' if selected_estado == 'cita_agendada' }}>Cita agendada</option>
-            <option value="cita_asistio" {{ 'selected' if selected_estado == 'cita_asistio' }}>Cita asistio</option>
-            <option value="en_negociacion" {{ 'selected' if selected_estado == 'en_negociacion' }}>En negociacion</option>
+            <option value="cita_asistio" {{ 'selected' if selected_estado == 'cita_asistio' }}>Asistió</option>
+            <option value="en_negociacion" {{ 'selected' if selected_estado == 'en_negociacion' }}>En negociación</option>
             <option value="venta_cerrada" {{ 'selected' if selected_estado == 'venta_cerrada' }}>Venta cerrada</option>
             <option value="perdido" {{ 'selected' if selected_estado == 'perdido' }}>Perdido</option>
           </select>
+          <select name="referido" onchange="this.form.submit()">
+            <option value="">Todos los referidos</option>
+            {% for r in referidos %}
+            <option value="{{ r.id }}" {{ 'selected' if selected_referido == r.id }}>{{ r.nombre }}</option>
+            {% endfor %}
+          </select>
+          <input type="text" name="buscar" placeholder="Buscar nombre o tel..." value="{{ buscar or '' }}" style="min-width:160px"/>
+          <button type="submit" class="btn-sm btn-save">Buscar</button>
         </form>
       </div>
-    </div>
 
-    <div class="stats-row">
-      <div class="stat-card">
-        <div class="num">{{ counts.get('total', 0) }}</div>
-        <div class="lbl">Total</div>
+      <!-- Agregar manual -->
+      <div class="card">
+        <h2>Agregar prospecto</h2>
+        <form method="post" action="/admin/prospectos/crear">
+          <div class="form-row">
+            <div class="fg"><label>Nombre</label><input type="text" name="nombre_cliente" placeholder="Nombre del cliente" required/></div>
+            <div class="fg"><label>Teléfono</label><input type="text" name="telefono_cliente" placeholder="477 123 4567"/></div>
+            <div class="fg"><label>Interés</label><input type="text" name="desarrollo_interes" placeholder="Cárcamos Residencial"/></div>
+            <div class="fg" style="max-width:160px">
+              <label>Referido</label>
+              <select name="referido_id">
+                <option value="">Sin referido</option>
+                {% for r in referidos %}
+                <option value="{{ r.id }}">{{ r.nombre }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <button type="submit" class="btn-add">Agregar</button>
+          </div>
+        </form>
       </div>
-      <div class="stat-card">
-        <div class="num">{{ counts.get('nuevo', 0) }}</div>
-        <div class="lbl">Nuevos</div>
-      </div>
-      <div class="stat-card">
-        <div class="num">{{ counts.get('contactado', 0) }}</div>
-        <div class="lbl">Contactados</div>
-      </div>
-      <div class="stat-card">
-        <div class="num">{{ counts.get('cita_agendada', 0) + counts.get('cita_asistio', 0) }}</div>
-        <div class="lbl">Citas</div>
-      </div>
-      <div class="stat-card">
-        <div class="num">{{ counts.get('en_negociacion', 0) }}</div>
-        <div class="lbl">Negociacion</div>
-      </div>
-      <div class="stat-card">
-        <div class="num">{{ counts.get('venta_cerrada', 0) }}</div>
-        <div class="lbl">Ventas</div>
-      </div>
-    </div>
 
-    <!-- Crear prospecto manual -->
-    <div class="card">
-      <h2>Agregar prospecto manualmente</h2>
-      <form method="post" action="/admin/prospectos/crear">
-        <div class="form-row">
-          <div class="fg">
-            <label>Nombre cliente</label>
-            <input type="text" name="nombre_cliente" placeholder="Nombre del cliente" />
-          </div>
-          <div class="fg">
-            <label>Telefono</label>
-            <input type="text" name="telefono_cliente" placeholder="477 123 4567" />
-          </div>
-          <div class="fg">
-            <label>Interes</label>
-            <input type="text" name="desarrollo_interes" placeholder="Carcamos Residencial" />
-          </div>
-          <div class="fg" style="max-width:160px">
-            <label>Referido</label>
-            <select name="referido_id">
-              <option value="">Sin referido</option>
-              {% for r in referidos %}
-              <option value="{{ r.id }}">{{ r.nombre }}</option>
+      {% if prospectos %}
+      <!-- Bulk bar -->
+      <div class="bulk-bar" id="bulkBar">
+        <span class="count" id="bulkCount">0</span>
+        <span style="font-size:13px">seleccionados</span>
+        <form method="post" action="/admin/prospectos/bulk" id="bulkForm" style="display:contents;">
+          <div id="bulkHiddenInputs"></div>
+          <select name="bulk_action" id="bulkAction">
+            <option value="">Elegir acción...</option>
+            <optgroup label="Cambiar estado">
+              <option value="estado_nuevo">Nuevo</option>
+              <option value="estado_contactado">Contactado</option>
+              <option value="estado_cita_agendada">Cita agendada</option>
+              <option value="estado_en_negociacion">En negociación</option>
+              <option value="estado_venta_cerrada">Venta cerrada</option>
+              <option value="estado_perdido">Perdido</option>
+            </optgroup>
+            <optgroup label="Eliminar"><option value="eliminar">Eliminar</option></optgroup>
+          </select>
+          <button type="button" onclick="executeBulk()" class="btn-bulk btn-bulk-apply">Aplicar</button>
+        </form>
+        <button type="button" onclick="clearSelection()" class="btn-bulk btn-bulk-cancel">Cancelar</button>
+      </div>
+
+      <!-- Tabla prospectos -->
+      <div class="card">
+        <h2>{{ prospectos|length }} prospecto{{ 's' if prospectos|length != 1 else '' }}</h2>
+        <div style="overflow-x:auto;">
+          <table>
+            <thead>
+              <tr>
+                <th class="cb-col"><input type="checkbox" class="select-all-cb" id="selectAll"/></th>
+                <th>Cliente</th>
+                <th>Teléfono</th>
+                <th>Fuente</th>
+                <th>Interés</th>
+                <th>Estado</th>
+                <th>Notas</th>
+                <th>Fecha</th>
+                <th>Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for p in prospectos %}
+              <tr data-id="{{ p.id }}">
+                <td class="cb-col"><input type="checkbox" class="row-cb" value="{{ p.id }}"/></td>
+                <td>
+                  <a href="#" onclick="verDetalle({{ p.id }});return false" style="color:#fff;text-decoration:none;font-weight:600">
+                    {{ p.nombre_cliente or 'Sin nombre' }}
+                  </a>
+                </td>
+                <td>
+                  {{ p.telefono_cliente or '—' }}
+                  {% if p.telefono_cliente %}
+                  <a href="https://wa.me/{{ p.telefono_cliente|replace(' ','')|replace('-','')|replace('+','') }}" target="_blank" class="btn-wa" style="margin-left:4px" title="WhatsApp">WA</a>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if p.fuente == 'chatbot' %}<span class="badge badge-chatbot">Chatbot</span>
+                  {% elif p.referido_nombre %}<span class="badge badge-referido">{{ p.referido_nombre }}</span>
+                  {% else %}<span class="badge badge-manual">Manual</span>{% endif %}
+                </td>
+                <td>{{ p.desarrollo_interes or '—' }}</td>
+                <td>
+                  <form method="post" action="/admin/prospectos/{{ p.id }}/estado" style="display:flex;gap:4px;align-items:center;">
+                    <select name="estado" class="estado-select">
+                      {% for est in ['nuevo','contactado','cita_agendada','cita_asistio','en_negociacion','venta_cerrada','perdido'] %}
+                      <option value="{{ est }}" {{ 'selected' if p.estado == est }}>{{ est|replace('_',' ')|title }}</option>
+                      {% endfor %}
+                    </select>
+                    <input type="hidden" name="notas" value="{{ p.notas or '' }}"/>
+                    <button type="submit" class="btn-sm btn-save">OK</button>
+                  </form>
+                </td>
+                <td>
+                  <form method="post" action="/admin/prospectos/{{ p.id }}/estado" style="display:flex;gap:4px;align-items:center;">
+                    <input type="hidden" name="estado" value="{{ p.estado }}"/>
+                    <input type="text" name="notas" class="notas-input" value="{{ p.notas or '' }}" placeholder="Nota..."/>
+                    <button type="submit" class="btn-sm btn-save">OK</button>
+                  </form>
+                </td>
+                <td style="font-size:11px;color:#a0aec0;white-space:nowrap;">{{ p.created_at[:10] if p.created_at else '—' }}</td>
+                <td>
+                  <div style="display:flex;gap:4px">
+                    <button class="btn-sm btn-save" onclick="verDetalle({{ p.id }})" title="Ver detalle">i</button>
+                    <form method="post" action="/admin/prospectos/{{ p.id }}/eliminar" style="display:inline" onsubmit="return confirm('¿Eliminar?')">
+                      <button type="submit" class="btn-sm btn-delete">X</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
               {% endfor %}
-            </select>
-          </div>
-          <button type="submit" class="btn-add">Agregar</button>
+            </tbody>
+          </table>
         </div>
-      </form>
-    </div>
-
-    <!-- Lista de prospectos -->
-    {% if prospectos %}
-
-    <!-- Barra de acciones masivas -->
-    <div class="bulk-bar" id="bulkBar">
-      <span class="count" id="bulkCount">0</span>
-      <span class="label">seleccionados</span>
-      <form method="post" action="/admin/prospectos/bulk" id="bulkForm" style="display:contents;">
-        <div id="bulkHiddenInputs"></div>
-        <select name="bulk_action" id="bulkAction">
-          <option value="">Elegir accion...</option>
-          <optgroup label="Cambiar estado">
-            <option value="estado_nuevo">Marcar como Nuevo</option>
-            <option value="estado_contactado">Marcar como Contactado</option>
-            <option value="estado_cita_agendada">Marcar como Cita agendada</option>
-            <option value="estado_cita_asistio">Marcar como Cita asistio</option>
-            <option value="estado_en_negociacion">Marcar como En negociacion</option>
-            <option value="estado_venta_cerrada">Marcar como Venta cerrada</option>
-            <option value="estado_perdido">Marcar como Perdido</option>
-          </optgroup>
-          <optgroup label="Eliminar">
-            <option value="eliminar">Eliminar seleccionados</option>
-          </optgroup>
-        </select>
-        <button type="button" onclick="executeBulk()" class="btn-bulk btn-bulk-apply">Aplicar</button>
-      </form>
-      <button type="button" onclick="clearSelection()" class="btn-bulk btn-bulk-cancel">Cancelar</button>
-    </div>
-
-    <div class="card">
-      <h2>Prospectos ({{ prospectos | length }})</h2>
-      <div style="overflow-x:auto;">
-        <table>
-          <thead>
-            <tr>
-              <th class="cb-col"><input type="checkbox" class="select-all-cb" id="selectAll" title="Seleccionar todos" /></th>
-              <th>Cliente</th>
-              <th>Telefono</th>
-              <th>Referido</th>
-              <th>Interes</th>
-              <th>Estado</th>
-              <th>Notas</th>
-              <th>Fecha</th>
-              <th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for p in prospectos %}
-            <tr data-id="{{ p.id }}">
-              <td class="cb-col"><input type="checkbox" class="row-cb" value="{{ p.id }}" /></td>
-              <td>{{ p.nombre_cliente or 'Sin nombre' }}</td>
-              <td>{{ p.telefono_cliente or '—' }}</td>
-              <td>{{ p.referido_nombre or 'Directo' }}</td>
-              <td>{{ p.desarrollo_interes or '—' }}</td>
-              <td>
-                <form method="post" action="/admin/prospectos/{{ p.id }}/estado" style="display:flex;gap:4px;align-items:center;">
-                  <select name="estado" class="estado-select">
-                    <option value="nuevo" {{ 'selected' if p.estado == 'nuevo' }}>Nuevo</option>
-                    <option value="contactado" {{ 'selected' if p.estado == 'contactado' }}>Contactado</option>
-                    <option value="cita_agendada" {{ 'selected' if p.estado == 'cita_agendada' }}>Cita agendada</option>
-                    <option value="cita_asistio" {{ 'selected' if p.estado == 'cita_asistio' }}>Cita asistio</option>
-                    <option value="en_negociacion" {{ 'selected' if p.estado == 'en_negociacion' }}>En negociacion</option>
-                    <option value="venta_cerrada" {{ 'selected' if p.estado == 'venta_cerrada' }}>Venta cerrada</option>
-                    <option value="perdido" {{ 'selected' if p.estado == 'perdido' }}>Perdido</option>
-                  </select>
-                  <input type="hidden" name="notas" value="{{ p.notas or '' }}" />
-                  <button type="submit" class="btn-sm btn-save" title="Guardar estado">OK</button>
-                </form>
-              </td>
-              <td>
-                <form method="post" action="/admin/prospectos/{{ p.id }}/estado" style="display:flex;gap:4px;align-items:center;">
-                  <input type="hidden" name="estado" value="{{ p.estado }}" />
-                  <input type="text" name="notas" class="notas-input" value="{{ p.notas or '' }}" placeholder="Agregar nota..." />
-                  <button type="submit" class="btn-sm btn-save" title="Guardar nota">OK</button>
-                </form>
-              </td>
-              <td style="font-size:11px;color:#a0aec0;white-space:nowrap;">
-                {{ p.created_at[:10] if p.created_at else '—' }}
-              </td>
-              <td>
-                <form method="post" action="/admin/prospectos/{{ p.id }}/eliminar" style="display:inline"
-                      onsubmit="return confirm('Eliminar este prospecto?')">
-                  <button type="submit" class="btn-sm btn-delete">X</button>
-                </form>
-              </td>
-            </tr>
-            {% endfor %}
-          </tbody>
-        </table>
       </div>
+      {% else %}
+      <div class="empty-state">
+        <h2>No hay prospectos</h2>
+        <p>Se registran automáticamente cuando un cliente escribe por WhatsApp o desde el chatbot.</p>
+      </div>
+      {% endif %}
     </div>
-    {% else %}
-    <div class="empty-state">
-      <h2>No hay prospectos aun</h2>
-      <p>Los prospectos se registran automaticamente cuando un cliente escribe por WhatsApp con un prefijo de referido.</p>
+
+    <!-- ════════════════════════════════════════════════════ -->
+    <!-- TAB: CITAS                                          -->
+    <!-- ════════════════════════════════════════════════════ -->
+    <div class="tab-content" id="tab-citas">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+        <h1 style="font-size:22px;color:#c9a227;font-family:'Playfair Display',serif">Citas del Chatbot</h1>
+      </div>
+
+      {% if citas %}
+      <div class="stats-row">
+        {% set pendientes = citas|selectattr('estado','equalto','pendiente')|list|length %}
+        {% set confirmadas = citas|selectattr('estado','equalto','confirmada')|list|length %}
+        {% set completadas = citas|selectattr('estado','equalto','completada')|list|length %}
+        <div class="stat-card"><div class="num">{{ citas|length }}</div><div class="lbl">Total citas</div></div>
+        <div class="stat-card"><div class="num">{{ pendientes }}</div><div class="lbl">Pendientes</div></div>
+        <div class="stat-card"><div class="num">{{ confirmadas }}</div><div class="lbl">Confirmadas</div></div>
+        <div class="stat-card"><div class="num">{{ completadas }}</div><div class="lbl">Completadas</div></div>
+      </div>
+
+      {% for c in citas %}
+      <div class="cita-card">
+        <div class="cita-info">
+          <h4>{{ c.titulo or 'Visita' }}</h4>
+          <p>
+            <strong>{{ c.nombre_cliente or 'Sin nombre' }}</strong>
+            {% if c.telefono_cliente %} — {{ c.telefono_cliente }}{% endif %}
+            {% if c.desarrollo %} — {{ c.desarrollo }}{% endif %}
+          </p>
+          {% if c.notas %}<p style="margin-top:4px;font-size:12px;color:rgba(255,255,255,.4)">{{ c.notas }}</p>{% endif %}
+        </div>
+        <div class="cita-meta">
+          <div class="cita-fecha">{{ c.fecha if c.fecha else '—' }}</div>
+          <div class="cita-hora">
+            {% if c.hora_inicio %}{{ c.hora_inicio }}{% endif %}
+            {% if c.hora_fin %} - {{ c.hora_fin }}{% endif %}
+          </div>
+          <div style="margin-top:6px">
+            <span class="badge badge-{{ c.estado or 'pendiente' }}">{{ (c.estado or 'pendiente')|replace('_',' ')|title }}</span>
+          </div>
+          <div class="cita-actions">
+            {% if c.telefono_cliente %}
+            <a href="https://wa.me/{{ c.telefono_cliente|replace(' ','')|replace('-','')|replace('+','') }}?text={{ ('Hola ' + (c.nombre_cliente or '') + ', te confirmo tu cita para ' + (c.fecha|string if c.fecha else ''))|urlencode }}" target="_blank" class="btn-wa">WA</a>
+            {% endif %}
+            <form method="post" action="/admin/citas/{{ c.id }}/estado" style="display:inline">
+              <select name="estado" class="estado-select" onchange="this.form.submit()">
+                {% for est in ['pendiente','confirmada','completada','cancelada'] %}
+                <option value="{{ est }}" {{ 'selected' if c.estado == est }}>{{ est|title }}</option>
+                {% endfor %}
+              </select>
+            </form>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+
+      {% else %}
+      <div class="empty-state">
+        <h2>No hay citas</h2>
+        <p>Las citas se registran automáticamente cuando un cliente agenda desde el chatbot de WhatsApp.</p>
+      </div>
+      {% endif %}
     </div>
-    {% endif %}
+  </div>
+
+  <!-- ─── Modal Detalle Prospecto ─── -->
+  <div class="detail-overlay" id="detailOverlay" onclick="if(event.target===this)cerrarDetalle()">
+    <div class="detail-panel" style="position:relative">
+      <button class="close-detail" onclick="cerrarDetalle()">&times;</button>
+      <h3 id="detailNombre">—</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:20px">
+        <div class="detail-field"><div class="fl">Teléfono</div><div class="fv" id="detailTel">—</div></div>
+        <div class="detail-field"><div class="fl">Fuente</div><div class="fv" id="detailFuente">—</div></div>
+        <div class="detail-field"><div class="fl">Interés</div><div class="fv" id="detailInteres">—</div></div>
+        <div class="detail-field"><div class="fl">Estado</div><div class="fv" id="detailEstado">—</div></div>
+        <div class="detail-field"><div class="fl">Fecha registro</div><div class="fv" id="detailFecha">—</div></div>
+        <div class="detail-field"><div class="fl">Referido</div><div class="fv" id="detailReferido">—</div></div>
+      </div>
+      <div class="detail-field"><div class="fl">Notas</div><div class="fv" id="detailNotas">—</div></div>
+      <div class="detail-field" style="margin-top:8px"><div class="fl">Mensaje original</div><div class="fv" id="detailMsg" style="font-size:13px;color:rgba(255,255,255,.5)">—</div></div>
+
+      <h3 style="margin-top:20px;font-size:15px">Historial</h3>
+      <div id="detailHistorial" style="margin-top:8px">
+        <p style="color:rgba(255,255,255,.3);font-size:13px">Sin historial</p>
+      </div>
+
+      <div style="margin-top:20px;text-align:center" id="detailWaBtn"></div>
+    </div>
   </div>
 
   <script>
-    // ─── Selección masiva de prospectos ───
+    /* ─── Tabs ─── */
+    function switchTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+      event.target.closest('.tab').classList.add('active');
+      document.getElementById('tab-' + tab).classList.add('active');
+    }
+
+    /* ─── Detalle Prospecto ─── */
+    async function verDetalle(id) {
+      try {
+        const r = await fetch('/api/prospectos/' + id);
+        const data = await r.json();
+        if (!data.prospecto) { alert('No encontrado'); return; }
+        const p = data.prospecto;
+        document.getElementById('detailNombre').textContent = p.nombre_cliente || 'Sin nombre';
+        document.getElementById('detailTel').textContent = p.telefono_cliente || '—';
+        document.getElementById('detailFuente').innerHTML = p.fuente === 'chatbot'
+          ? '<span class="badge badge-chatbot">Chatbot</span>'
+          : (p.referido_nombre ? '<span class="badge badge-referido">' + p.referido_nombre + '</span>' : '<span class="badge badge-manual">Manual</span>');
+        document.getElementById('detailInteres').textContent = p.desarrollo_interes || '—';
+        document.getElementById('detailEstado').innerHTML = '<span class="badge badge-' + (p.estado||'nuevo') + '">' + (p.estado||'nuevo').replace(/_/g,' ') + '</span>';
+        document.getElementById('detailFecha').textContent = p.created_at ? p.created_at.slice(0,10) : '—';
+        document.getElementById('detailReferido').textContent = p.referido_nombre || 'Directo';
+        document.getElementById('detailNotas').textContent = p.notas || '—';
+        document.getElementById('detailMsg').textContent = p.mensaje_original || '—';
+
+        // Historial
+        let hist = p.historial || [];
+        if (typeof hist === 'string') { try { hist = JSON.parse(hist); } catch(e) { hist = []; } }
+        const hDiv = document.getElementById('detailHistorial');
+        if (hist.length === 0) {
+          hDiv.innerHTML = '<p style="color:rgba(255,255,255,.3);font-size:13px">Sin historial</p>';
+        } else {
+          hDiv.innerHTML = hist.map(h =>
+            '<div class="historial-item">' +
+              '<div class="hi-tipo">' + (h.tipo||'mensaje') + '</div>' +
+              '<div class="hi-msg">' + (h.mensaje||'—') + '</div>' +
+              '<div class="hi-fecha">' + (h.fecha ? h.fecha.slice(0,16) : '') + '</div>' +
+            '</div>'
+          ).join('');
+        }
+
+        // WA button
+        const waDiv = document.getElementById('detailWaBtn');
+        if (p.telefono_cliente) {
+          const tel = p.telefono_cliente.replace(/[\s\-\+]/g, '');
+          waDiv.innerHTML = '<a href="https://wa.me/' + tel + '" target="_blank" class="btn-wa" style="padding:10px 24px;font-size:14px">Contactar por WhatsApp</a>';
+        } else {
+          waDiv.innerHTML = '';
+        }
+
+        document.getElementById('detailOverlay').classList.add('open');
+      } catch(e) { console.error(e); alert('Error al cargar detalle'); }
+    }
+    function cerrarDetalle() { document.getElementById('detailOverlay').classList.remove('open'); }
+
+    /* ─── Bulk selection ─── */
     var selectAll = document.getElementById('selectAll');
     var bulkBar = document.getElementById('bulkBar');
     var bulkCount = document.getElementById('bulkCount');
@@ -382,95 +589,38 @@
     var bulkForm = document.getElementById('bulkForm');
     var bulkHidden = document.getElementById('bulkHiddenInputs');
 
-    function getCheckboxes() {
-      return document.querySelectorAll('.row-cb');
-    }
-
+    function getCheckboxes() { return document.querySelectorAll('.row-cb'); }
     function getSelected() {
-      var checked = [];
-      getCheckboxes().forEach(function(cb) {
-        if (cb.checked) checked.push(cb.value);
-      });
-      return checked;
+      var r = []; getCheckboxes().forEach(function(c) { if(c.checked) r.push(c.value); }); return r;
     }
-
     function updateBulkBar() {
-      var selected = getSelected();
-      var count = selected.length;
-      bulkCount.textContent = count;
-      if (count > 0) {
-        bulkBar.classList.add('active');
-      } else {
-        bulkBar.classList.remove('active');
-      }
-      // Update "select all" checkbox state
+      var s = getSelected(), n = s.length;
+      if(bulkCount) bulkCount.textContent = n;
+      if(bulkBar) { if(n>0) bulkBar.classList.add('active'); else bulkBar.classList.remove('active'); }
       var all = getCheckboxes();
-      if (all.length > 0 && count === all.length) {
-        selectAll.checked = true;
-        selectAll.indeterminate = false;
-      } else if (count > 0) {
-        selectAll.checked = false;
-        selectAll.indeterminate = true;
-      } else {
-        selectAll.checked = false;
-        selectAll.indeterminate = false;
+      if(selectAll) {
+        if(all.length>0 && n===all.length) { selectAll.checked=true; selectAll.indeterminate=false; }
+        else if(n>0) { selectAll.checked=false; selectAll.indeterminate=true; }
+        else { selectAll.checked=false; selectAll.indeterminate=false; }
       }
-      // Row highlight
       document.querySelectorAll('tbody tr[data-id]').forEach(function(tr) {
-        var cb = tr.querySelector('.row-cb');
-        if (cb && cb.checked) {
-          tr.classList.add('selected-row');
-        } else {
-          tr.classList.remove('selected-row');
-        }
+        var cb=tr.querySelector('.row-cb');
+        if(cb&&cb.checked) tr.classList.add('selected-row'); else tr.classList.remove('selected-row');
       });
     }
-
-    // Select all checkbox
-    if (selectAll) {
-      selectAll.addEventListener('change', function() {
-        var checked = this.checked;
-        getCheckboxes().forEach(function(cb) {
-          cb.checked = checked;
-        });
-        updateBulkBar();
-      });
-    }
-
-    // Individual checkboxes
-    getCheckboxes().forEach(function(cb) {
-      cb.addEventListener('change', updateBulkBar);
+    if(selectAll) selectAll.addEventListener('change', function() {
+      var c=this.checked; getCheckboxes().forEach(function(cb){cb.checked=c;}); updateBulkBar();
     });
-
-    function clearSelection() {
-      getCheckboxes().forEach(function(cb) { cb.checked = false; });
-      bulkAction.value = '';
-      updateBulkBar();
-    }
-
+    getCheckboxes().forEach(function(cb) { cb.addEventListener('change', updateBulkBar); });
+    function clearSelection() { getCheckboxes().forEach(function(cb){cb.checked=false;}); if(bulkAction)bulkAction.value=''; updateBulkBar(); }
     function executeBulk() {
-      var action = bulkAction.value;
-      var selected = getSelected();
-      if (!action) { alert('Selecciona una accion'); return; }
-      if (selected.length === 0) { alert('Selecciona al menos un prospecto'); return; }
-
-      if (action === 'eliminar') {
-        if (!confirm('¿Estás seguro de eliminar ' + selected.length + ' prospecto(s)? Esta acción no se puede deshacer.')) return;
-      } else {
-        var actionLabel = bulkAction.options[bulkAction.selectedIndex].text;
-        if (!confirm('¿' + actionLabel + ' para ' + selected.length + ' prospecto(s)?')) return;
-      }
-
-      // Add hidden inputs for selected IDs
-      bulkHidden.innerHTML = '';
-      selected.forEach(function(id) {
-        var input = document.createElement('input');
-        input.type = 'hidden';
-        input.name = 'selected_ids';
-        input.value = id;
-        bulkHidden.appendChild(input);
-      });
-
+      var action=bulkAction.value, selected=getSelected();
+      if(!action){alert('Selecciona una acción');return;}
+      if(selected.length===0){alert('Selecciona al menos un prospecto');return;}
+      if(action==='eliminar'){if(!confirm('¿Eliminar '+selected.length+' prospecto(s)?'))return;}
+      else{if(!confirm('¿Aplicar acción a '+selected.length+' prospecto(s)?'))return;}
+      bulkHidden.innerHTML='';
+      selected.forEach(function(id){var i=document.createElement('input');i.type='hidden';i.name='selected_ids';i.value=id;bulkHidden.appendChild(i);});
       bulkForm.submit();
     }
   </script>

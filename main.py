@@ -43,6 +43,7 @@ from database import (
     guardar_seguimiento, get_ultimo_seguimiento_por_propiedad,
     crear_notificacion, get_notificaciones, marcar_notificacion_leida,
     contar_notificaciones_no_leidas, get_propiedades_con_docs_pendientes,
+    get_site_config, set_site_config, get_all_site_config,
 )
 
 # ─── Sesiones con cookie firmada ───
@@ -1793,11 +1794,13 @@ async def index(request: Request):
     user = await require_auth(request)
     if not user:
         # Visitante no autenticado → web pública
-        props = await get_all_properties(active_only=True, limit=12, offset=0)
+        props = await get_all_properties(active_only=True, limit=12, offset=0, publicada_web=True)
         desarrollos_list = list(DESARROLLOS_DATA.values())
+        c = await load_public_config()
         return templates.TemplateResponse(request=request, name="public_home.html", context={
             "propiedades": props,
             "desarrollos": desarrollos_list,
+            "c": c,
         })
     return templates.TemplateResponse(request=request, name="wizard.html", context={"user": user})
 
@@ -2041,6 +2044,21 @@ async def dashboard_toggle(request: Request, prop_id: int):
     if user["rol"] != "admin" and prop.get("user_id") != user["id"]:
         return RedirectResponse("/dashboard", status_code=302)
     await toggle_property(prop_id, not prop["activa"])
+    return RedirectResponse("/dashboard", status_code=302)
+
+
+@app.post("/dashboard/toggle-web/{prop_id}")
+async def dashboard_toggle_web(request: Request, prop_id: int):
+    """Toggle publicada_web para mostrar/ocultar en la web pública."""
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    prop = await get_property_by_id(prop_id)
+    if not prop:
+        return RedirectResponse("/dashboard", status_code=302)
+    if user["rol"] != "admin" and prop.get("user_id") != user["id"]:
+        return RedirectResponse("/dashboard", status_code=302)
+    await update_property(prop_id, {"publicada_web": not prop.get("publicada_web", False)})
     return RedirectResponse("/dashboard", status_code=302)
 
 
@@ -3340,32 +3358,90 @@ async def dashboard_referido(request: Request):
 # ─── Admin: Gestion de Prospectos ───
 
 @app.get("/admin/prospectos", response_class=HTMLResponse)
-async def admin_prospectos_page(request: Request, referido: Optional[str] = None, estado: Optional[str] = None):
+async def admin_prospectos_page(
+    request: Request,
+    referido: Optional[str] = None,
+    estado: Optional[str] = None,
+    fuente: Optional[str] = None,
+    buscar: Optional[str] = None,
+):
     user = await require_auth(request)
     if not user or user["rol"] != "admin":
         return RedirectResponse("/login", status_code=302)
     referido_id = int(referido) if referido and referido.isdigit() else None
     prospectos = await get_all_prospectos(referido_id=referido_id)
+
+    # Filtrar por estado
     if estado:
-        prospectos = [p for p in prospectos if p["estado"] == estado]
+        prospectos = [p for p in prospectos if p.get("estado") == estado]
+    # Filtrar por fuente
+    if fuente:
+        if fuente == "referido":
+            prospectos = [p for p in prospectos if p.get("referido_id")]
+        elif fuente == "manual":
+            prospectos = [p for p in prospectos if not p.get("referido_id") and p.get("fuente") != "chatbot"]
+        else:
+            prospectos = [p for p in prospectos if p.get("fuente") == fuente]
+    # Filtrar por búsqueda
+    if buscar:
+        q = buscar.lower()
+        prospectos = [p for p in prospectos
+                      if q in (p.get("nombre_cliente") or "").lower()
+                      or q in (p.get("telefono_cliente") or "").lower()
+                      or q in (p.get("desarrollo_interes") or "").lower()]
+
     counts = await count_prospectos()
     referidos = await get_all_referidos()
+    citas = await get_citas_chatbot(limit=100)
 
-    for p in prospectos:
-        for k, v in p.items():
-            if hasattr(v, 'isoformat'):
-                p[k] = v.isoformat()
-            elif not isinstance(v, (int, float, str, bool, list, dict, type(None))):
-                p[k] = str(v)
+    # Serializar para template
+    for items in [prospectos, citas]:
+        for p in items:
+            for k, v in p.items():
+                if hasattr(v, 'isoformat'):
+                    p[k] = v.isoformat()
+                elif not isinstance(v, (int, float, str, bool, list, dict, type(None))):
+                    p[k] = str(v)
 
     return templates.TemplateResponse(request=request, name="admin_prospectos.html", context={
         "user": user,
         "prospectos": prospectos,
+        "citas": citas,
         "counts": counts,
         "referidos": referidos,
         "selected_referido": referido_id,
         "selected_estado": estado or "",
+        "selected_fuente": fuente or "",
+        "buscar": buscar or "",
     })
+
+
+@app.get("/api/prospectos/{prospecto_id}")
+async def api_get_prospecto(request: Request, prospecto_id: int):
+    """API para obtener detalle de un prospecto (usado por el modal JS)."""
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"error": "No autenticado"}, status_code=401)
+    p = await get_prospecto_by_id(prospecto_id)
+    if not p:
+        return JSONResponse({"error": "No encontrado"}, status_code=404)
+    # Serializar
+    for k, v in p.items():
+        if hasattr(v, 'isoformat'):
+            p[k] = v.isoformat()
+        elif not isinstance(v, (int, float, str, bool, list, dict, type(None))):
+            p[k] = str(v)
+    return JSONResponse({"prospecto": p})
+
+
+@app.post("/admin/citas/{cita_id}/estado")
+async def admin_update_cita_estado(request: Request, cita_id: int, estado: str = Form(...)):
+    """Actualizar estado de una cita del chatbot."""
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    await update_cita_chatbot(cita_id, {"estado": estado})
+    return RedirectResponse("/admin/prospectos", status_code=302)
 
 
 @app.post("/admin/prospectos/{prospecto_id}/estado")
@@ -3405,6 +3481,7 @@ async def admin_create_prospecto(
         "agente_id": user["id"],
         "notas": notas,
         "estado": "nuevo",
+        "fuente": "manual",
     }
     await create_prospecto(data)
     return RedirectResponse("/admin/prospectos", status_code=302)
@@ -3991,14 +4068,192 @@ DESARROLLOS_DATA = {
 }
 
 
+@app.get("/admin/desarrollos", response_class=HTMLResponse)
+async def admin_desarrollos_page(request: Request, msg: Optional[str] = None, msg_type: str = "ok"):
+    """Panel de gestión de desarrollos."""
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    # Verificar qué imágenes existen realmente
+    devs_con_img = {}
+    for slug, d in DESARROLLOS_DATA.items():
+        d_copy = dict(d)
+        img_path = BASE_DIR / "static" / "uploads" / f"{slug}-hero.jpg"
+        img_path_png = BASE_DIR / "static" / "uploads" / f"{slug}-hero.png"
+        if img_path.exists():
+            d_copy["imagen_actual"] = f"/static/uploads/{slug}-hero.jpg"
+        elif img_path_png.exists():
+            d_copy["imagen_actual"] = f"/static/uploads/{slug}-hero.png"
+        else:
+            d_copy["imagen_actual"] = None
+        devs_con_img[slug] = d_copy
+    return templates.TemplateResponse(request=request, name="admin_desarrollos.html", context={
+        "user": user,
+        "desarrollos": devs_con_img,
+        "msg": msg,
+        "msg_type": msg_type,
+    })
+
+
+@app.post("/admin/desarrollos/{slug}/imagen")
+async def admin_upload_desarrollo_imagen(request: Request, slug: str, imagen: UploadFile = File(...)):
+    """Sube imagen hero de un desarrollo."""
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    if slug not in DESARROLLOS_DATA:
+        return RedirectResponse("/admin/desarrollos?msg=Desarrollo no encontrado&msg_type=err", status_code=302)
+
+    # Validar tipo
+    content_type = imagen.content_type or ""
+    if not content_type.startswith("image/"):
+        return RedirectResponse("/admin/desarrollos?msg=Solo se permiten imágenes&msg_type=err", status_code=302)
+
+    # Determinar extensión
+    ext = "jpg"
+    if "png" in content_type:
+        ext = "png"
+    elif "webp" in content_type:
+        ext = "webp"
+
+    filename = f"{slug}-hero.{ext}"
+    filepath = UPLOAD_DIR / filename
+
+    # Guardar archivo
+    content = await imagen.read()
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    # Actualizar DESARROLLOS_DATA en memoria
+    DESARROLLOS_DATA[slug]["imagen"] = f"/static/uploads/{filename}"
+
+    return RedirectResponse(f"/admin/desarrollos?msg=Imagen de {DESARROLLOS_DATA[slug]['nombre']} actualizada&msg_type=ok", status_code=302)
+
+
+@app.post("/admin/desarrollos/{slug}/datos")
+async def admin_update_desarrollo_datos(
+    request: Request, slug: str,
+    nombre: str = Form(""), ubicacion: str = Form(""),
+    precio_desde: str = Form(""), tipo: str = Form(""),
+    unidades: str = Form(""), descripcion_corta: str = Form(""),
+    descripcion: str = Form(""), diferenciales: str = Form(""),
+    tags: str = Form(""), pdf_url: str = Form(""),
+):
+    """Actualiza datos de un desarrollo."""
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    if slug not in DESARROLLOS_DATA:
+        return RedirectResponse("/admin/desarrollos?msg=Desarrollo no encontrado&msg_type=err", status_code=302)
+
+    d = DESARROLLOS_DATA[slug]
+    if nombre:
+        d["nombre"] = nombre
+    if ubicacion:
+        d["ubicacion"] = ubicacion
+    if precio_desde:
+        d["precio_desde"] = precio_desde
+    if tipo:
+        d["tipo"] = tipo
+    d["unidades"] = unidades
+    if descripcion_corta:
+        d["descripcion_corta"] = descripcion_corta
+    if descripcion:
+        d["descripcion"] = descripcion
+    if diferenciales:
+        d["diferenciales"] = [x.strip() for x in diferenciales.split(",") if x.strip()]
+    if tags:
+        d["tags"] = [x.strip() for x in tags.split(",") if x.strip()]
+    if pdf_url:
+        d["pdf_url"] = pdf_url
+
+    return RedirectResponse(f"/admin/desarrollos?msg=Datos de {d['nombre']} actualizados&msg_type=ok", status_code=302)
+
+
+# ─── Configuración del Sitio ───
+
+@app.get("/admin/config", response_class=HTMLResponse)
+async def admin_config_page(request: Request, msg: Optional[str] = None):
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    config = await get_all_site_config()
+    return templates.TemplateResponse(request=request, name="admin_config.html", context={
+        "user": user, "c": config, "msg": msg,
+    })
+
+
+@app.post("/admin/config")
+async def admin_config_save(request: Request):
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    form = await request.form()
+    # Lista de todos los campos del formulario de configuración
+    campos = [
+        "hero_titulo", "hero_subtitulo",
+        "telefono", "whatsapp", "email", "wa_mensaje",
+        "agente_nombre", "agente_cargo", "agente_bio",
+        "empresa_desc1", "empresa_desc2",
+        "stat1_num", "stat1_label", "stat2_num", "stat2_label",
+        "stat3_num", "stat3_label", "stat4_num", "stat4_label",
+        "ciudades",
+        "seo_titulo", "seo_descripcion",
+        "cta_titulo", "cta_subtitulo", "cta_boton",
+        "footer_texto", "footer_zonas",
+    ]
+    for campo in campos:
+        valor = form.get(campo, "").strip()
+        if valor:
+            await set_site_config(campo, valor)
+    return RedirectResponse("/admin/config?msg=Configuración guardada correctamente", status_code=302)
+
+
+async def load_public_config() -> dict:
+    """Carga toda la config del sitio para las páginas públicas."""
+    config = await get_all_site_config()
+    # Valores por defecto
+    defaults = {
+        "hero_titulo": "Tu hogar ideal en Guanajuato",
+        "hero_subtitulo": "Compra, venta y renta de propiedades con asesoría legal completa y acompañamiento de inicio a fin.",
+        "telefono": "4737365219",
+        "whatsapp": "524737365219",
+        "email": "irealestatemx@gmail.com",
+        "wa_mensaje": "Hola, me interesa información sobre sus propiedades",
+        "agente_nombre": "Esteban Castellanos",
+        "agente_cargo": "CEO / Fundador",
+        "agente_bio": "Abogado especialista en bienes raíces. Más de 650 operaciones cerradas exitosamente.",
+        "empresa_desc1": "Somos una empresa de asesores inmobiliarios certificados en Guanajuato, especializados en compra, venta y renta de propiedades con acompañamiento legal completo.",
+        "empresa_desc2": "Con más de 15 años de experiencia en bienes raíces y derecho inmobiliario, ofrecemos certeza jurídica, contratos claros y estrategias de inversión personalizadas.",
+        "stat1_num": "650+", "stat1_label": "Operaciones exitosas",
+        "stat2_num": "15+", "stat2_label": "Años de experiencia",
+        "stat3_num": "100%", "stat3_label": "Respaldo legal",
+        "stat4_num": "3", "stat4_label": "Ciudades activas",
+        "ciudades": "Guanajuato, León, Irapuato",
+        "seo_titulo": "iRealEstateMx — Inmobiliaria en Guanajuato",
+        "seo_descripcion": "Compra, venta y renta de propiedades en Guanajuato. Casas, departamentos y terrenos con asesoría legal completa.",
+        "cta_titulo": "¿Listo para invertir?",
+        "cta_subtitulo": "Agenda una visita o solicita información sin compromiso",
+        "cta_boton": "Contactar por WhatsApp",
+        "footer_texto": "Asesores inmobiliarios certificados en Guanajuato. Compra, venta y renta con respaldo legal completo.",
+        "footer_zonas": "Guanajuato, León e Irapuato",
+    }
+    for k, v in defaults.items():
+        if k not in config or not config[k]:
+            config[k] = v
+    return config
+
+
 @app.get("/web")
 async def public_home(request: Request):
     """Página principal pública."""
-    props = await get_all_properties(active_only=True, limit=12, offset=0)
+    props = await get_all_properties(active_only=True, limit=12, offset=0, publicada_web=True)
     desarrollos = list(DESARROLLOS_DATA.values())
+    c = await load_public_config()
     return templates.TemplateResponse(request=request, name="public_home.html", context={
         "propiedades": props,
         "desarrollos": desarrollos,
+        "c": c,
     })
 
 
@@ -4017,13 +4272,14 @@ async def public_propiedades(
     if any([operacion, tipo, ciudad, precio_max_f]):
         props = await search_properties(
             ciudad=ciudad, operacion=operacion, tipo=tipo,
-            precio_max=precio_max_f, limit=limit
+            precio_max=precio_max_f, limit=limit, publicada_web=True
         )
         total = len(props)
     else:
-        props = await get_all_properties(active_only=True, limit=limit, offset=offset)
-        total = await count_properties(active_only=True)
+        props = await get_all_properties(active_only=True, limit=limit, offset=offset, publicada_web=True)
+        total = await count_properties(active_only=True, publicada_web=True)
 
+    c = await load_public_config()
     return templates.TemplateResponse(request=request, name="public_propiedades.html", context={
         "propiedades": props,
         "total": total,
@@ -4032,6 +4288,7 @@ async def public_propiedades(
         "filtro_tipo": tipo or "",
         "filtro_ciudad": ciudad or "",
         "filtro_precio_max": precio_max or "",
+        "c": c,
     })
 
 
@@ -4064,18 +4321,22 @@ async def public_propiedad_detalle(request: Request, prop_id: int):
         except Exception:
             amenidades = []
 
+    c = await load_public_config()
     return templates.TemplateResponse(request=request, name="public_propiedad.html", context={
         "prop": prop,
         "fotos_extra": fotos_extra,
         "amenidades": amenidades,
+        "c": c,
     })
 
 
 @app.get("/desarrollos")
 async def public_desarrollos(request: Request):
     """Listado de desarrollos."""
+    c = await load_public_config()
     return templates.TemplateResponse(request=request, name="public_desarrollos.html", context={
         "desarrollos": list(DESARROLLOS_DATA.values()),
+        "c": c,
     })
 
 
@@ -4090,7 +4351,7 @@ async def public_desarrollo_detalle(request: Request, slug: str):
 
     # Buscar propiedades relacionadas al desarrollo por nombre
     nombre_dev = desarrollo["nombre"]
-    all_props = await get_all_properties(active_only=True, limit=50)
+    all_props = await get_all_properties(active_only=True, limit=50, publicada_web=True)
     props_dev = [
         p for p in all_props
         if nombre_dev.lower() in (p.get("direccion", "") or "").lower()
@@ -4098,9 +4359,11 @@ async def public_desarrollo_detalle(request: Request, slug: str):
         or nombre_dev.lower() in (p.get("descripcion_profesional", "") or "").lower()
     ]
 
+    c = await load_public_config()
     return templates.TemplateResponse(request=request, name="public_desarrollo.html", context={
         "desarrollo": desarrollo,
         "propiedades": props_dev,
+        "c": c,
     })
 
 

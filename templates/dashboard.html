@@ -86,6 +86,8 @@
     .btn-video { background: #1a3c5e; color: #fff; }
     .btn-toggle-off { background: rgba(192,57,43,.2); color: #e74c3c; }
     .btn-toggle-on { background: rgba(39,174,96,.2); color: #2ecc71; }
+    .btn-web-on { background: rgba(0,174,239,.2); color: #00AEEF; }
+    .btn-web-off { background: rgba(255,255,255,.08); color: rgba(255,255,255,.4); }
     .badge-inactive {
       display: inline-block; font-size: 10px; font-weight: 600;
       padding: 2px 8px; border-radius: 10px;
@@ -113,6 +115,8 @@
       <a href="/dashboard-asesor">Seguimiento</a>
       {% if user.rol == 'admin' %}
       <a href="/admin/prospectos">Prospectos</a>
+      <a href="/admin/desarrollos">Desarrollos</a>
+      <a href="/admin/config">Configuración</a>
       <a href="/admin/usuarios">Usuarios</a>
       {% endif %}
       <span class="topbar-user">{{ user.nombre }}</span>
@@ -149,6 +153,10 @@
       <div class="stat-card">
         <div class="num">{{ propiedades | selectattr('publicada_instagram') | list | length }}</div>
         <div class="lbl">Publicadas IG</div>
+      </div>
+      <div class="stat-card">
+        <div class="num">{{ propiedades | selectattr('publicada_web') | list | length }}</div>
+        <div class="lbl">Publicadas Web</div>
       </div>
     </div>
 
@@ -236,6 +244,12 @@
             </form>
 
             {% if can_edit %}
+            <!-- Toggle publicar en web -->
+            <form method="post" action="/dashboard/toggle-web/{{ p.id }}" style="display:inline">
+              <button type="submit" class="btn-sm {{ 'btn-web-on' if p.publicada_web else 'btn-web-off' }}" title="{{ 'Quitar de la web' if p.publicada_web else 'Publicar en web' }}">
+                {{ 'En Web' if p.publicada_web else 'Publicar Web' }}
+              </button>
+            </form>
             <!-- Toggle activa/inactiva -->
             <form method="post" action="/dashboard/toggle/{{ p.id }}" style="display:inline">
               <button type="submit" class="btn-sm {{ 'btn-toggle-off' if p.activa else 'btn-toggle-on' }}">

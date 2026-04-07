@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>iRealEstateMxPro — Desarrollos</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',sans-serif;background:#0d0d0d;color:#e0e0e0;min-height:100vh}
+    .topbar{background:#111;border-bottom:1px solid rgba(201,162,39,.15);padding:16px 32px;display:flex;align-items:center;justify-content:space-between}
+    .topbar-logo{height:36px}
+    .topbar-nav{display:flex;gap:16px;align-items:center}
+    .topbar-nav a{color:rgba(255,255,255,.6);text-decoration:none;font-size:14px;font-weight:500;transition:color .2s}
+    .topbar-nav a:hover{color:#c9a227}
+    .topbar-nav a.active{color:#c9a227;border-bottom:2px solid #c9a227;padding-bottom:2px}
+    .topbar-user{color:rgba(255,255,255,.4);font-size:13px}
+    .hamburger{display:none;background:none;border:none;cursor:pointer;padding:4px}
+    .hamburger span{display:block;width:22px;height:2px;background:#c9a227;margin:5px 0;border-radius:2px}
+    @media(max-width:768px){
+      .hamburger{display:block}
+      .topbar{flex-wrap:wrap;padding:12px 16px}
+      .topbar-nav{display:none;width:100%;flex-direction:column;gap:0;padding-top:12px;border-top:1px solid rgba(255,255,255,.1);margin-top:12px}
+      .topbar-nav.open{display:flex}
+      .topbar-nav a,.topbar-nav span{padding:10px 0;font-size:15px}
+    }
+    .container{max-width:1000px;margin:24px auto;padding:0 20px}
+    h1{font-size:24px;color:#c9a227;font-family:'Playfair Display',serif;margin-bottom:24px}
+    .dev-card{
+      background:#1a1a1a;border:1px solid rgba(201,162,39,.15);border-radius:12px;
+      padding:24px;margin-bottom:24px;display:grid;grid-template-columns:280px 1fr;gap:24px;
+      align-items:start;
+    }
+    @media(max-width:700px){.dev-card{grid-template-columns:1fr}}
+    .dev-img-area{position:relative;border-radius:10px;overflow:hidden;background:#111;aspect-ratio:16/10}
+    .dev-img-area img{width:100%;height:100%;object-fit:cover}
+    .dev-img-placeholder{
+      width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;
+      color:rgba(255,255,255,.3);font-size:14px;gap:8px;
+    }
+    .dev-info h2{font-size:20px;color:#fff;margin-bottom:4px}
+    .dev-info .dev-ubicacion{font-size:13px;color:rgba(255,255,255,.45);margin-bottom:12px}
+    .dev-info .dev-precio{font-size:16px;color:#c9a227;font-weight:700;margin-bottom:16px}
+    .upload-area{margin-top:12px}
+    .upload-area label{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:8px 18px;background:#c9a227;color:#0d0d0d;border-radius:8px;
+      font-size:13px;font-weight:700;cursor:pointer;transition:background .2s;
+      font-family:'Inter',sans-serif;
+    }
+    .upload-area label:hover{background:#d4af37}
+    .upload-area input[type=file]{display:none}
+    .upload-status{font-size:12px;color:rgba(255,255,255,.4);margin-top:6px}
+    .field-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+    .field-row .fg{flex:1;min-width:200px}
+    .field-row label{display:block;font-size:11px;font-weight:600;color:rgba(255,255,255,.4);margin-bottom:4px;text-transform:uppercase}
+    .field-row input,.field-row textarea,.field-row select{
+      width:100%;padding:8px 12px;border:1px solid rgba(201,162,39,.2);border-radius:8px;
+      font-size:13px;font-family:'Inter',sans-serif;background:#111;color:#e0e0e0;
+    }
+    .field-row textarea{min-height:80px;resize:vertical}
+    .field-row input:focus,.field-row textarea:focus{border-color:#c9a227;outline:none}
+    .btn-save{
+      padding:10px 24px;background:linear-gradient(135deg,#c9a227,#d4af37);
+      color:#1a3c5e;border:none;border-radius:8px;font-size:14px;font-weight:700;
+      cursor:pointer;font-family:'Inter',sans-serif;
+    }
+    .btn-save:hover{box-shadow:0 2px 10px rgba(201,162,39,.4)}
+    .tags-container{display:flex;gap:6px;flex-wrap:wrap;margin-top:4px}
+    .tag{
+      background:rgba(201,162,39,.15);color:#c9a227;font-size:11px;font-weight:600;
+      padding:4px 10px;border-radius:20px;
+    }
+    .msg{padding:12px 20px;border-radius:8px;margin-bottom:20px;font-size:14px}
+    .msg-ok{background:rgba(39,174,96,.15);color:#2ecc71;border:1px solid rgba(39,174,96,.2)}
+    .msg-err{background:rgba(192,57,43,.15);color:#e74c3c;border:1px solid rgba(192,57,43,.2)}
+    .preview-link{
+      display:inline-flex;align-items:center;gap:4px;font-size:13px;color:#00AEEF;
+      margin-top:8px;text-decoration:none;
+    }
+    .preview-link:hover{color:#c9a227}
+  </style>
+</head>
+<body>
+
+<div class="topbar">
+  <img src="/static/logo-header.png" alt="iRealEstateMx" class="topbar-logo"/>
+  <button class="hamburger" onclick="this.classList.toggle('open');document.querySelector('.topbar-nav').classList.toggle('open')">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="topbar-nav">
+    <a href="/">Nueva Propiedad</a>
+    <a href="/dashboard">Propiedades</a>
+    <a href="/admin/prospectos">Prospectos</a>
+    <a href="/admin/desarrollos" class="active">Desarrollos</a>
+    {% if user.rol == 'admin' %}<a href="/admin/config">Configuración</a>{% endif %}
+    {% if user.rol == 'admin' %}<a href="/admin/usuarios">Usuarios</a>{% endif %}
+    <span class="topbar-user">{{ user.nombre }}</span>
+    <a href="/logout">Salir</a>
+  </div>
+</div>
+
+<div class="container">
+  <h1>Gestión de Desarrollos</h1>
+
+  {% if msg %}
+  <div class="msg {{ 'msg-ok' if msg_type == 'ok' else 'msg-err' }}">{{ msg }}</div>
+  {% endif %}
+
+  {% for slug, d in desarrollos.items() %}
+  <div class="dev-card">
+    <!-- Imagen -->
+    <div>
+      <div class="dev-img-area">
+        {% if d.imagen_actual %}
+        <img src="{{ d.imagen_actual }}" alt="{{ d.nombre }}"/>
+        {% else %}
+        <div class="dev-img-placeholder">
+          <span style="font-size:32px">🏗️</span>
+          <span>Sin imagen</span>
+        </div>
+        {% endif %}
+      </div>
+      <form method="post" action="/admin/desarrollos/{{ slug }}/imagen" enctype="multipart/form-data">
+        <div class="upload-area">
+          <label>📷 Subir imagen hero
+            <input type="file" name="imagen" accept="image/*" onchange="this.form.submit()"/>
+          </label>
+          <div class="upload-status">JPG o PNG, recomendado 800x400px</div>
+        </div>
+      </form>
+      <a href="/desarrollo/{{ slug }}" class="preview-link" target="_blank">Ver en web pública →</a>
+    </div>
+
+    <!-- Info editable -->
+    <div class="dev-info">
+      <form method="post" action="/admin/desarrollos/{{ slug }}/datos">
+        <h2>{{ d.nombre }}</h2>
+        <div class="dev-ubicacion">{{ d.ubicacion }}</div>
+        <div class="dev-precio">Desde {{ d.precio_desde }}</div>
+
+        <div class="field-row">
+          <div class="fg">
+            <label>Nombre</label>
+            <input type="text" name="nombre" value="{{ d.nombre }}"/>
+          </div>
+          <div class="fg">
+            <label>Ubicación</label>
+            <input type="text" name="ubicacion" value="{{ d.ubicacion }}"/>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="fg">
+            <label>Precio desde</label>
+            <input type="text" name="precio_desde" value="{{ d.precio_desde }}"/>
+          </div>
+          <div class="fg">
+            <label>Tipo</label>
+            <input type="text" name="tipo" value="{{ d.tipo }}"/>
+          </div>
+          <div class="fg">
+            <label>Unidades</label>
+            <input type="text" name="unidades" value="{{ d.unidades or '' }}"/>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="fg">
+            <label>Descripción corta</label>
+            <input type="text" name="descripcion_corta" value="{{ d.descripcion_corta }}"/>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="fg">
+            <label>Descripción completa</label>
+            <textarea name="descripcion">{{ d.descripcion }}</textarea>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="fg">
+            <label>Diferenciales (separados por coma)</label>
+            <input type="text" name="diferenciales" value="{{ d.diferenciales|join(', ') }}"/>
+          </div>
+        </div>
+        <div class="field-row">
+          <div class="fg">
+            <label>Tags (separados por coma)</label>
+            <input type="text" name="tags" value="{{ d.tags|join(', ') }}"/>
+          </div>
+          <div class="fg">
+            <label>URL del PDF</label>
+            <input type="text" name="pdf_url" value="{{ d.pdf_url or '' }}"/>
+          </div>
+        </div>
+
+        <div style="margin-top:8px">
+          <div class="tags-container">
+            {% for tag in d.tags %}<span class="tag">{{ tag }}</span>{% endfor %}
+          </div>
+        </div>
+
+        <div style="margin-top:16px">
+          <button type="submit" class="btn-save">Guardar cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+</body>
+</html>
