@@ -155,6 +155,7 @@ CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_propiedades_operacion ON propiedades(operacion);",
     "CREATE INDEX IF NOT EXISTS idx_propiedades_activa ON propiedades(activa);",
     "CREATE INDEX IF NOT EXISTS idx_propiedades_created ON propiedades(created_at DESC);",
+    "CREATE INDEX IF NOT EXISTS idx_propiedades_desarrollo ON propiedades(desarrollo_slug);",
     "CREATE INDEX IF NOT EXISTS idx_desarrollos_ciudad ON desarrollos(ciudad);",
     "CREATE INDEX IF NOT EXISTS idx_desarrollos_activo ON desarrollos(activo);",
     "CREATE INDEX IF NOT EXISTS idx_desarrollos_nombre ON desarrollos(nombre);",
@@ -194,6 +195,8 @@ MIGRATIONS = [
     "ALTER TABLE prospectos ADD COLUMN IF NOT EXISTS email_cliente VARCHAR(300);",
     "ALTER TABLE prospectos ADD COLUMN IF NOT EXISTS cita_data JSONB DEFAULT '{}';",
     "ALTER TABLE prospectos ADD COLUMN IF NOT EXISTS historial JSONB DEFAULT '[]';",
+    # Vincular propiedades a desarrollos
+    "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS desarrollo_slug VARCHAR(100);",
 ]
 
 CREATE_CITAS_CHATBOT = """
@@ -270,7 +273,7 @@ async def save_property(data: dict) -> int:
         descripcion_profesional, instagram_copy,
         agente_nombre, agente_telefono, agente_email,
         foto_portada_url, fotos_extra_urls, user_id,
-        nombre_propiedad, latitud, longitud
+        nombre_propiedad, latitud, longitud, desarrollo_slug
     ) VALUES (
         :session_id, :tipo_propiedad, :operacion, :direccion, :ciudad, :estado,
         :precio, :precio_formateado, :recamaras, :banos, :metros_construidos,
@@ -278,7 +281,7 @@ async def save_property(data: dict) -> int:
         :descripcion_profesional, :instagram_copy,
         :agente_nombre, :agente_telefono, :agente_email,
         :foto_portada_url, :fotos_extra_urls, :user_id,
-        :nombre_propiedad, :latitud, :longitud
+        :nombre_propiedad, :latitud, :longitud, :desarrollo_slug
     ) RETURNING id
     """
     values = {
@@ -308,6 +311,7 @@ async def save_property(data: dict) -> int:
         "nombre_propiedad": data.get("nombre_propiedad"),
         "latitud": float(data["latitud"]) if data.get("latitud") else None,
         "longitud": float(data["longitud"]) if data.get("longitud") else None,
+        "desarrollo_slug": data.get("desarrollo_slug") or None,
     }
     row_id = await database.execute(query=query, values=values)
     return row_id
@@ -460,6 +464,18 @@ async def get_all_properties(active_only: bool = True, limit: int = 50, offset: 
     return [_normalize_prop(dict(r._mapping)) for r in rows]
 
 
+async def get_properties_by_desarrollo(slug: str, limit: int = 50):
+    """Lista propiedades vinculadas a un desarrollo por slug."""
+    query = """
+    SELECT * FROM propiedades
+    WHERE desarrollo_slug = :slug AND activa = TRUE AND publicada_web = TRUE
+      AND (vendida IS NULL OR vendida = FALSE)
+    ORDER BY created_at DESC LIMIT :limit
+    """
+    rows = await database.fetch_all(query=query, values={"slug": slug, "limit": limit})
+    return [_normalize_prop(dict(r._mapping)) for r in rows]
+
+
 async def get_property_by_id(prop_id: int):
     """Obtiene una propiedad por ID."""
     query = "SELECT * FROM propiedades WHERE id = :id"
@@ -521,6 +537,7 @@ async def update_property(prop_id: int, updates: dict):
         "publicada_instagram", "publicada_web", "activa",
         "vendedor_id", "comprador_id", "cierre_data", "tipo_compra",
         "nombre_propiedad", "latitud", "longitud", "vendida", "fecha_venta",
+        "desarrollo_slug",
     }
     fields = {k: v for k, v in updates.items() if k in allowed}
     if not fields:

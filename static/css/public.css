@@ -87,6 +87,12 @@ img{max-width:100%;height:auto}
 .section-subtitle{color:var(--text-dim);font-size:15px;margin-bottom:32px}
 .section-alt{background:#0a0a0a}
 
+/* ─── Breadcrumbs ─── */
+.breadcrumbs{padding:12px 32px;font-size:13px;color:var(--text-dim);max-width:1200px;margin:0 auto}
+.breadcrumbs a{color:var(--text-dim);text-decoration:none;transition:color .2s}
+.breadcrumbs a:hover{color:var(--gold)}
+.breadcrumbs .sep{margin:0 8px;opacity:.4}
+
 /* ─── Property Grid ─── */
 .prop-grid{
   display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
@@ -114,6 +120,7 @@ img{max-width:100%;height:auto}
 }
 .prop-badge.renta{background:#00AEEF}
 .prop-badge.vendida{background:#c0392b;color:#fff}
+.prop-badge.desarrollo{background:rgba(201,162,39,.85);color:#0d0d0d;font-size:10px;top:auto;bottom:12px}
 .prop-card-body{padding:20px}
 .prop-card-body h3{font-size:17px;color:var(--text-bright);margin-bottom:4px;font-weight:600}
 .prop-card-body .prop-nombre{font-size:14px;color:var(--gold-light);margin-bottom:6px;font-weight:500}
@@ -199,7 +206,7 @@ img{max-width:100%;height:auto}
 .footer{
   background:#080808;border-top:1px solid var(--border);padding:48px 32px 24px;
 }
-.footer-inner{max-width:var(--max-w);margin:0 auto;display:grid;grid-template-columns:2fr 1fr 1fr;gap:40px}
+.footer-inner{max-width:var(--max-w);margin:0 auto;display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:40px}
 .footer h4{color:var(--text-bright);font-size:15px;margin-bottom:16px}
 .footer p,.footer a{font-size:13px;color:var(--text-dim)}
 .footer a:hover{color:var(--gold)}

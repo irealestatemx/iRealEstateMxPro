@@ -5,10 +5,72 @@
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
   <title>{{ c.seo_titulo }}</title>
   <meta name="description" content="{{ c.seo_descripcion }}"/>
+  <link rel="canonical" href="https://irealestatemx.com/"/>
+  <!-- Open Graph -->
+  <meta property="og:type" content="website"/>
+  <meta property="og:locale" content="es_MX"/>
+  <meta property="og:site_name" content="iRealEstateMx"/>
+  <meta property="og:title" content="{{ c.seo_titulo }}"/>
+  <meta property="og:description" content="{{ c.seo_descripcion }}"/>
+  <meta property="og:url" content="https://irealestatemx.com/"/>
+  <meta property="og:image" content="https://irealestatemx.com/static/img/hero-bg.jpg"/>
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="{{ c.seo_titulo }}"/>
+  <meta name="twitter:description" content="{{ c.seo_descripcion }}"/>
+  <meta name="twitter:image" content="https://irealestatemx.com/static/img/hero-bg.jpg"/>
+  <!-- SEO extras -->
+  <meta name="robots" content="index, follow"/>
+  <meta name="geo.region" content="MX-GUA"/>
+  <meta name="geo.placename" content="León, Guanajuato"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/static/css/public.css"/>
   <link rel="icon" href="/static/img/logo-header.png"/>
+  <!-- JSON-LD: RealEstateAgent -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "RealEstateAgent",
+    "name": "iRealEstateMx",
+    "url": "https://irealestatemx.com",
+    "logo": "https://irealestatemx.com/static/img/logo-full.png",
+    "description": "{{ c.seo_descripcion }}",
+    "address": {
+      "@type": "PostalAddress",
+      "addressLocality": "León",
+      "addressRegion": "Guanajuato",
+      "addressCountry": "MX"
+    },
+    "areaServed": [
+      {"@type": "City", "name": "León"},
+      {"@type": "City", "name": "Guanajuato"},
+      {"@type": "City", "name": "Irapuato"},
+      {"@type": "City", "name": "Celaya"},
+      {"@type": "City", "name": "San Miguel de Allende"}
+    ],
+    "knowsAbout": ["Bienes Raíces", "Casas en Venta", "Departamentos", "Terrenos", "Desarrollos Inmobiliarios"]
+  }
+  </script>
+  <!-- JSON-LD: ItemList (propiedades destacadas) -->
+  {% if propiedades %}
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    "name": "Propiedades Destacadas en Guanajuato",
+    "itemListElement": [
+      {% for p in propiedades[:6] %}
+      {
+        "@type": "ListItem",
+        "position": {{ loop.index }},
+        "url": "https://irealestatemx.com/propiedad/{{ p.id }}"
+      }{{ "," if not loop.last else "" }}
+      {% endfor %}
+    ]
+  }
+  </script>
+  {% endif %}
 </head>
 <body>
 
@@ -72,6 +134,9 @@
           <span class="prop-badge {{ 'renta' if p.operacion and 'renta' in p.operacion.lower() else '' }}">
             {{ p.operacion or 'En Venta' }}
           </span>
+          {% if p.desarrollo_slug and desarrollos_dict.get(p.desarrollo_slug) %}
+          <span class="prop-badge desarrollo" style="left:auto;right:12px;">{{ desarrollos_dict[p.desarrollo_slug].nombre }}</span>
+          {% endif %}
         </div>
         <div class="prop-card-body">
           {% if p.nombre_propiedad %}<div class="prop-nombre">{{ p.nombre_propiedad }}</div>{% endif %}
@@ -237,25 +302,36 @@
     <div>
       <h4>Propiedades</h4>
       <ul class="footer-links">
-        <li><a href="/propiedades?operacion=venta">En Venta</a></li>
-        <li><a href="/propiedades?operacion=renta">En Renta</a></li>
-        <li><a href="/propiedades?tipo=casa">Casas</a></li>
-        <li><a href="/propiedades?tipo=departamento">Departamentos</a></li>
-        <li><a href="/propiedades?tipo=terreno">Terrenos</a></li>
+        <li><a href="/propiedades?operacion=venta">Casas en Venta</a></li>
+        <li><a href="/propiedades?operacion=renta">Propiedades en Renta</a></li>
+        <li><a href="/propiedades?operacion=preventa">Preventa</a></li>
+        <li><a href="/propiedades?tipo=Casa">Casas</a></li>
+        <li><a href="/propiedades?tipo=Departamento">Departamentos</a></li>
+        <li><a href="/propiedades?tipo=Terreno">Terrenos</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Ciudades</h4>
+      <ul class="footer-links">
+        <li><a href="/propiedades?ciudad=Le%C3%B3n">Bienes Raíces en León</a></li>
+        <li><a href="/propiedades?ciudad=Guanajuato">Bienes Raíces en Guanajuato</a></li>
+        <li><a href="/propiedades?ciudad=Irapuato">Bienes Raíces en Irapuato</a></li>
+        <li><a href="/propiedades?ciudad=Celaya">Bienes Raíces en Celaya</a></li>
+        <li><a href="/propiedades?ciudad=San+Miguel+de+Allende">San Miguel de Allende</a></li>
       </ul>
     </div>
     <div>
       <h4>Desarrollos</h4>
       <ul class="footer-links">
-        <li><a href="/desarrollo/carcamos-residencial">Cárcamos Residencial</a></li>
-        <li><a href="/desarrollo/privada-del-fresno">Privada del Fresno</a></li>
+        {% for slug, dev in desarrollos_dict.items() %}
+        <li><a href="/desarrollo/{{ slug }}">{{ dev.nombre }}</a></li>
+        {% endfor %}
       </ul>
       <h4 style="margin-top:20px">Empresa</h4>
       <ul class="footer-links">
-        <li><a href="#nosotros">Sobre nosotros</a></li>
         <li><a href="/vendidas">Propiedades Vendidas</a></li>
         <li><a href="/aviso-de-privacidad">Aviso de Privacidad</a></li>
-        <li><a href="/terminos-y-condiciones">Terminos y Condiciones</a></li>
+        <li><a href="/terminos-y-condiciones">Términos y Condiciones</a></li>
       </ul>
     </div>
   </div>

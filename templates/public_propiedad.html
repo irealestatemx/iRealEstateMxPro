@@ -3,15 +3,71 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>{{ prop.nombre_propiedad or (prop.tipo_propiedad or 'Propiedad') + ' en ' + (prop.ciudad or 'Guanajuato') }} — iRealEstateMx</title>
-  <meta name="description" content="{{ (prop.descripcion_profesional or prop.descripcion_agente or '')[:160] }}"/>
-  <meta property="og:title" content="{{ prop.nombre_propiedad or (prop.tipo_propiedad or 'Propiedad') }} — iRealEstateMx"/>
-  <meta property="og:description" content="{{ prop.precio_formateado or '' }} — {{ prop.direccion or '' }}"/>
-  {% if prop.foto_portada_url %}<meta property="og:image" content="{{ prop.foto_portada_url }}"/>{% endif %}
+  {% set seo_title = prop.nombre_propiedad or ((prop.tipo_propiedad or 'Propiedad') + ' en ' + (prop.ciudad or 'Guanajuato')) %}
+  {% set seo_desc = (prop.descripcion_profesional or prop.descripcion_agente or 'Propiedad en ' + (prop.ciudad or 'Guanajuato'))[:160] %}
+  <title>{{ seo_title }} — iRealEstateMx</title>
+  <meta name="description" content="{{ seo_desc }}"/>
+  <link rel="canonical" href="https://irealestatemx.com/propiedad/{{ prop.id }}"/>
+  <!-- Open Graph -->
+  <meta property="og:type" content="website"/>
+  <meta property="og:locale" content="es_MX"/>
+  <meta property="og:site_name" content="iRealEstateMx"/>
+  <meta property="og:title" content="{{ seo_title }} — iRealEstateMx"/>
+  <meta property="og:description" content="{{ prop.precio_formateado or 'Consultar' }} — {{ prop.direccion or prop.ciudad or '' }}"/>
+  <meta property="og:url" content="https://irealestatemx.com/propiedad/{{ prop.id }}"/>
+  {% if prop.foto_portada_url %}<meta property="og:image" content="https://irealestatemx.com{{ prop.foto_portada_url }}"/>{% endif %}
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="{{ seo_title }}"/>
+  <meta name="twitter:description" content="{{ prop.precio_formateado or 'Consultar' }} — {{ prop.direccion or '' }}"/>
+  {% if prop.foto_portada_url %}<meta name="twitter:image" content="https://irealestatemx.com{{ prop.foto_portada_url }}"/>{% endif %}
+  <meta name="robots" content="index, follow"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/static/css/public.css"/>
   <link rel="icon" href="/static/img/logo-header.png"/>
+  <!-- JSON-LD: RealEstateListing -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "RealEstateListing",
+    "name": "{{ seo_title }}",
+    "description": "{{ seo_desc|replace('"', '\\"') }}",
+    "url": "https://irealestatemx.com/propiedad/{{ prop.id }}",
+    {% if prop.foto_portada_url %}"image": "https://irealestatemx.com{{ prop.foto_portada_url }}",{% endif %}
+    "datePosted": "{{ prop.created_at.isoformat() if prop.created_at else '' }}",
+    "offers": {
+      "@type": "Offer",
+      "priceCurrency": "MXN",
+      {% if prop.precio %}"price": "{{ prop.precio }}",{% endif %}
+      "availability": "https://schema.org/InStock"
+    },
+    "address": {
+      "@type": "PostalAddress",
+      "streetAddress": "{{ prop.direccion or '' }}",
+      "addressLocality": "{{ prop.ciudad or 'León' }}",
+      "addressRegion": "{{ prop.estado or 'Guanajuato' }}",
+      "addressCountry": "MX"
+    }{% if prop.latitud and prop.longitud %},
+    "geo": {
+      "@type": "GeoCoordinates",
+      "latitude": {{ prop.latitud }},
+      "longitude": {{ prop.longitud }}
+    }{% endif %}
+  }
+  </script>
+  <!-- JSON-LD: BreadcrumbList -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://irealestatemx.com/"},
+      {"@type": "ListItem", "position": 2, "name": "Propiedades", "item": "https://irealestatemx.com/propiedades"},
+      {"@type": "ListItem", "position": 3, "name": "{{ seo_title }}"}
+    ]
+  }
+  </script>
   <style>
     .gallery-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:200;align-items:center;justify-content:center;flex-direction:column}
     .gallery-modal.open{display:flex}
@@ -43,6 +99,13 @@
     <a href="/propiedades?operacion=renta">Renta</a>
     <a href="/desarrollos">Desarrollos</a>
   </div>
+</nav>
+
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <a href="/">Inicio</a><span class="sep">/</span>
+  <a href="/propiedades">Propiedades</a><span class="sep">/</span>
+  {% if desarrollo %}<a href="/desarrollo/{{ desarrollo.slug }}">{{ desarrollo.nombre }}</a><span class="sep">/</span>{% endif %}
+  <span>{{ prop.nombre_propiedad or prop.tipo_propiedad or 'Propiedad' }}</span>
 </nav>
 
 <!-- Gallery -->
@@ -83,6 +146,12 @@
           <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
           {{ prop.direccion or '' }}{{ (', ' + prop.ciudad) if prop.ciudad and prop.direccion else (prop.ciudad or '') }}{{ (', ' + prop.estado) if prop.estado else '' }}
         </div>
+        {% if desarrollo %}
+        <a href="/desarrollo/{{ desarrollo.slug }}" style="display:inline-flex;align-items:center;gap:6px;margin-top:8px;padding:5px 14px;background:rgba(201,162,39,.15);border:1px solid rgba(201,162,39,.3);border-radius:20px;color:#c9a227;font-size:13px;font-weight:600;text-decoration:none;transition:background .2s">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/></svg>
+          {{ desarrollo.nombre }}
+        </a>
+        {% endif %}
         <div class="detail-precio">{{ prop.precio_formateado or 'Consultar precio' }}</div>
 
         <!-- Share -->

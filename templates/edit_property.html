@@ -116,7 +116,17 @@
             <select name="operacion">
               <option value="Venta" {{ 'selected' if prop.operacion == 'Venta' }}>Venta</option>
               <option value="Renta" {{ 'selected' if prop.operacion == 'Renta' }}>Renta</option>
+              <option value="Preventa" {{ 'selected' if prop.operacion == 'Preventa' }}>Preventa</option>
               <option value="Traspaso" {{ 'selected' if prop.operacion == 'Traspaso' }}>Traspaso</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Desarrollo</label>
+            <select name="desarrollo_slug">
+              <option value="">— Sin desarrollo —</option>
+              {% for slug, dev in desarrollos_dict.items() %}
+              <option value="{{ slug }}" {{ 'selected' if prop.desarrollo_slug == slug }}>{{ dev.nombre }}</option>
+              {% endfor %}
             </select>
           </div>
           <div class="form-group full">

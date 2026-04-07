@@ -3,12 +3,34 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>Propiedades {{ ('en ' + filtro_operacion.title()) if filtro_operacion else '' }} — iRealEstateMx</title>
-  <meta name="description" content="Encuentra propiedades en venta y renta en Guanajuato, León e Irapuato. Casas, departamentos, terrenos y locales comerciales."/>
+  {% set page_title = 'Propiedades ' + (('en ' + filtro_operacion.title()) if filtro_operacion else 'en Venta y Renta') + ' en Guanajuato — iRealEstateMx' %}
+  {% set page_desc = 'Encuentra casas, departamentos, terrenos y locales en ' + (filtro_ciudad if filtro_ciudad else 'León, Guanajuato, Irapuato y San Miguel de Allende') + '. Propiedades ' + (filtro_operacion if filtro_operacion else 'en venta y renta') + ' con asesoría profesional.' %}
+  <title>{{ page_title }}</title>
+  <meta name="description" content="{{ page_desc }}"/>
+  <link rel="canonical" href="https://irealestatemx.com/propiedades"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:locale" content="es_MX"/>
+  <meta property="og:site_name" content="iRealEstateMx"/>
+  <meta property="og:title" content="{{ page_title }}"/>
+  <meta property="og:description" content="{{ page_desc }}"/>
+  <meta property="og:url" content="https://irealestatemx.com/propiedades"/>
+  <meta property="og:image" content="https://irealestatemx.com/static/img/hero-bg.jpg"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="robots" content="index, follow"/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/static/css/public.css"/>
   <link rel="icon" href="/static/img/logo-header.png"/>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://irealestatemx.com/"},
+      {"@type": "ListItem", "position": 2, "name": "Propiedades"}
+    ]
+  }
+  </script>
 </head>
 <body>
 
@@ -26,6 +48,11 @@
     <a href="/desarrollos">Desarrollos</a>
     <a href="#contacto">Contacto</a>
   </div>
+</nav>
+
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <a href="/">Inicio</a><span class="sep">/</span>
+  <span>Propiedades{% if filtro_operacion %} en {{ filtro_operacion|title }}{% endif %}</span>
 </nav>
 
 <!-- ─── Header + Filtros ─── -->
@@ -84,6 +111,9 @@
           <span class="prop-badge {{ 'renta' if p.operacion and 'renta' in p.operacion.lower() else '' }}">
             {{ p.operacion or 'En Venta' }}
           </span>
+          {% if p.desarrollo_slug and desarrollos_dict.get(p.desarrollo_slug) %}
+          <span class="prop-badge desarrollo" style="left:auto;right:12px;">{{ desarrollos_dict[p.desarrollo_slug].nombre }}</span>
+          {% endif %}
         </div>
         <div class="prop-card-body">
           {% if p.nombre_propiedad %}<div class="prop-nombre">{{ p.nombre_propiedad }}</div>{% endif %}

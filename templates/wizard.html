@@ -595,6 +595,18 @@
               </select>
             </div>
           </div>
+          <div class="wz-grid wz-grid-2" id="desarrollo-row" style="margin-top:16px;display:none;">
+            <div class="wz-field">
+              <label>Desarrollo</label>
+              <select name="desarrollo_slug" id="desarrollo-select" class="wz-select">
+                <option value="">— Sin desarrollo —</option>
+                {% for slug, dev in desarrollos_dict.items() %}
+                <option value="{{ slug }}">{{ dev.nombre }}</option>
+                {% endfor %}
+              </select>
+              <small style="color:var(--gray-500);font-size:12px">Si pertenece a un desarrollo, selecciónalo aquí</small>
+            </div>
+          </div>
           <div class="wz-grid" style="margin-top:16px;">
             <div class="wz-field">
               <label>Dirección / Colonia / Zona <span class="required">*</span></label>
@@ -1120,6 +1132,21 @@
     function prevStep() {
       if (currentStep > 1) goToStep(currentStep - 1);
     }
+
+    // ═══════ DESARROLLO TOGGLE ═══════
+    (function(){
+      var opSel = document.querySelector('select[name="operacion"]');
+      var devRow = document.getElementById('desarrollo-row');
+      if (opSel && devRow) {
+        function toggleDev() {
+          var v = opSel.value;
+          devRow.style.display = (v === 'Venta' || v === 'Preventa') ? '' : 'none';
+          if (v === 'Renta') document.getElementById('desarrollo-select').value = '';
+        }
+        opSel.addEventListener('change', toggleDev);
+        toggleDev();
+      }
+    })();
 
     // ═══════ PRICE FORMATTER ═══════
     var precioInput = document.getElementById('precioInput');

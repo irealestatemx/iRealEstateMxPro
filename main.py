@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import List, Optional, Dict
 
 from fastapi import FastAPI, Request, Form, File, UploadFile, Depends
-from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse, JSONResponse, RedirectResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from openai import OpenAI
@@ -38,7 +38,7 @@ from database import (
     get_prospecto_by_telefono, agregar_historial_prospecto,
     create_cita_chatbot, get_citas_chatbot, update_cita_chatbot,
     save_documento, get_documentos_by_propiedad, update_documento_estado,
-    get_properties_by_vendedor, get_properties_by_comprador,
+    get_properties_by_vendedor, get_properties_by_comprador, get_properties_by_desarrollo,
     get_propiedades_seguimiento, set_tipo_compra,
     guardar_seguimiento, get_ultimo_seguimiento_por_propiedad,
     crear_notificacion, get_notificaciones, marcar_notificacion_leida,
@@ -1802,7 +1802,10 @@ async def index(request: Request):
             "desarrollos": desarrollos_list,
             "c": c,
         })
-    return templates.TemplateResponse(request=request, name="wizard.html", context={"user": user})
+    return templates.TemplateResponse(request=request, name="wizard.html", context={
+        "user": user,
+        "desarrollos_dict": DESARROLLOS_DATA,
+    })
 
 
 # ─── Panel de Usuarios (solo admin) ───
@@ -1950,6 +1953,7 @@ async def edit_property_page(request: Request, prop_id: int):
         "prop": prop,
         "vendedores": vendedores,
         "compradores": compradores,
+        "desarrollos_dict": DESARROLLOS_DATA,
     })
 
 
@@ -1971,6 +1975,7 @@ async def edit_property_submit(
     agente_nombre: str = Form(""),
     agente_telefono: str = Form(""),
     agente_email: str = Form(""),
+    desarrollo_slug: Optional[str] = Form(None),
 ):
     user = await require_auth(request)
     if not user:
@@ -1997,6 +2002,7 @@ async def edit_property_submit(
         "agente_nombre": agente_nombre,
         "agente_telefono": agente_telefono,
         "agente_email": agente_email,
+        "desarrollo_slug": desarrollo_slug or None,
     }
     await update_property(prop_id, updates)
     return RedirectResponse("/dashboard", status_code=302)
@@ -4313,6 +4319,7 @@ async def public_home(request: Request):
     return templates.TemplateResponse(request=request, name="public_home.html", context={
         "propiedades": props,
         "desarrollos": desarrollos,
+        "desarrollos_dict": DESARROLLOS_DATA,
         "c": c,
     })
 
@@ -4348,6 +4355,7 @@ async def public_propiedades(
         "filtro_tipo": tipo or "",
         "filtro_ciudad": ciudad or "",
         "filtro_precio_max": precio_max or "",
+        "desarrollos_dict": DESARROLLOS_DATA,
         "c": c,
     })
 
@@ -4388,12 +4396,17 @@ async def public_propiedad_detalle(request: Request, prop_id: int):
     except Exception:
         pass
 
+    # Resolver nombre del desarrollo si tiene uno vinculado
+    desarrollo_info = DESARROLLOS_DATA.get(prop.get("desarrollo_slug") or "") if prop.get("desarrollo_slug") else None
+
     c = await load_public_config()
     return templates.TemplateResponse(request=request, name="public_propiedad.html", context={
         "prop": prop,
         "fotos_extra": fotos_extra,
         "amenidades": amenidades,
         "similares": similares,
+        "desarrollo": desarrollo_info,
+        "desarrollos_dict": DESARROLLOS_DATA,
         "c": c,
     })
 
@@ -4417,15 +4430,8 @@ async def public_desarrollo_detalle(request: Request, slug: str):
             "desarrollos": list(DESARROLLOS_DATA.values()),
         })
 
-    # Buscar propiedades relacionadas al desarrollo por nombre
-    nombre_dev = desarrollo["nombre"]
-    all_props = await get_all_properties(active_only=True, limit=50, publicada_web=True)
-    props_dev = [
-        p for p in all_props
-        if nombre_dev.lower() in (p.get("direccion", "") or "").lower()
-        or nombre_dev.lower() in (p.get("descripcion_agente", "") or "").lower()
-        or nombre_dev.lower() in (p.get("descripcion_profesional", "") or "").lower()
-    ]
+    # Buscar propiedades vinculadas al desarrollo por slug
+    props_dev = await get_properties_by_desarrollo(slug)
 
     c = await load_public_config()
     return templates.TemplateResponse(request=request, name="public_desarrollo.html", context={
@@ -4476,6 +4482,77 @@ async def aviso_privacidad(request: Request):
 async def terminos_condiciones(request: Request):
     c = await load_public_config()
     return templates.TemplateResponse(request=request, name="public_terminos.html", context={"c": c})
+
+
+# ─── SEO: Sitemap y Robots ───
+
+@app.get("/robots.txt", response_class=PlainTextResponse)
+async def robots_txt():
+    return """User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /dashboard
+Disallow: /login
+Disallow: /generate
+Disallow: /api/
+
+Sitemap: https://irealestatemx.com/sitemap.xml
+"""
+
+
+@app.get("/sitemap.xml")
+async def sitemap_xml():
+    from datetime import datetime as dt
+    props = await get_all_properties(active_only=True, limit=500, publicada_web=True)
+    now = dt.utcnow().strftime("%Y-%m-%d")
+
+    urls = []
+    # Páginas estáticas
+    static_pages = [
+        ("/", "1.0", "weekly"),
+        ("/propiedades", "0.9", "daily"),
+        ("/desarrollos", "0.8", "weekly"),
+        ("/propiedades?operacion=venta", "0.8", "daily"),
+        ("/propiedades?operacion=renta", "0.8", "daily"),
+        ("/propiedades?operacion=preventa", "0.8", "weekly"),
+        ("/vendidas", "0.5", "weekly"),
+        ("/aviso-de-privacidad", "0.3", "yearly"),
+        ("/terminos-y-condiciones", "0.3", "yearly"),
+    ]
+    for path, priority, freq in static_pages:
+        urls.append(f"""  <url>
+    <loc>https://irealestatemx.com{path}</loc>
+    <lastmod>{now}</lastmod>
+    <changefreq>{freq}</changefreq>
+    <priority>{priority}</priority>
+  </url>""")
+
+    # Desarrollos
+    for slug, dev in DESARROLLOS_DATA.items():
+        urls.append(f"""  <url>
+    <loc>https://irealestatemx.com/desarrollo/{slug}</loc>
+    <lastmod>{now}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>""")
+
+    # Propiedades individuales
+    for p in props:
+        lastmod = p.get("updated_at") or p.get("created_at")
+        lastmod_str = lastmod.strftime("%Y-%m-%d") if lastmod else now
+        urls.append(f"""  <url>
+    <loc>https://irealestatemx.com/propiedad/{p['id']}</loc>
+    <lastmod>{lastmod_str}</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>""")
+
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+{chr(10).join(urls)}
+</urlset>"""
+    from starlette.responses import Response
+    return Response(content=xml, media_type="application/xml")
 
 
 # ─── API REST de Propiedades (para web, chatbot, n8n) ───
@@ -4717,6 +4794,7 @@ async def generate(
     agente_instagram: Optional[str] = Form(None),
     agente_inmobiliaria: Optional[str] = Form(None),
     fotos: List[UploadFile] = File(default=[]),
+    desarrollo_slug: Optional[str] = Form(None),
     # ─── Nuevos campos del wizard ───
     amenidades_custom: Optional[str] = Form(None),
     video_tipo: Optional[str] = Form("reel"),
@@ -4881,6 +4959,7 @@ async def generate(
 
     context = {
         "nombre_propiedad": nombre_propiedad or "",
+        "desarrollo_slug": desarrollo_slug or None,
         "tipo_propiedad": tipo_propiedad,
         "operacion": operacion,
         "direccion": direccion,
