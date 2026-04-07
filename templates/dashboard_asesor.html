@@ -237,6 +237,12 @@
       display: inline-flex; align-items: center; gap: 6px;
     }
     .btn-wa-modal:hover { background: #20bd5a; }
+    .btn-wa-cierre {
+      padding: 8px 14px; border: 1px solid #333; border-radius: 8px; font-size: 12px;
+      font-weight: 500; cursor: pointer; font-family: 'Inter', sans-serif;
+      background: #1a1a1a; color: #ccc; transition: all .2s;
+    }
+    .btn-wa-cierre:hover { background: #25d366; color: #fff; border-color: #25d366; }
 
     .empty-state {
       text-align: center; padding: 60px 20px; color: rgba(255,255,255,.3);
@@ -699,14 +705,42 @@
         </div>
       </div>
 
-      <!-- Mensaje WhatsApp -->
+      <!-- Enviar mensajes WhatsApp -->
       <div style="margin-top:16px;padding-top:12px;border-top:1px solid rgba(255,255,255,.08);">
-        <div class="modal-text" id="cierreMensaje" style="margin-bottom:12px;"></div>
-        <div class="modal-actions">
-          <button class="btn-copy" onclick="copiarCierreMensaje();">Copiar mensaje</button>
-          <a href="#" class="btn-wa-modal" id="cierreWa" target="_blank">&#x1F4AC; Abrir WhatsApp</a>
+        <div style="font-weight:600;color:#c9a227;margin-bottom:10px;">Enviar mensajes por WhatsApp</div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+          <button class="btn-wa-cierre" onclick="abrirMensajeWA('cierre_fecha','vendedor')">&#x1F4C5; Fecha notaria &#x2192; Vendedor</button>
+          <button class="btn-wa-cierre" onclick="abrirMensajeWA('cierre_fecha','comprador')">&#x1F4C5; Fecha notaria &#x2192; Comprador</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;">
+          <button class="btn-wa-cierre" onclick="abrirMensajeWA('cierre_gastos','vendedor')">&#x1F4B0; Gastos &#x2192; Vendedor</button>
+          <button class="btn-wa-cierre" onclick="abrirMensajeWA('cierre_gastos','comprador')">&#x1F4B0; Gastos &#x2192; Comprador</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn-wa-cierre" onclick="abrirMensajeWA('docs_completos','vendedor')">&#x1F4CB; Docs completos &#x2192; Vendedor</button>
+          <button class="btn-wa-cierre" onclick="abrirMensajeWA('docs_completos','comprador')">&#x1F4CB; Docs completos &#x2192; Comprador</button>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal: Enviar mensaje WhatsApp -->
+  <div class="modal-overlay" id="waMessageOverlay" onclick="if(event.target===this)cerrarMensajeWA();">
+    <div class="modal-cierre" style="max-width:520px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+        <h3 style="margin:0;color:#c9a227;" id="waMessageTitle">Enviar WhatsApp</h3>
+        <button onclick="cerrarMensajeWA()" style="background:none;border:none;color:#888;font-size:20px;cursor:pointer;">&#x2715;</button>
+      </div>
+      <div style="margin-bottom:8px;color:#aaa;font-size:13px;">
+        Para: <span id="waDestNombre" style="color:#fff;font-weight:600;"></span>
+        <span id="waDestTel" style="color:#888;margin-left:8px;"></span>
+      </div>
+      <textarea id="waMessageText" style="width:100%;min-height:200px;background:#111;border:1px solid #333;border-radius:8px;color:#fff;padding:12px;font-size:13px;line-height:1.5;resize:vertical;font-family:inherit;"></textarea>
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn-copy" onclick="copiarMensajeWA();" style="flex:1;">&#x1F4CB; Copiar mensaje</button>
+        <a href="#" class="btn-wa-modal" id="waOpenLink" target="_blank" style="flex:1;text-align:center;" onclick="setTimeout(cerrarMensajeWA,500);">&#x1F4AC; Abrir WhatsApp</a>
+      </div>
+      <div id="waCopied" style="display:none;text-align:center;color:#48bb78;margin-top:8px;font-size:13px;">&#x2705; Mensaje copiado</div>
     </div>
   </div>
 
@@ -988,39 +1022,8 @@
     }
   }
 
-  function guardarDatosCierre() {
-    var datos = {
-      promesa_fecha: document.getElementById('cf_promesa_fecha').value,
-      promesa_monto: document.getElementById('cf_promesa_monto').value,
-      promesa_notas: document.getElementById('cf_promesa_notas').value,
-      forma_pago: document.getElementById('cf_forma_pago').value,
-      banco: document.getElementById('cf_banco').value,
-      enganche_monto: document.getElementById('cf_enganche_monto').value,
-      monto_total: document.getElementById('cf_monto_total').value,
-      notaria_nombre: document.getElementById('cf_notaria_nombre').value,
-      notaria_contacto: document.getElementById('cf_notaria_contacto').value,
-      notaria_direccion: document.getElementById('cf_notaria_direccion').value,
-      fecha_escrituracion: document.getElementById('cf_fecha_escrituracion').value,
-      notas_cierre: document.getElementById('cf_notas_cierre').value,
-    };
-
-    fetch('/api/generar-cierre/' + cierrePropId + '/datos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(datos),
-    })
-    .then(function(r) { return r.json(); })
-    .then(function(data) {
-      if (data.ok) {
-        var saved = document.getElementById('cfSaved');
-        saved.style.display = 'block';
-        setTimeout(function() { saved.style.display = 'none'; }, 3000);
-        // Recargar checklist para reflejar items auto-marcados
-        abrirCierre(cierrePropId);
-      }
-    })
-    .catch(function() {});
-  }
+  // guardarDatosCierre y guardarGastosCierre se definen al final del script
+  // con lógica de sugerencia de envío WhatsApp
 
   // ── Gastos de cierre ──
   function toggleGastosForm() {
@@ -1063,6 +1066,103 @@
     document.getElementById('totalGastosGeneral').textContent = (totalV + totalC).toLocaleString('es-MX');
   }
 
+  function cerrarCierre() {
+    document.getElementById('cierreOverlay').classList.remove('open');
+  }
+
+  function copiarCierreMensaje() {
+    if (!cierreMensajeActual) return;
+    navigator.clipboard.writeText(cierreMensajeActual).then(function() {
+      cerrarCierre();
+      showToast();
+    });
+  }
+
+  // ── Modal: Enviar mensaje WhatsApp ──
+  function abrirMensajeWA(tipo, destinatario) {
+    var url = '/api/mensaje-wa/' + tipo + '/' + cierrePropId + '?destinatario=' + destinatario;
+    fetch(url, { credentials: 'same-origin' })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data.ok) { alert(data.error || 'Error'); return; }
+      document.getElementById('waMessageTitle').textContent =
+        tipo === 'cierre_fecha' ? 'Fecha de escrituracion' :
+        tipo === 'cierre_gastos' ? 'Gastos de cierre' : 'Mensaje';
+      document.getElementById('waDestNombre').textContent = data.nombre || 'Sin asignar';
+      document.getElementById('waDestTel').textContent = data.telefono ? '+' + data.telefono : 'Sin telefono';
+      document.getElementById('waMessageText').value = data.mensaje || '';
+      document.getElementById('waOpenLink').href = data.telefono
+        ? 'https://wa.me/' + data.telefono + '?text=' + encodeURIComponent(data.mensaje)
+        : '#';
+      document.getElementById('waCopied').style.display = 'none';
+      document.getElementById('waMessageOverlay').classList.add('open');
+    })
+    .catch(function() { alert('Error de conexion'); });
+  }
+
+  // Actualizar link wa.me cuando el agente edita el mensaje
+  document.getElementById('waMessageText').addEventListener('input', function() {
+    var tel = document.getElementById('waDestTel').textContent.replace(/[^0-9]/g, '');
+    if (tel) {
+      document.getElementById('waOpenLink').href = 'https://wa.me/' + tel + '?text=' + encodeURIComponent(this.value);
+    }
+  });
+
+  function copiarMensajeWA() {
+    var txt = document.getElementById('waMessageText').value;
+    navigator.clipboard.writeText(txt).then(function() {
+      var el = document.getElementById('waCopied');
+      el.style.display = 'block';
+      setTimeout(function() { el.style.display = 'none'; }, 2500);
+    });
+  }
+
+  function cerrarMensajeWA() {
+    document.getElementById('waMessageOverlay').classList.remove('open');
+  }
+
+  // ── Guardar datos y gastos con sugerencia de envío WhatsApp ──
+  function guardarDatosCierre() {
+    var datos = {
+      promesa_fecha: document.getElementById('cf_promesa_fecha').value,
+      promesa_monto: document.getElementById('cf_promesa_monto').value,
+      promesa_notas: document.getElementById('cf_promesa_notas').value,
+      forma_pago: document.getElementById('cf_forma_pago').value,
+      banco: document.getElementById('cf_banco').value,
+      enganche_monto: document.getElementById('cf_enganche_monto').value,
+      monto_total: document.getElementById('cf_monto_total').value,
+      notaria_nombre: document.getElementById('cf_notaria_nombre').value,
+      notaria_contacto: document.getElementById('cf_notaria_contacto').value,
+      notaria_direccion: document.getElementById('cf_notaria_direccion').value,
+      fecha_escrituracion: document.getElementById('cf_fecha_escrituracion').value,
+      notas_cierre: document.getElementById('cf_notas_cierre').value,
+    };
+
+    fetch('/api/generar-cierre/' + cierrePropId + '/datos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(datos),
+    })
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (data.ok) {
+        var saved = document.getElementById('cfSaved');
+        saved.style.display = 'block';
+        setTimeout(function() { saved.style.display = 'none'; }, 3000);
+        abrirCierre(cierrePropId);
+        // Si se guardó fecha de escrituración, sugerir enviar WA
+        if (datos.fecha_escrituracion && data.mensajes_wa) {
+          setTimeout(function() {
+            if (confirm('Fecha de escrituracion guardada. ¿Deseas enviar el mensaje al vendedor por WhatsApp?')) {
+              abrirMensajeWA('cierre_fecha', 'vendedor');
+            }
+          }, 500);
+        }
+      }
+    })
+    .catch(function() {});
+  }
+
   function guardarGastosCierre() {
     var vendedor = {}, comprador = {};
     document.querySelectorAll('#gastosVendedorFields .gasto-input').forEach(function(inp) {
@@ -1083,28 +1183,23 @@
         var saved = document.getElementById('gastosSaved');
         saved.style.display = 'block';
         setTimeout(function() { saved.style.display = 'none'; }, 3000);
-        // Recargar cierre para actualizar checklist (gastos_calculados)
         abrirCierre(cierrePropId);
+        // Sugerir enviar gastos por WA
+        if (data.mensajes_wa && (data.mensajes_wa.vendedor || data.mensajes_wa.comprador)) {
+          setTimeout(function() {
+            if (confirm('Gastos guardados. ¿Deseas enviar el desglose al vendedor por WhatsApp?')) {
+              abrirMensajeWA('cierre_gastos', 'vendedor');
+            }
+          }, 500);
+        }
       }
     })
     .catch(function() {});
   }
 
-  function cerrarCierre() {
-    document.getElementById('cierreOverlay').classList.remove('open');
-  }
-
-  function copiarCierreMensaje() {
-    if (!cierreMensajeActual) return;
-    navigator.clipboard.writeText(cierreMensajeActual).then(function() {
-      cerrarCierre();
-      showToast();
-    });
-  }
-
   // Cerrar con Escape
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape') { cerrarModal(); cerrarCierre(); }
+    if (e.key === 'Escape') { cerrarModal(); cerrarCierre(); cerrarMensajeWA(); }
   });
   </script>
 </body>

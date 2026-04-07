@@ -1334,131 +1334,152 @@ def _construir_desglose_gastos(gastos_dict: dict, labels_list: list, modo: str =
     return "\n".join(lineas) if lineas else "Sin gastos registrados aún."
 
 
-async def _notificar_cierre_fecha(prop: dict, datos: dict):
-    """Envía notificación de fecha de escrituración a vendedor y comprador."""
-    import asyncio
+def _generar_mensajes_cierre_fecha(prop: dict, datos: dict, cierre_data: dict) -> dict:
+    """Genera mensajes predeterminados de fecha de escrituración para que el agente envíe por WhatsApp."""
     direccion = prop.get("direccion", "Sin dirección")
-    metadata = {
-        "direccion": direccion,
-        "fecha_escrituracion": datos.get("fecha_escrituracion", "Por definir"),
-        "notaria_nombre": datos.get("notaria_nombre", "Por definir"),
-        "notaria_direccion": datos.get("notaria_direccion", "Por definir"),
-        "forma_pago": datos.get("forma_pago", "Por definir"),
-        "monto_total": datos.get("monto_total", "Por definir"),
-    }
-
-    cierre_data = prop.get("cierre_data") or {}
     gastos = cierre_data.get("gastos", {})
+    mensajes = {}
 
-    # Notificar al vendedor
     vendedor_id = prop.get("vendedor_id")
     if vendedor_id:
-        vendedor = await get_user_by_id(vendedor_id)
-        if vendedor:
-            desglose_v = _construir_desglose_gastos(
-                gastos.get("vendedor", {}), GASTOS_VENDEDOR, "whatsapp"
-            )
-            meta_v = {**metadata, "desglose_gastos": f"📝 *Tus gastos como vendedor:*\n{desglose_v}"}
-            plantilla = NOTIF_MENSAJES["cierre_fecha_notaria"]
-            asunto = plantilla["asunto"]
-            cuerpo_email = plantilla["cuerpo"]
-            desglose_email = _construir_desglose_gastos(
-                gastos.get("vendedor", {}), GASTOS_VENDEDOR, "email"
-            )
-            meta_email = {**metadata, "desglose_gastos": f"Tus gastos como vendedor:\n{desglose_email}"}
-            try:
-                cuerpo_email = cuerpo_email.format(**meta_email)
-            except KeyError:
-                pass
-            asyncio.create_task(enviar_email_notificacion(vendedor["email"], vendedor["nombre"], asunto, cuerpo_email))
-            asyncio.create_task(enviar_whatsapp_n8n("cierre_fecha_notaria", vendedor, meta_v))
+        desglose = _construir_desglose_gastos(gastos.get("vendedor", {}), GASTOS_VENDEDOR, "whatsapp")
+        mensajes["vendedor"] = {
+            "user_id": vendedor_id,
+            "mensaje": (
+                f"Hola, le informamos que se ha programado la fecha de escrituración "
+                f"para la propiedad en *{direccion}*.\n\n"
+                f"📅 *Fecha:* {datos.get('fecha_escrituracion', 'Por definir')}\n"
+                f"🏛️ *Notaría:* {datos.get('notaria_nombre', 'Por definir')}\n"
+                f"📍 *Dirección:* {datos.get('notaria_direccion', 'Por definir')}\n"
+                f"💰 *Forma de pago:* {datos.get('forma_pago', 'Por definir')}\n"
+                f"💵 *Monto total:* ${datos.get('monto_total', 'Por definir')}\n\n"
+                f"📝 *Tus gastos como vendedor:*\n{desglose}\n\n"
+                f"Por favor confirma tu asistencia. Quedo al pendiente."
+            ),
+        }
 
-    # Notificar al comprador
     comprador_id = prop.get("comprador_id")
     if comprador_id:
-        comprador = await get_user_by_id(comprador_id)
-        if comprador:
-            desglose_c = _construir_desglose_gastos(
-                gastos.get("comprador", {}), GASTOS_COMPRADOR, "whatsapp"
-            )
-            meta_c = {**metadata, "desglose_gastos": f"📝 *Tus gastos como comprador:*\n{desglose_c}"}
-            plantilla = NOTIF_MENSAJES["cierre_fecha_notaria"]
-            asunto = plantilla["asunto"]
-            cuerpo_email = plantilla["cuerpo"]
-            desglose_email = _construir_desglose_gastos(
-                gastos.get("comprador", {}), GASTOS_COMPRADOR, "email"
-            )
-            meta_email = {**metadata, "desglose_gastos": f"Tus gastos como comprador:\n{desglose_email}"}
-            try:
-                cuerpo_email = cuerpo_email.format(**meta_email)
-            except KeyError:
-                pass
-            asyncio.create_task(enviar_email_notificacion(comprador["email"], comprador["nombre"], asunto, cuerpo_email))
-            asyncio.create_task(enviar_whatsapp_n8n("cierre_fecha_notaria", comprador, meta_c))
+        desglose = _construir_desglose_gastos(gastos.get("comprador", {}), GASTOS_COMPRADOR, "whatsapp")
+        mensajes["comprador"] = {
+            "user_id": comprador_id,
+            "mensaje": (
+                f"Hola, le informamos que se ha programado la fecha de escrituración "
+                f"para la propiedad en *{direccion}*.\n\n"
+                f"📅 *Fecha:* {datos.get('fecha_escrituracion', 'Por definir')}\n"
+                f"🏛️ *Notaría:* {datos.get('notaria_nombre', 'Por definir')}\n"
+                f"📍 *Dirección:* {datos.get('notaria_direccion', 'Por definir')}\n"
+                f"💰 *Forma de pago:* {datos.get('forma_pago', 'Por definir')}\n"
+                f"💵 *Monto total:* ${datos.get('monto_total', 'Por definir')}\n\n"
+                f"📝 *Tus gastos como comprador:*\n{desglose}\n\n"
+                f"Por favor confirma tu asistencia. Quedo al pendiente."
+            ),
+        }
+    return mensajes
 
 
-async def _notificar_gastos_cierre(prop: dict, gastos: dict):
-    """Envía notificación de gastos de cierre a vendedor y/o comprador."""
+def _generar_mensajes_gastos(prop: dict, gastos: dict) -> dict:
+    """Genera mensajes predeterminados de gastos para que el agente envíe por WhatsApp."""
+    direccion = prop.get("direccion", "Sin dirección")
+    mensajes = {}
+
+    vendedor_id = prop.get("vendedor_id")
+    total_vend = gastos.get("total_vendedor", 0)
+    if vendedor_id and total_vend and float(total_vend) > 0:
+        desglose = _construir_desglose_gastos(gastos.get("vendedor", {}), GASTOS_VENDEDOR, "whatsapp")
+        mensajes["vendedor"] = {
+            "user_id": vendedor_id,
+            "mensaje": (
+                f"Hola, le comparto el desglose de gastos de cierre para la "
+                f"propiedad en *{direccion}*.\n\n"
+                f"📝 *Gastos a tu cargo como vendedor:*\n{desglose}\n\n"
+                f"🔸 *Total: ${float(total_vend):,.2f}*\n\n"
+                f"Si tienes alguna duda sobre algún concepto, quedo al pendiente."
+            ),
+        }
+
+    comprador_id = prop.get("comprador_id")
+    total_comp = gastos.get("total_comprador", 0)
+    if comprador_id and total_comp and float(total_comp) > 0:
+        desglose = _construir_desglose_gastos(gastos.get("comprador", {}), GASTOS_COMPRADOR, "whatsapp")
+        mensajes["comprador"] = {
+            "user_id": comprador_id,
+            "mensaje": (
+                f"Hola, le comparto el desglose de gastos de cierre para la "
+                f"propiedad en *{direccion}*.\n\n"
+                f"📝 *Gastos a tu cargo como comprador:*\n{desglose}\n\n"
+                f"🔸 *Total: ${float(total_comp):,.2f}*\n\n"
+                f"Si tienes alguna duda sobre algún concepto, quedo al pendiente."
+            ),
+        }
+    return mensajes
+
+
+async def _enviar_emails_cierre_fecha(prop: dict, datos: dict):
+    """Envía emails automáticos de fecha de escrituración (no WhatsApp)."""
+    import asyncio
+    direccion = prop.get("direccion", "Sin dirección")
+    cierre_data = prop.get("cierre_data") or {}
+    gastos = cierre_data.get("gastos", {})
+    plantilla = NOTIF_MENSAJES["cierre_fecha_notaria"]
+
+    for rol, user_id_key, gastos_key, labels in [
+        ("vendedor", "vendedor_id", "vendedor", GASTOS_VENDEDOR),
+        ("comprador", "comprador_id", "comprador", GASTOS_COMPRADOR),
+    ]:
+        uid = prop.get(user_id_key)
+        if not uid:
+            continue
+        user = await get_user_by_id(uid)
+        if not user:
+            continue
+        desglose = _construir_desglose_gastos(gastos.get(gastos_key, {}), labels, "email")
+        meta = {
+            "direccion": direccion,
+            "fecha_escrituracion": datos.get("fecha_escrituracion", "Por definir"),
+            "notaria_nombre": datos.get("notaria_nombre", "Por definir"),
+            "notaria_direccion": datos.get("notaria_direccion", "Por definir"),
+            "forma_pago": datos.get("forma_pago", "Por definir"),
+            "monto_total": datos.get("monto_total", "Por definir"),
+            "desglose_gastos": f"Tus gastos como {rol}:\n{desglose}",
+        }
+        cuerpo = plantilla["cuerpo"]
+        try:
+            cuerpo = cuerpo.format(**meta)
+        except KeyError:
+            pass
+        asyncio.create_task(enviar_email_notificacion(user["email"], user["nombre"], plantilla["asunto"], cuerpo))
+
+
+async def _enviar_emails_gastos(prop: dict, gastos: dict):
+    """Envía emails automáticos de gastos de cierre (no WhatsApp)."""
     import asyncio
     direccion = prop.get("direccion", "Sin dirección")
 
-    # Notificar vendedor si tiene gastos
-    vendedor_id = prop.get("vendedor_id")
-    gastos_vend = gastos.get("vendedor", {})
-    total_vend = gastos.get("total_vendedor", 0)
-    if vendedor_id and total_vend and float(total_vend) > 0:
-        vendedor = await get_user_by_id(vendedor_id)
-        if vendedor:
-            desglose_wa = _construir_desglose_gastos(gastos_vend, GASTOS_VENDEDOR, "whatsapp")
-            desglose_em = _construir_desglose_gastos(gastos_vend, GASTOS_VENDEDOR, "email")
-            meta_wa = {
-                "direccion": direccion,
-                "desglose_gastos": desglose_wa,
-                "total_gastos": f"{float(total_vend):,.2f}",
-            }
-            plantilla = NOTIF_MENSAJES["cierre_gastos_vendedor"]
-            asunto = plantilla["asunto"]
-            cuerpo = plantilla["cuerpo"]
-            meta_em = {
-                "direccion": direccion,
-                "desglose_gastos": desglose_em,
-                "total_gastos": f"{float(total_vend):,.2f}",
-            }
-            try:
-                cuerpo = cuerpo.format(**meta_em)
-            except KeyError:
-                pass
-            asyncio.create_task(enviar_email_notificacion(vendedor["email"], vendedor["nombre"], asunto, cuerpo))
-            asyncio.create_task(enviar_whatsapp_n8n("cierre_gastos_vendedor", vendedor, meta_wa))
-
-    # Notificar comprador si tiene gastos
-    comprador_id = prop.get("comprador_id")
-    gastos_comp = gastos.get("comprador", {})
-    total_comp = gastos.get("total_comprador", 0)
-    if comprador_id and total_comp and float(total_comp) > 0:
-        comprador = await get_user_by_id(comprador_id)
-        if comprador:
-            desglose_wa = _construir_desglose_gastos(gastos_comp, GASTOS_COMPRADOR, "whatsapp")
-            desglose_em = _construir_desglose_gastos(gastos_comp, GASTOS_COMPRADOR, "email")
-            meta_wa = {
-                "direccion": direccion,
-                "desglose_gastos": desglose_wa,
-                "total_gastos": f"{float(total_comp):,.2f}",
-            }
-            plantilla = NOTIF_MENSAJES["cierre_gastos_comprador"]
-            asunto = plantilla["asunto"]
-            cuerpo = plantilla["cuerpo"]
-            meta_em = {
-                "direccion": direccion,
-                "desglose_gastos": desglose_em,
-                "total_gastos": f"{float(total_comp):,.2f}",
-            }
-            try:
-                cuerpo = cuerpo.format(**meta_em)
-            except KeyError:
-                pass
-            asyncio.create_task(enviar_email_notificacion(comprador["email"], comprador["nombre"], asunto, cuerpo))
-            asyncio.create_task(enviar_whatsapp_n8n("cierre_gastos_comprador", comprador, meta_wa))
+    for rol, user_id_key, gastos_key, labels, tipo in [
+        ("vendedor", "vendedor_id", "vendedor", GASTOS_VENDEDOR, "cierre_gastos_vendedor"),
+        ("comprador", "comprador_id", "comprador", GASTOS_COMPRADOR, "cierre_gastos_comprador"),
+    ]:
+        uid = prop.get(user_id_key)
+        total = gastos.get(f"total_{rol}", 0)
+        if not uid or not total or float(total) <= 0:
+            continue
+        user = await get_user_by_id(uid)
+        if not user:
+            continue
+        desglose = _construir_desglose_gastos(gastos.get(gastos_key, {}), labels, "email")
+        plantilla = NOTIF_MENSAJES[tipo]
+        meta = {
+            "direccion": direccion,
+            "desglose_gastos": desglose,
+            "total_gastos": f"{float(total):,.2f}",
+        }
+        cuerpo = plantilla["cuerpo"]
+        try:
+            cuerpo = cuerpo.format(**meta)
+        except KeyError:
+            pass
+        asyncio.create_task(enviar_email_notificacion(user["email"], user["nombre"], plantilla["asunto"], cuerpo))
 
 
 async def enviar_email_notificacion(to_email: str, to_name: str, asunto: str, cuerpo: str):
@@ -1609,12 +1630,11 @@ async def disparar_notificaciones(tipo: str, user_id: int, propiedad_id: int, me
         except KeyError:
             pass
 
-    # Email (en background para no bloquear la respuesta)
+    # Email automático (en background para no bloquear la respuesta)
     import asyncio
     asyncio.create_task(enviar_email_notificacion(user["email"], user["nombre"], asunto, cuerpo))
 
-    # WhatsApp vía n8n
-    asyncio.create_task(enviar_whatsapp_n8n(tipo, user, meta_con_dir))
+    # WhatsApp: ya no se envía automático, el agente lo manda desde el dashboard
 APP_URL = os.getenv("APP_URL", "https://api.irealestatemx.cloud")
 
 
@@ -2184,6 +2204,7 @@ async def cambiar_estado_documento(
         return JSONResponse({"error": "Documento no encontrado"}, status_code=404)
 
     # ── Trigger: si se rechazó, notificar al vendedor/comprador ──
+    mensaje_wa = None
     if estado == "rechazado":
         prop = await get_property_by_id(result["propiedad_id"])
         destinatario_id = None
@@ -2205,9 +2226,39 @@ async def cambiar_estado_documento(
                 propiedad_id=result["propiedad_id"],
                 metadata=meta_rechazado,
             )
-            await disparar_notificaciones("documento_rechazado", destinatario_id, result["propiedad_id"], meta_rechazado)
+            # Email automático
+            destinatario = await get_user_by_id(destinatario_id)
+            if destinatario:
+                direccion = prop.get("direccion", "") if prop else ""
+                plantilla = NOTIF_MENSAJES.get("documento_rechazado", {})
+                cuerpo = plantilla.get("cuerpo", "")
+                try:
+                    cuerpo = cuerpo.format(**{**meta_rechazado, "direccion": direccion})
+                except KeyError:
+                    pass
+                import asyncio
+                asyncio.create_task(enviar_email_notificacion(
+                    destinatario["email"], destinatario["nombre"],
+                    plantilla.get("asunto", "Documento rechazado"), cuerpo
+                ))
+                # Generar mensaje WA para que el agente lo envíe
+                telefono = destinatario.get("telefono", "")
+                msg_wa = plantilla.get("whatsapp", "")
+                try:
+                    msg_wa = msg_wa.format(**{**meta_rechazado, "direccion": direccion})
+                except KeyError:
+                    pass
+                if telefono:
+                    tel_limpio = "".join(c for c in str(telefono) if c.isdigit())
+                    if len(tel_limpio) == 10:
+                        tel_limpio = "52" + tel_limpio
+                    mensaje_wa = {
+                        "telefono": tel_limpio,
+                        "nombre": destinatario.get("nombre", ""),
+                        "mensaje": msg_wa,
+                    }
 
-    return JSONResponse({"ok": True, "estado": estado})
+    return JSONResponse({"ok": True, "estado": estado, "mensaje_wa": mensaje_wa})
 
 
 # ── Notificaciones API ──
@@ -2768,16 +2819,20 @@ async def guardar_datos_cierre(propiedad_id: int, request: Request):
 
     await update_property(propiedad_id, {"cierre_data": cierre_data})
 
-    # ── Phase 6: Notificaciones cuando se guarda fecha de escrituración ──
+    # Generar mensajes predeterminados si se guardó fecha de escrituración
+    mensajes_wa = {}
     if datos.get("fecha_escrituracion") and body.get("fecha_escrituracion"):
-        # Recargar prop con cierre_data actualizado para incluir gastos
+        mensajes_wa = _generar_mensajes_cierre_fecha(prop, datos, cierre_data)
+
+    # Email automático (no requiere intervención del agente)
+    if datos.get("fecha_escrituracion") and body.get("fecha_escrituracion"):
         import asyncio
         prop_actualizada = await get_property_by_id(propiedad_id)
         if prop_actualizada:
             prop_actualizada["cierre_data"] = cierre_data
-            asyncio.create_task(_notificar_cierre_fecha(prop_actualizada, datos))
+            asyncio.create_task(_enviar_emails_cierre_fecha(prop_actualizada, datos))
 
-    return JSONResponse({"ok": True, "datos": datos})
+    return JSONResponse({"ok": True, "datos": datos, "mensajes_wa": mensajes_wa})
 
 
 @app.post("/api/generar-cierre/{propiedad_id}/gastos")
@@ -2838,11 +2893,113 @@ async def guardar_gastos_cierre(propiedad_id: int, request: Request):
     cierre_data["gastos_updated_at"] = str(datetime.now())
     await update_property(propiedad_id, {"cierre_data": cierre_data})
 
-    # ── Phase 6: Notificaciones cuando se guardan gastos ──
-    import asyncio
-    asyncio.create_task(_notificar_gastos_cierre(prop, gastos))
+    # Generar mensajes predeterminados para vendedor/comprador
+    mensajes_wa = _generar_mensajes_gastos(prop, gastos)
 
-    return JSONResponse({"ok": True, "gastos": gastos})
+    # Email automático
+    import asyncio
+    asyncio.create_task(_enviar_emails_gastos(prop, gastos))
+
+    return JSONResponse({"ok": True, "gastos": gastos, "mensajes_wa": mensajes_wa})
+
+
+# ── Plantillas de mensajes predeterminados ──
+PLANTILLAS_WA = {
+    "doc_recibido": "Hola *{nombre}*, le informamos que recibimos tu documento *{tipo_documento}* para la propiedad en _{direccion}_. Lo revisaremos a la brevedad.",
+    "doc_rechazado": "Hola *{nombre}*, tu documento *{tipo_documento}* fue rechazado.\n\n📋 *Motivo:* _{motivo}_\n\nPor favor sube una versión corregida lo antes posible.",
+    "docs_completos": "Hola *{nombre}*, tu expediente de documentos está *completo* para la propiedad en _{direccion}_. Procederemos con los siguientes pasos del cierre.",
+    "bienvenida_vendedor": "Hola *{nombre}*, soy {agente_nombre} tu asesor inmobiliario. Ya tenemos tu propiedad en _{direccion}_ registrada. Necesitamos que subas tus documentos en el portal:\n\n🔗 {portal_url}\n\nQuedo al pendiente.",
+    "bienvenida_comprador": "Hola *{nombre}*, soy {agente_nombre} tu asesor inmobiliario. Ya estás registrado como comprador para la propiedad en _{direccion}_. Te comparto el acceso al portal:\n\n🔗 {portal_url}\n\nQuedo al pendiente.",
+    "seguimiento_general": "Hola *{nombre}*, ¿cómo va todo? Le doy seguimiento sobre la propiedad en _{direccion}_. ¿Tiene alguna duda o necesita algo?",
+}
+
+
+@app.get("/api/mensaje-wa/{tipo}/{propiedad_id}")
+async def generar_mensaje_wa(tipo: str, propiedad_id: int, request: Request, destinatario: str = "vendedor"):
+    """Genera un mensaje predeterminado de WhatsApp para que el agente lo envíe."""
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"error": "No autenticado"}, status_code=401)
+    if user["rol"] not in ("admin", "agente"):
+        return JSONResponse({"error": "Sin permisos"}, status_code=403)
+
+    prop = await get_property_by_id(propiedad_id)
+    if not prop:
+        return JSONResponse({"error": "Propiedad no encontrada"}, status_code=404)
+
+    direccion = prop.get("direccion", "Sin dirección")
+    cierre_data = prop.get("cierre_data") or {}
+    datos = cierre_data.get("datos", {})
+    gastos = cierre_data.get("gastos", {})
+
+    # Determinar destinatario
+    dest_id = prop.get("vendedor_id") if destinatario == "vendedor" else prop.get("comprador_id")
+    dest_user = await get_user_by_id(dest_id) if dest_id else None
+    nombre_dest = dest_user["nombre"] if dest_user else "Cliente"
+    telefono = dest_user.get("telefono", "") if dest_user else ""
+
+    tel_limpio = ""
+    if telefono:
+        tel_limpio = "".join(c for c in str(telefono) if c.isdigit())
+        if len(tel_limpio) == 10:
+            tel_limpio = "52" + tel_limpio
+
+    # Construir mensaje según tipo
+    plantilla = PLANTILLAS_WA.get(tipo, "")
+    meta = {
+        "nombre": nombre_dest,
+        "direccion": direccion,
+        "agente_nombre": user.get("nombre", ""),
+        "portal_url": f"{APP_URL}/portal",
+        "tipo_documento": request.query_params.get("tipo_documento", ""),
+        "motivo": request.query_params.get("motivo", ""),
+    }
+
+    # Tipos especiales de cierre
+    if tipo == "cierre_fecha":
+        desglose = _construir_desglose_gastos(
+            gastos.get(destinatario, {}),
+            GASTOS_VENDEDOR if destinatario == "vendedor" else GASTOS_COMPRADOR,
+            "whatsapp"
+        )
+        mensaje = (
+            f"Hola *{nombre_dest}*, le informamos que se ha programado la fecha de escrituración "
+            f"para la propiedad en *{direccion}*.\n\n"
+            f"📅 *Fecha:* {datos.get('fecha_escrituracion', 'Por definir')}\n"
+            f"🏛️ *Notaría:* {datos.get('notaria_nombre', 'Por definir')}\n"
+            f"📍 *Dirección:* {datos.get('notaria_direccion', 'Por definir')}\n"
+            f"💰 *Forma de pago:* {datos.get('forma_pago', 'Por definir')}\n"
+            f"💵 *Monto total:* ${datos.get('monto_total', 'Por definir')}\n\n"
+            f"📝 *Tus gastos como {destinatario}:*\n{desglose}\n\n"
+            f"Por favor confirma tu asistencia. Quedo al pendiente."
+        )
+    elif tipo == "cierre_gastos":
+        total = gastos.get(f"total_{destinatario}", 0)
+        desglose = _construir_desglose_gastos(
+            gastos.get(destinatario, {}),
+            GASTOS_VENDEDOR if destinatario == "vendedor" else GASTOS_COMPRADOR,
+            "whatsapp"
+        )
+        mensaje = (
+            f"Hola *{nombre_dest}*, le comparto el desglose de gastos de cierre para la "
+            f"propiedad en *{direccion}*.\n\n"
+            f"📝 *Gastos a tu cargo como {destinatario}:*\n{desglose}\n\n"
+            f"🔸 *Total: ${float(total):,.2f}*\n\n"
+            f"Si tienes alguna duda, quedo al pendiente."
+        )
+    else:
+        try:
+            mensaje = plantilla.format(**meta)
+        except KeyError:
+            mensaje = plantilla
+
+    return JSONResponse({
+        "ok": True,
+        "mensaje": mensaje,
+        "telefono": tel_limpio,
+        "nombre": nombre_dest,
+        "wa_link": f"https://wa.me/{tel_limpio}?text={mensaje}" if tel_limpio else "",
+    })
 
 
 @app.get("/api/gastos-cierre/{propiedad_id}")
@@ -3417,12 +3574,24 @@ async def whatsapp_paused_list():
 
 @app.post("/api/whatsapp/deactivate")
 async def whatsapp_deactivate(request: Request):
-    """Desactiva la conversación del bot (flujo completado)."""
+    """Registra que el flujo del bot completó una respuesta.
+    Ya NO desactiva la conversación inmediatamente — se mantiene activa
+    por ACTIVE_DURATION (2h) para permitir follow-ups del cliente.
+    Solo se desactiva si se pasa force=true (para desactivación manual)."""
     body = await request.json()
     phone = body.get("phone", "")
-    _active_chats.pop(phone, None)
-    print(f"[BOT] Conversación desactivada para {phone} (flujo completado)")
-    return JSONResponse({"ok": True, "deactivated": phone})
+    force = body.get("force", False)
+
+    if force:
+        _active_chats.pop(phone, None)
+        print(f"[BOT] Conversación FORZADA desactivada para {phone}")
+        return JSONResponse({"ok": True, "deactivated": phone})
+
+    # No desactivar — refrescar el timestamp para que siga activa
+    if phone in _active_chats:
+        _active_chats[phone] = time.time()
+        print(f"[BOT] Flujo completado para {phone} — conversación sigue activa (2h)")
+    return JSONResponse({"ok": True, "deactivated": ""})
 
 
 @app.post("/api/whatsapp/debounce")
