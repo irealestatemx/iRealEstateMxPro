@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Propiedades Vendidas — iRealEstateMx</title>
+  <meta name="description" content="Historial de propiedades vendidas por iRealEstateMx. Resultados que respaldan nuestra experiencia."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/public.css"/>
+  <link rel="icon" href="/static/logo-header.png"/>
+</head>
+<body>
+
+<nav class="topbar">
+  <a href="/"><img src="/static/logo-full.png" alt="iRealEstateMx" class="topbar-logo"/></a>
+  <button class="hamburger" onclick="this.classList.toggle('open');document.getElementById('nav').classList.toggle('open')">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="topbar-nav" id="nav">
+    <a href="/">Inicio</a>
+    <a href="/propiedades">Propiedades</a>
+    <a href="/propiedades?operacion=venta">Venta</a>
+    <a href="/propiedades?operacion=renta">Renta</a>
+    <a href="/vendidas" class="active">Vendidas</a>
+    <a href="/desarrollos">Desarrollos</a>
+  </div>
+</nav>
+
+<section class="hero" style="padding:60px 32px 48px">
+  <h1>Propiedades <span>Vendidas</span></h1>
+  <p>Cada propiedad vendida es una historia de exito. Conoce nuestro historial de operaciones cerradas.</p>
+</section>
+
+<section class="section">
+  <div class="section-inner">
+    {% if propiedades %}
+    <p class="section-subtitle">{{ propiedades|length }} propiedad{{ 'es' if propiedades|length != 1 else '' }} vendida{{ 's' if propiedades|length != 1 else '' }}</p>
+    <div class="prop-grid">
+      {% for p in propiedades %}
+      <a href="/propiedad/{{ p.id }}" class="prop-card" style="text-decoration:none;color:inherit">
+        <div class="prop-card-img">
+          {% if p.foto_portada_url %}
+          <img src="{{ p.foto_portada_url }}" alt="{{ p.nombre_propiedad or p.tipo_propiedad or 'Propiedad' }}" loading="lazy"/>
+          {% else %}
+          <div style="width:100%;height:100%;background:#222;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">Sin foto</div>
+          {% endif %}
+          <div class="sold-overlay"><span>VENDIDA</span></div>
+          <span class="prop-badge vendida">Vendida</span>
+        </div>
+        <div class="prop-card-body">
+          {% if p.nombre_propiedad %}<div class="prop-nombre">{{ p.nombre_propiedad }}</div>{% endif %}
+          <h3>{{ p.tipo_propiedad or 'Propiedad' }} {{ ('en ' + p.ciudad) if p.ciudad else '' }}</h3>
+          <div class="prop-ubicacion">
+            <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            {{ p.direccion or p.ciudad or '' }}
+          </div>
+          <div class="prop-precio">{{ p.precio_formateado or 'Consultar' }}</div>
+          <div class="prop-specs">
+            {% if p.recamaras %}<span class="prop-spec">{{ p.recamaras }} rec.</span>{% endif %}
+            {% if p.banos %}<span class="prop-spec">{{ p.banos }} ba.</span>{% endif %}
+            {% if p.metros_construidos %}<span class="prop-spec">{{ p.metros_construidos }} m2</span>{% endif %}
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="no-results">
+      <p style="font-size:40px;margin-bottom:16px">🏆</p>
+      <p>Proximamente aqui veran nuestras operaciones cerradas.</p>
+      <p style="margin-top:8px"><a href="/propiedades">Ver propiedades disponibles</a></p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div>
+      <img src="/static/logo-full.png" alt="iRealEstateMx" style="height:32px;margin-bottom:16px;filter:brightness(2)"/>
+      <p>{{ c.footer_texto }}</p>
+      <p style="margin-top:12px">Tel: <a href="tel:+52{{ c.telefono }}">{{ c.telefono }}</a></p>
+    </div>
+    <div>
+      <h4>Propiedades</h4>
+      <ul class="footer-links">
+        <li><a href="/propiedades?operacion=venta">En Venta</a></li>
+        <li><a href="/propiedades?operacion=renta">En Renta</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Legal</h4>
+      <ul class="footer-links">
+        <li><a href="/aviso-de-privacidad">Aviso de Privacidad</a></li>
+        <li><a href="/terminos-y-condiciones">Terminos y Condiciones</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>&copy; 2026 iRealEstateMx.</span>
+    <span>{{ c.footer_zonas }}</span>
+  </div>
+</footer>
+
+<a href="https://wa.me/{{ c.whatsapp }}?text={{ c.wa_mensaje|urlencode }}" class="wa-float" target="_blank">
+  <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.612.616l4.523-1.471A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.312-.726-5.994-1.956l-.418-.306-2.685.873.896-2.632-.336-.432A9.96 9.96 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+</a>
+
+</body>
+</html>

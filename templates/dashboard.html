@@ -173,8 +173,10 @@
           <div>
             <span class="prop-card-type">{{ p.tipo_propiedad }}</span>
             <span class="prop-card-op {{ 'op-venta' if 'venta' in (p.operacion|lower) else 'op-renta' }}">{{ p.operacion }}</span>
+            {% if p.vendida %}<span style="background:rgba(192,57,43,.2);color:#c0392b;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">VENDIDA</span>{% endif %}
             {% if not p.activa %}<span class="badge-inactive">Inactiva</span>{% endif %}
           </div>
+          {% if p.nombre_propiedad %}<div style="color:#c9a227;font-weight:600;font-size:14px;margin:4px 0">{{ p.nombre_propiedad }}</div>{% endif %}
           <div class="prop-card-price">{{ p.precio_formateado }}</div>
           <div class="prop-card-loc">{{ p.direccion }}, {{ p.ciudad }}</div>
           <div class="prop-card-specs">
@@ -250,6 +252,15 @@
                 {{ 'En Web' if p.publicada_web else 'Publicar Web' }}
               </button>
             </form>
+            <!-- Marcar vendida -->
+            {% if not p.vendida %}
+            <form method="post" action="/dashboard/marcar-vendida/{{ p.id }}" style="display:inline"
+                  onsubmit="return confirm('¿Marcar esta propiedad como VENDIDA? Aparecerá en la sección de propiedades vendidas.')">
+              <button type="submit" class="btn-sm" style="background:rgba(39,174,96,.2);color:#27ae60">Vendida</button>
+            </form>
+            {% else %}
+            <span class="btn-sm" style="background:rgba(192,57,43,.2);color:#c0392b;cursor:default">VENDIDA</span>
+            {% endif %}
             <!-- Toggle activa/inactiva -->
             <form method="post" action="/dashboard/toggle/{{ p.id }}" style="display:inline">
               <button type="submit" class="btn-sm {{ 'btn-toggle-off' if p.activa else 'btn-toggle-on' }}">

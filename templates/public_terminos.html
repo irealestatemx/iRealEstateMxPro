@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Terminos y Condiciones — iRealEstateMx</title>
+  <meta name="description" content="Terminos y condiciones de uso del sitio web de iRealEstateMx."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/public.css"/>
+  <link rel="icon" href="/static/logo-header.png"/>
+</head>
+<body>
+
+<nav class="topbar">
+  <a href="/"><img src="/static/logo-full.png" alt="iRealEstateMx" class="topbar-logo"/></a>
+  <button class="hamburger" onclick="this.classList.toggle('open');document.getElementById('nav').classList.toggle('open')">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="topbar-nav" id="nav">
+    <a href="/">Inicio</a>
+    <a href="/propiedades">Propiedades</a>
+    <a href="/desarrollos">Desarrollos</a>
+  </div>
+</nav>
+
+<div class="legal-page">
+  <h1>Terminos y Condiciones</h1>
+  <p class="last-updated">Ultima actualizacion: Abril 2026</p>
+
+  <p>Bienvenido al sitio web de <strong>iRealEstateMx</strong>. Al acceder y utilizar este sitio web, usted acepta cumplir con los siguientes terminos y condiciones de uso. Si no esta de acuerdo con alguno de estos terminos, le solicitamos no utilizar este sitio.</p>
+
+  <h2>1. Uso del sitio web</h2>
+  <p>Este sitio web tiene como finalidad proporcionar informacion sobre los servicios inmobiliarios ofrecidos por iRealEstateMx, incluyendo pero no limitado a: compra, venta y renta de propiedades, asesoria legal inmobiliaria y servicios relacionados.</p>
+  <p>El contenido de este sitio, incluyendo textos, imagenes, fotografias, descripciones de propiedades, precios y demas informacion, es de caracter informativo y puede estar sujeto a cambios sin previo aviso.</p>
+
+  <h2>2. Informacion de propiedades</h2>
+  <p>La informacion sobre las propiedades publicadas en este sitio web se presenta de buena fe y se considera precisa al momento de su publicacion. Sin embargo, iRealEstateMx no garantiza la exactitud, integridad o vigencia de dicha informacion.</p>
+  <ul>
+    <li>Los precios publicados son aproximados y pueden variar</li>
+    <li>Las fotografias son ilustrativas y pueden no reflejar el estado actual de la propiedad</li>
+    <li>La disponibilidad de las propiedades esta sujeta a cambios</li>
+    <li>Las medidas y especificaciones deben verificarse directamente con el asesor</li>
+  </ul>
+
+  <h2>3. Propiedad intelectual</h2>
+  <p>Todo el contenido de este sitio web, incluyendo pero no limitado a logotipos, marcas, textos, imagenes, graficos, diseno y software, es propiedad de iRealEstateMx o de sus respectivos propietarios y esta protegido por las leyes de propiedad intelectual aplicables.</p>
+  <p>Queda prohibida la reproduccion, distribucion, modificacion o uso comercial del contenido sin autorizacion previa por escrito.</p>
+
+  <h2>4. Comunicaciones</h2>
+  <p>Al proporcionar sus datos de contacto a traves de nuestro sitio web, formularios, WhatsApp u otros canales, usted autoriza a iRealEstateMx a comunicarse con usted para:</p>
+  <ul>
+    <li>Responder a sus consultas</li>
+    <li>Enviar informacion sobre propiedades relevantes</li>
+    <li>Dar seguimiento a citas y visitas</li>
+    <li>Compartir novedades y promociones</li>
+  </ul>
+  <p>Usted puede solicitar en cualquier momento dejar de recibir comunicaciones enviando un mensaje a <a href="mailto:{{ c.email }}">{{ c.email }}</a>.</p>
+
+  <h2>5. Responsabilidad del usuario</h2>
+  <p>El usuario se compromete a utilizar el sitio web de manera responsable, no proporcionar informacion falsa, y no utilizar el sitio para fines ilegales o no autorizados.</p>
+
+  <h2>6. Limitacion de responsabilidad</h2>
+  <p>iRealEstateMx no sera responsable por danos directos, indirectos, incidentales o consecuentes que resulten del uso o la imposibilidad de uso de este sitio web. Las decisiones de inversion inmobiliaria son responsabilidad exclusiva del usuario.</p>
+
+  <h2>7. Enlaces a terceros</h2>
+  <p>Este sitio web puede contener enlaces a sitios web de terceros. iRealEstateMx no es responsable del contenido, politicas de privacidad ni practicas de dichos sitios.</p>
+
+  <h2>8. Ley aplicable y jurisdiccion</h2>
+  <p>Estos terminos y condiciones se rigen por las leyes vigentes en Mexico. Cualquier controversia derivada del uso de este sitio web sera sometida a la jurisdiccion de los tribunales competentes del Estado de Guanajuato, Mexico.</p>
+
+  <h2>9. Modificaciones</h2>
+  <p>iRealEstateMx se reserva el derecho de modificar estos terminos y condiciones en cualquier momento. Las modificaciones entraran en vigor al momento de su publicacion en este sitio web.</p>
+
+  <h2>10. Contacto</h2>
+  <p>Para cualquier duda o aclaracion sobre estos terminos y condiciones:</p>
+  <ul>
+    <li>Correo: <a href="mailto:{{ c.email }}">{{ c.email }}</a></li>
+    <li>Telefono: <a href="tel:+52{{ c.telefono }}">{{ c.telefono }}</a></li>
+    <li>WhatsApp: <a href="https://wa.me/{{ c.whatsapp }}">{{ c.whatsapp }}</a></li>
+  </ul>
+</div>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div>
+      <img src="/static/logo-full.png" alt="iRealEstateMx" style="height:32px;margin-bottom:16px;filter:brightness(2)"/>
+      <p>{{ c.footer_texto }}</p>
+    </div>
+    <div>
+      <h4>Legal</h4>
+      <ul class="footer-links">
+        <li><a href="/aviso-de-privacidad">Aviso de Privacidad</a></li>
+        <li><a href="/terminos-y-condiciones">Terminos y Condiciones</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Propiedades</h4>
+      <ul class="footer-links">
+        <li><a href="/propiedades?operacion=venta">En Venta</a></li>
+        <li><a href="/propiedades?operacion=renta">En Renta</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom"><span>&copy; 2026 iRealEstateMx.</span><span>{{ c.footer_zonas }}</span></div>
+</footer>
+
+</body>
+</html>

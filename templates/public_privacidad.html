@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Aviso de Privacidad — iRealEstateMx</title>
+  <meta name="description" content="Aviso de privacidad de iRealEstateMx. Conoce como protegemos tus datos personales."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/public.css"/>
+  <link rel="icon" href="/static/logo-header.png"/>
+</head>
+<body>
+
+<nav class="topbar">
+  <a href="/"><img src="/static/logo-full.png" alt="iRealEstateMx" class="topbar-logo"/></a>
+  <button class="hamburger" onclick="this.classList.toggle('open');document.getElementById('nav').classList.toggle('open')">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="topbar-nav" id="nav">
+    <a href="/">Inicio</a>
+    <a href="/propiedades">Propiedades</a>
+    <a href="/desarrollos">Desarrollos</a>
+  </div>
+</nav>
+
+<div class="legal-page">
+  <h1>Aviso de Privacidad</h1>
+  <p class="last-updated">Ultima actualizacion: Abril 2026</p>
+
+  <p><strong>iRealEstateMx</strong>, con domicilio en Guanajuato, Mexico, es responsable del tratamiento de los datos personales que nos proporcione, los cuales seran protegidos conforme a lo dispuesto por la Ley Federal de Proteccion de Datos Personales en Posesion de los Particulares y demas normatividad aplicable.</p>
+
+  <h2>Datos personales que recabamos</h2>
+  <p>Para las finalidades senaladas en el presente aviso de privacidad, podemos recabar sus datos personales de distintas formas: cuando usted nos los proporciona directamente, cuando visita nuestro sitio web o utiliza nuestros servicios en linea, y cuando obtenemos informacion a traves de otras fuentes permitidas por la ley. Los datos personales que recabamos incluyen:</p>
+  <ul>
+    <li>Nombre completo</li>
+    <li>Numero de telefono</li>
+    <li>Correo electronico</li>
+    <li>Datos de contacto de WhatsApp</li>
+    <li>Preferencias de busqueda inmobiliaria (tipo de propiedad, presupuesto, ubicacion)</li>
+    <li>Mensajes e interacciones a traves de nuestros canales de comunicacion</li>
+  </ul>
+
+  <h2>Finalidades del tratamiento</h2>
+  <p>Sus datos personales seran utilizados para las siguientes finalidades:</p>
+  <ul>
+    <li>Brindar asesoria inmobiliaria personalizada</li>
+    <li>Agendar citas y visitas a propiedades</li>
+    <li>Enviar informacion relevante sobre propiedades que se ajusten a sus preferencias</li>
+    <li>Dar seguimiento a su proceso de compra, venta o renta</li>
+    <li>Elaborar contratos y documentacion legal relacionada con operaciones inmobiliarias</li>
+    <li>Mejorar nuestros servicios y la experiencia del usuario en nuestro sitio web</li>
+    <li>Cumplir con obligaciones legales y regulatorias</li>
+  </ul>
+
+  <h2>Transferencia de datos</h2>
+  <p>Sus datos personales no seran transferidos a terceros sin su consentimiento, salvo las excepciones previstas en la Ley Federal de Proteccion de Datos Personales en Posesion de los Particulares.</p>
+
+  <h2>Derechos ARCO</h2>
+  <p>Usted tiene derecho de Acceder, Rectificar y Cancelar sus datos personales, asi como de Oponerse al tratamiento de los mismos o revocar el consentimiento que para tal fin nos haya otorgado, a traves de los procedimientos que hemos implementado. Para conocer dichos procedimientos, los requisitos y plazos, puede comunicarse al correo electronico <a href="mailto:{{ c.email }}">{{ c.email }}</a> o al telefono <a href="tel:+52{{ c.telefono }}">{{ c.telefono }}</a>.</p>
+
+  <h2>Uso de cookies y tecnologias de rastreo</h2>
+  <p>Nuestro sitio web puede utilizar cookies y otras tecnologias de rastreo para mejorar su experiencia de navegacion, ofrecer contenido personalizado y analizar el trafico del sitio. Usted puede desactivar las cookies a traves de la configuracion de su navegador.</p>
+
+  <h2>Cambios al aviso de privacidad</h2>
+  <p>El presente aviso de privacidad puede sufrir modificaciones, cambios o actualizaciones. Nos comprometemos a mantenerlo informado sobre cualquier cambio a traves de nuestro sitio web.</p>
+
+  <h2>Contacto</h2>
+  <p>Si tiene alguna duda o comentario sobre este aviso de privacidad, puede comunicarse con nosotros:</p>
+  <ul>
+    <li>Correo: <a href="mailto:{{ c.email }}">{{ c.email }}</a></li>
+    <li>Telefono: <a href="tel:+52{{ c.telefono }}">{{ c.telefono }}</a></li>
+    <li>WhatsApp: <a href="https://wa.me/{{ c.whatsapp }}">{{ c.whatsapp }}</a></li>
+  </ul>
+</div>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div>
+      <img src="/static/logo-full.png" alt="iRealEstateMx" style="height:32px;margin-bottom:16px;filter:brightness(2)"/>
+      <p>{{ c.footer_texto }}</p>
+    </div>
+    <div>
+      <h4>Legal</h4>
+      <ul class="footer-links">
+        <li><a href="/aviso-de-privacidad">Aviso de Privacidad</a></li>
+        <li><a href="/terminos-y-condiciones">Terminos y Condiciones</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Propiedades</h4>
+      <ul class="footer-links">
+        <li><a href="/propiedades?operacion=venta">En Venta</a></li>
+        <li><a href="/propiedades?operacion=renta">En Renta</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom"><span>&copy; 2026 iRealEstateMx.</span><span>{{ c.footer_zonas }}</span></div>
+</footer>
+
+</body>
+</html>

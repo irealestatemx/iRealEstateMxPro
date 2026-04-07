@@ -46,7 +46,7 @@ CREATE TABLE IF NOT EXISTS propiedades (
     fotos_extra_urls JSONB DEFAULT '[]',
     user_id             INTEGER,
     publicada_instagram BOOLEAN DEFAULT FALSE,
-    publicada_web       BOOLEAN DEFAULT FALSE,
+    publicada_web       BOOLEAN DEFAULT TRUE,
     activa              BOOLEAN DEFAULT TRUE,
     created_at      TIMESTAMP DEFAULT NOW(),
     updated_at      TIMESTAMP DEFAULT NOW()
@@ -179,6 +179,16 @@ MIGRATIONS = [
     "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS tipo_compra VARCHAR(50);",
     "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS telefono VARCHAR(20);",
     "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS cierre_data JSONB DEFAULT '{}';",
+    # Nuevos campos propiedades
+    "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS nombre_propiedad VARCHAR(300);",
+    "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS latitud DOUBLE PRECISION;",
+    "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS longitud DOUBLE PRECISION;",
+    "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS vendida BOOLEAN DEFAULT FALSE;",
+    "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS fecha_venta TIMESTAMP;",
+    # Hacer visibles en web todas las propiedades activas existentes
+    "UPDATE propiedades SET publicada_web = TRUE WHERE activa = TRUE AND publicada_web = FALSE;",
+    # Cambiar default de publicada_web a TRUE
+    "ALTER TABLE propiedades ALTER COLUMN publicada_web SET DEFAULT TRUE;",
     # Prospectos chatbot
     "ALTER TABLE prospectos ADD COLUMN IF NOT EXISTS fuente VARCHAR(50) DEFAULT 'chatbot';",
     "ALTER TABLE prospectos ADD COLUMN IF NOT EXISTS email_cliente VARCHAR(300);",
@@ -259,14 +269,16 @@ async def save_property(data: dict) -> int:
         metros_terreno, estacionamientos, amenidades, descripcion_agente,
         descripcion_profesional, instagram_copy,
         agente_nombre, agente_telefono, agente_email,
-        foto_portada_url, fotos_extra_urls, user_id
+        foto_portada_url, fotos_extra_urls, user_id,
+        nombre_propiedad, latitud, longitud
     ) VALUES (
         :session_id, :tipo_propiedad, :operacion, :direccion, :ciudad, :estado,
         :precio, :precio_formateado, :recamaras, :banos, :metros_construidos,
         :metros_terreno, :estacionamientos, :amenidades, :descripcion_agente,
         :descripcion_profesional, :instagram_copy,
         :agente_nombre, :agente_telefono, :agente_email,
-        :foto_portada_url, :fotos_extra_urls, :user_id
+        :foto_portada_url, :fotos_extra_urls, :user_id,
+        :nombre_propiedad, :latitud, :longitud
     ) RETURNING id
     """
     values = {
@@ -293,6 +305,9 @@ async def save_property(data: dict) -> int:
         "foto_portada_url": data.get("foto_portada_url"),
         "fotos_extra_urls": json.dumps(data.get("fotos_extra_urls", [])),
         "user_id": data.get("user_id"),
+        "nombre_propiedad": data.get("nombre_propiedad"),
+        "latitud": float(data["latitud"]) if data.get("latitud") else None,
+        "longitud": float(data["longitud"]) if data.get("longitud") else None,
     }
     row_id = await database.execute(query=query, values=values)
     return row_id
@@ -426,13 +441,15 @@ async def set_tipo_compra(propiedad_id: int, tipo_compra: str):
 
 
 async def get_all_properties(active_only: bool = True, limit: int = 50, offset: int = 0,
-                             publicada_web: bool = None):
+                             publicada_web: bool = None, include_vendidas: bool = False):
     """Lista propiedades, las mas recientes primero."""
     conditions = []
     if active_only:
         conditions.append("activa = TRUE")
     if publicada_web is not None:
         conditions.append(f"publicada_web = {'TRUE' if publicada_web else 'FALSE'}")
+    if not include_vendidas:
+        conditions.append("(vendida IS NULL OR vendida = FALSE)")
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
     query = f"""
     SELECT * FROM propiedades {where}
@@ -462,7 +479,7 @@ async def search_properties(ciudad: str = None, operacion: str = None,
                             precio_max: float = None, limit: int = 20,
                             publicada_web: bool = None):
     """Busca propiedades con filtros. Ideal para el chatbot de WhatsApp."""
-    conditions = ["activa = TRUE"]
+    conditions = ["activa = TRUE", "(vendida IS NULL OR vendida = FALSE)"]
     if publicada_web is not None:
         conditions.append(f"publicada_web = {'TRUE' if publicada_web else 'FALSE'}")
     values = {"limit": limit}
@@ -503,6 +520,7 @@ async def update_property(prop_id: int, updates: dict):
         "foto_portada_url", "fotos_extra_urls",
         "publicada_instagram", "publicada_web", "activa",
         "vendedor_id", "comprador_id", "cierre_data", "tipo_compra",
+        "nombre_propiedad", "latitud", "longitud", "vendida", "fecha_venta",
     }
     fields = {k: v for k, v in updates.items() if k in allowed}
     if not fields:
@@ -527,13 +545,15 @@ async def toggle_property(prop_id: int, active: bool):
     await database.execute(query=query, values={"activa": active, "id": prop_id})
 
 
-async def count_properties(active_only: bool = True, publicada_web: bool = None) -> int:
+async def count_properties(active_only: bool = True, publicada_web: bool = None, include_vendidas: bool = False) -> int:
     """Cuenta total de propiedades."""
     conditions = []
     if active_only:
         conditions.append("activa = TRUE")
     if publicada_web is not None:
         conditions.append(f"publicada_web = {'TRUE' if publicada_web else 'FALSE'}")
+    if not include_vendidas:
+        conditions.append("(vendida IS NULL OR vendida = FALSE)")
     where = "WHERE " + " AND ".join(conditions) if conditions else ""
     query = f"SELECT COUNT(*) as total FROM propiedades {where}"
     row = await database.fetch_one(query=query)
@@ -820,7 +840,7 @@ async def get_prospecto_by_id(prospecto_id: int):
 
 async def update_prospecto(prospecto_id: int, updates: dict):
     """Actualiza un prospecto (estado, notas, etc.)."""
-    allowed = {"nombre_cliente", "telefono_cliente", "desarrollo_interes", "estado", "notas", "agente_id"}
+    allowed = {"nombre_cliente", "telefono_cliente", "desarrollo_interes", "estado", "notas", "agente_id", "referido_id"}
     fields = {k: v for k, v in updates.items() if k in allowed}
     if not fields:
         return False

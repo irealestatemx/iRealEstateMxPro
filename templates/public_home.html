@@ -74,8 +74,12 @@
           </span>
         </div>
         <div class="prop-card-body">
+          {% if p.nombre_propiedad %}<div class="prop-nombre">{{ p.nombre_propiedad }}</div>{% endif %}
           <h3>{{ p.tipo_propiedad or 'Propiedad' }} {{ ('en ' + p.ciudad) if p.ciudad else '' }}</h3>
-          <div class="prop-ubicacion">{{ p.direccion or p.ciudad or '' }}</div>
+          <div class="prop-ubicacion">
+            <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            {{ p.direccion or p.ciudad or '' }}
+          </div>
           <div class="prop-precio">{{ p.precio_formateado or 'Consultar' }}</div>
           <div class="prop-specs">
             {% if p.recamaras %}
@@ -249,7 +253,9 @@
       <h4 style="margin-top:20px">Empresa</h4>
       <ul class="footer-links">
         <li><a href="#nosotros">Sobre nosotros</a></li>
-        <li><a href="#contacto">Contacto</a></li>
+        <li><a href="/vendidas">Propiedades Vendidas</a></li>
+        <li><a href="/aviso-de-privacidad">Aviso de Privacidad</a></li>
+        <li><a href="/terminos-y-condiciones">Terminos y Condiciones</a></li>
       </ul>
     </div>
   </div>

@@ -565,6 +565,13 @@
 
         <div class="wz-card">
           <h3>Información general</h3>
+          <div class="wz-grid" style="margin-bottom:16px">
+            <div class="wz-field">
+              <label>Nombre de la propiedad</label>
+              <input type="text" name="nombre_propiedad" class="wz-input" placeholder="Ej: Casa Nelumbo, Departamento Vista Real, Terreno Los Olivos" />
+              <small style="color:var(--gray-500);font-size:12px">Este nombre aparecerá como título en la página web</small>
+            </div>
+          </div>
           <div class="wz-grid wz-grid-2">
             <div class="wz-field">
               <label>Tipo de propiedad <span class="required">*</span></label>
@@ -608,6 +615,17 @@
             <div class="wz-field">
               <label>Estado <span class="required">*</span></label>
               <input type="text" name="estado" class="wz-input" value="Guanajuato" required />
+            </div>
+          </div>
+          <div class="wz-grid wz-grid-2" style="margin-top:16px;">
+            <div class="wz-field">
+              <label>Latitud</label>
+              <input type="text" name="latitud" class="wz-input" placeholder="Ej: 21.1236" inputmode="decimal" />
+            </div>
+            <div class="wz-field">
+              <label>Longitud</label>
+              <input type="text" name="longitud" class="wz-input" placeholder="Ej: -101.6821" inputmode="decimal" />
+              <small style="color:var(--gray-500);font-size:12px">Busca en Google Maps y copia las coordenadas</small>
             </div>
           </div>
           <div class="wz-grid" style="margin-top:16px;">

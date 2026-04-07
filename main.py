@@ -1905,7 +1905,7 @@ async def dashboard(request: Request, agente: Optional[str] = None):
         if agente_id:
             props = await get_properties_by_user(agente_id)
         else:
-            props = await get_all_properties(active_only=False, limit=100)
+            props = await get_all_properties(active_only=False, limit=100, include_vendidas=True)
         all_users = await get_all_users()
         agents = [u for u in all_users if u["rol"] in ("agente", "admin")]
     else:
@@ -3803,11 +3803,19 @@ async def chatbot_registrar_mensaje(request: Request):
 
     if prospecto:
         prospecto_id = prospecto["id"]
+        updates = {}
+        if nombre and not prospecto.get("nombre_cliente"):
+            updates["nombre_cliente"] = nombre
+        if desarrollo and not prospecto.get("desarrollo_interes"):
+            updates["desarrollo_interes"] = desarrollo
+        if updates:
+            await update_prospecto(prospecto_id, updates)
         from datetime import datetime as dt
         await agregar_historial_prospecto(prospecto_id, {
             "tipo": "mensaje_chatbot",
             "mensaje": mensaje,
             "fecha": str(dt.now()),
+            "datos": {"desarrollo": desarrollo},
         })
     else:
         prospecto_id = await create_prospecto({
@@ -3950,20 +3958,48 @@ async def whatsapp_debounce(request: Request):
         final = _message_buffer.pop(phone)
         combined = "\n".join(final["messages"])
 
-        # ─── Registrar prospecto en nuestra BD (una vez) ───
+        # ─── Registrar prospecto en nuestra BD (buscar existente primero) ───
         try:
             referido = None
             if final["prefijo"]:
                 referido = await get_user_by_prefijo(final["prefijo"])
-            await create_prospecto({
-                "referido_id": referido["id"] if referido else None,
-                "nombre_cliente": final["name"],
-                "telefono_cliente": phone,
-                "mensaje_original": combined,
-                "prefijo": final["prefijo"],
-                "desarrollo_interes": final["desarrollo"],
-                "estado": "nuevo",
-            })
+
+            existente = await get_prospecto_by_telefono(phone)
+
+            if existente:
+                # Ya existe → actualizar campos faltantes y agregar historial
+                prospecto_id = existente["id"]
+                updates = {}
+                if final["name"] and not existente.get("nombre_cliente"):
+                    updates["nombre_cliente"] = final["name"]
+                if final["desarrollo"]:
+                    updates["desarrollo_interes"] = final["desarrollo"]
+                if referido and not existente.get("referido_id"):
+                    updates["referido_id"] = referido["id"]
+                if updates:
+                    await update_prospecto(prospecto_id, updates)
+                # Agregar mensaje al historial
+                from datetime import datetime as dt
+                await agregar_historial_prospecto(prospecto_id, {
+                    "tipo": "mensaje_chatbot",
+                    "mensaje": combined,
+                    "fecha": str(dt.now()),
+                    "datos": {"desarrollo": final["desarrollo"]},
+                })
+                print(f"[PROSPECTO] Existente #{prospecto_id} actualizado para {phone}")
+            else:
+                # No existe → crear nuevo
+                prospecto_id = await create_prospecto({
+                    "referido_id": referido["id"] if referido else None,
+                    "nombre_cliente": final["name"],
+                    "telefono_cliente": phone,
+                    "mensaje_original": combined,
+                    "prefijo": final["prefijo"],
+                    "desarrollo_interes": final["desarrollo"],
+                    "estado": "nuevo",
+                    "fuente": "chatbot",
+                })
+                print(f"[PROSPECTO] Nuevo #{prospecto_id} creado para {phone}")
         except Exception as e:
             print(f"[PROSPECTO] Error: {e}")
 
@@ -4003,16 +4039,40 @@ async def api_registrar_prospecto(request: Request):
     if prefijo:
         referido = await get_user_by_prefijo(prefijo)
 
-    data = {
-        "referido_id": referido["id"] if referido else None,
-        "nombre_cliente": nombre,
-        "telefono_cliente": telefono,
-        "mensaje_original": mensaje,
-        "prefijo": prefijo,
-        "desarrollo_interes": desarrollo,
-        "estado": "nuevo",
-    }
-    prospecto_id = await create_prospecto(data)
+    # Buscar si ya existe prospecto con ese teléfono
+    existente = await get_prospecto_by_telefono(telefono) if telefono else None
+
+    if existente:
+        prospecto_id = existente["id"]
+        updates = {}
+        if nombre and not existente.get("nombre_cliente"):
+            updates["nombre_cliente"] = nombre
+        if desarrollo and not existente.get("desarrollo_interes"):
+            updates["desarrollo_interes"] = desarrollo
+        if referido and not existente.get("referido_id"):
+            updates["referido_id"] = referido["id"]
+        if updates:
+            await update_prospecto(prospecto_id, updates)
+        from datetime import datetime as dt
+        await agregar_historial_prospecto(prospecto_id, {
+            "tipo": "mensaje_whatsapp",
+            "mensaje": mensaje,
+            "fecha": str(dt.now()),
+            "datos": {"desarrollo": desarrollo, "prefijo": prefijo},
+        })
+    else:
+        data = {
+            "referido_id": referido["id"] if referido else None,
+            "nombre_cliente": nombre,
+            "telefono_cliente": telefono,
+            "mensaje_original": mensaje,
+            "prefijo": prefijo,
+            "desarrollo_interes": desarrollo,
+            "estado": "nuevo",
+            "fuente": "chatbot",
+        }
+        prospecto_id = await create_prospecto(data)
+
     return JSONResponse({
         "ok": True,
         "prospecto_id": prospecto_id,
@@ -4214,7 +4274,7 @@ async def load_public_config() -> dict:
     config = await get_all_site_config()
     # Valores por defecto
     defaults = {
-        "hero_titulo": "Tu hogar ideal en Guanajuato",
+        "hero_titulo": "Tu {gold}hogar ideal{/gold} en Guanajuato",
         "hero_subtitulo": "Compra, venta y renta de propiedades con asesoría legal completa y acompañamiento de inicio a fin.",
         "telefono": "4737365219",
         "whatsapp": "524737365219",
@@ -4297,11 +4357,7 @@ async def public_propiedad_detalle(request: Request, prop_id: int):
     """Detalle público de una propiedad."""
     prop = await get_property_by_id(prop_id)
     if not prop:
-        return templates.TemplateResponse(request=request, name="public_propiedades.html", context={
-            "propiedades": [], "total": 0,
-            "tiene_mas": False, "filtro_operacion": "", "filtro_tipo": "",
-            "filtro_ciudad": "", "filtro_precio_max": "",
-        })
+        return RedirectResponse("/propiedades", status_code=302)
 
     # Parsear fotos extra
     fotos_extra = prop.get("fotos_extra_urls") or []
@@ -4321,11 +4377,23 @@ async def public_propiedad_detalle(request: Request, prop_id: int):
         except Exception:
             amenidades = []
 
+    # Buscar propiedades similares (misma ciudad u operacion, excluyendo la actual)
+    similares = []
+    try:
+        all_similar = await search_properties(
+            ciudad=prop.get("ciudad"), operacion=prop.get("operacion"),
+            limit=5, publicada_web=True
+        )
+        similares = [s for s in all_similar if s["id"] != prop_id][:4]
+    except Exception:
+        pass
+
     c = await load_public_config()
     return templates.TemplateResponse(request=request, name="public_propiedad.html", context={
         "prop": prop,
         "fotos_extra": fotos_extra,
         "amenidades": amenidades,
+        "similares": similares,
         "c": c,
     })
 
@@ -4365,6 +4433,49 @@ async def public_desarrollo_detalle(request: Request, slug: str):
         "propiedades": props_dev,
         "c": c,
     })
+
+
+# ─── Propiedades Vendidas ───
+
+@app.get("/vendidas", response_class=HTMLResponse)
+async def public_vendidas(request: Request):
+    """Listado de propiedades vendidas / cerradas."""
+    # Buscar propiedades con vendida=True
+    query = """
+    SELECT * FROM propiedades WHERE vendida = TRUE ORDER BY fecha_venta DESC NULLS LAST, updated_at DESC LIMIT 50
+    """
+    rows = await database.fetch_all(query=query)
+    props = [dict(r._mapping) for r in rows]
+    c = await load_public_config()
+    return templates.TemplateResponse(request=request, name="public_vendidas.html", context={
+        "propiedades": props,
+        "c": c,
+    })
+
+
+@app.post("/dashboard/marcar-vendida/{prop_id}")
+async def marcar_vendida(request: Request, prop_id: int):
+    """Marca una propiedad como vendida desde el dashboard."""
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    from datetime import datetime as dt
+    await update_property(prop_id, {"vendida": True, "fecha_venta": dt.now()})
+    return RedirectResponse("/dashboard?msg=Propiedad marcada como vendida", status_code=302)
+
+
+# ─── Páginas Legales ───
+
+@app.get("/aviso-de-privacidad", response_class=HTMLResponse)
+async def aviso_privacidad(request: Request):
+    c = await load_public_config()
+    return templates.TemplateResponse(request=request, name="public_privacidad.html", context={"c": c})
+
+
+@app.get("/terminos-y-condiciones", response_class=HTMLResponse)
+async def terminos_condiciones(request: Request):
+    c = await load_public_config()
+    return templates.TemplateResponse(request=request, name="public_terminos.html", context={"c": c})
 
 
 # ─── API REST de Propiedades (para web, chatbot, n8n) ───
@@ -4585,9 +4696,12 @@ async def api_chatbot_search(
 @app.post("/generate", response_class=HTMLResponse)
 async def generate(
     request: Request,
+    nombre_propiedad: Optional[str] = Form(None),
     tipo_propiedad: str = Form(...),
     operacion: str = Form(...),
     direccion: str = Form(...),
+    latitud: Optional[str] = Form(None),
+    longitud: Optional[str] = Form(None),
     ciudad: str = Form(...),
     estado: str = Form(...),
     precio: str = Form(...),
@@ -4766,11 +4880,14 @@ async def generate(
             audio_path = generate_tts_audio(full_narration, voice)
 
     context = {
+        "nombre_propiedad": nombre_propiedad or "",
         "tipo_propiedad": tipo_propiedad,
         "operacion": operacion,
         "direccion": direccion,
         "ciudad": ciudad,
         "estado": estado,
+        "latitud": latitud,
+        "longitud": longitud,
         "precio_formateado": precio_formateado,
         "recamaras": recamaras,
         "banos": banos,

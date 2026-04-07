@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-  <title>{{ prop.tipo_propiedad or 'Propiedad' }} en {{ prop.ciudad or 'Guanajuato' }} — iRealEstateMx</title>
+  <title>{{ prop.nombre_propiedad or (prop.tipo_propiedad or 'Propiedad') + ' en ' + (prop.ciudad or 'Guanajuato') }} — iRealEstateMx</title>
   <meta name="description" content="{{ (prop.descripcion_profesional or prop.descripcion_agente or '')[:160] }}"/>
-  <meta property="og:title" content="{{ prop.tipo_propiedad or 'Propiedad' }} en {{ prop.ciudad or 'Guanajuato' }} — iRealEstateMx"/>
+  <meta property="og:title" content="{{ prop.nombre_propiedad or (prop.tipo_propiedad or 'Propiedad') }} — iRealEstateMx"/>
   <meta property="og:description" content="{{ prop.precio_formateado or '' }} — {{ prop.direccion or '' }}"/>
   {% if prop.foto_portada_url %}<meta property="og:image" content="{{ prop.foto_portada_url }}"/>{% endif %}
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
@@ -22,11 +22,15 @@
     .gallery-modal .prev{left:16px}
     .gallery-modal .next{right:16px}
     .gallery-counter{color:var(--text-dim);font-size:14px;margin-top:12px}
+    .share-bar{display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap}
+    .share-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid var(--border);color:var(--text-dim);transition:all .2s;text-decoration:none}
+    .share-btn:hover{border-color:var(--gold);color:var(--gold)}
+    .share-btn svg{width:14px;height:14px;fill:currentColor}
   </style>
 </head>
 <body>
 
-<!-- ─── Topbar ─── -->
+<!-- Topbar -->
 <nav class="topbar">
   <a href="/"><img src="/static/logo-full.png" alt="iRealEstateMx" class="topbar-logo"/></a>
   <button class="hamburger" onclick="this.classList.toggle('open');document.getElementById('nav').classList.toggle('open')">
@@ -41,12 +45,12 @@
   </div>
 </nav>
 
-<!-- ─── Gallery ─── -->
+<!-- Gallery -->
 <section class="detail-hero">
   <div class="detail-inner">
     <div class="detail-gallery">
       {% if prop.foto_portada_url %}
-      <img src="{{ prop.foto_portada_url }}" alt="Foto principal" class="main-img" onclick="abrirGaleria(0)"/>
+      <img src="{{ prop.foto_portada_url }}" alt="{{ prop.nombre_propiedad or 'Foto principal' }}" class="main-img" onclick="abrirGaleria(0)"/>
       {% else %}
       <div class="main-img" style="background:#222;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">Sin fotos</div>
       {% endif %}
@@ -62,75 +66,122 @@
       </div>
     </div>
 
-    <!-- ─── Content ─── -->
+    <!-- Content -->
     <div class="detail-content">
       <div class="detail-info">
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
-          <span class="prop-badge {{ 'renta' if prop.operacion and 'renta' in prop.operacion.lower() else '' }}" style="position:static">{{ prop.operacion or 'En Venta' }}</span>
+          <span class="prop-badge {{ 'renta' if prop.operacion and 'renta' in prop.operacion.lower() else '' }}{{ ' vendida' if prop.vendida else '' }}" style="position:static">
+            {% if prop.vendida %}VENDIDA{% else %}{{ prop.operacion or 'En Venta' }}{% endif %}
+          </span>
         </div>
+
+        {% if prop.nombre_propiedad %}
+        <div class="detail-nombre">{{ prop.nombre_propiedad }}</div>
+        {% endif %}
         <h1>{{ prop.tipo_propiedad or 'Propiedad' }} en {{ prop.ciudad or 'Guanajuato' }}</h1>
-        <div class="detail-ubicacion">{{ prop.direccion or '' }}{{ (', ' + prop.ciudad) if prop.ciudad and prop.direccion else (prop.ciudad or '') }}{{ (', ' + prop.estado) if prop.estado else '' }}</div>
+        <div class="detail-ubicacion">
+          <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+          {{ prop.direccion or '' }}{{ (', ' + prop.ciudad) if prop.ciudad and prop.direccion else (prop.ciudad or '') }}{{ (', ' + prop.estado) if prop.estado else '' }}
+        </div>
         <div class="detail-precio">{{ prop.precio_formateado or 'Consultar precio' }}</div>
 
+        <!-- Share -->
+        <div class="share-bar">
+          {% set share_url = request.url %}
+          {% set share_text = (prop.nombre_propiedad or prop.tipo_propiedad or 'Propiedad') + ' en ' + (prop.ciudad or '') + ' — ' + (prop.precio_formateado or '') %}
+          <a href="https://wa.me/?text={{ share_text|urlencode }}%20{{ share_url }}" target="_blank" class="share-btn">
+            <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>
+            WhatsApp
+          </a>
+          <a href="https://www.facebook.com/sharer/sharer.php?u={{ share_url }}" target="_blank" class="share-btn">
+            <svg viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+            Facebook
+          </a>
+          <button class="share-btn" onclick="navigator.clipboard.writeText(window.location.href);this.textContent='Copiado!'">
+            <svg viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>
+            Copiar link
+          </button>
+        </div>
+
         <!-- Specs -->
+        <h3 class="detail-section-title">
+          <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zM7 10h2v7H7zm4-3h2v10h-2zm4 6h2v4h-2z"/></svg>
+          Detalles
+        </h3>
         <div class="detail-specs-grid">
           {% if prop.recamaras %}
-          <div class="detail-spec"><span class="spec-value">{{ prop.recamaras }}</span><span class="spec-label">Recámaras</span></div>
+          <div class="detail-spec"><span class="spec-value">{{ prop.recamaras }}</span><span class="spec-label">Recamaras</span></div>
           {% endif %}
           {% if prop.banos %}
-          <div class="detail-spec"><span class="spec-value">{{ prop.banos }}</span><span class="spec-label">Baños</span></div>
+          <div class="detail-spec"><span class="spec-value">{{ prop.banos }}</span><span class="spec-label">Banos</span></div>
           {% endif %}
           {% if prop.metros_construidos %}
-          <div class="detail-spec"><span class="spec-value">{{ prop.metros_construidos }}</span><span class="spec-label">m² Construidos</span></div>
+          <div class="detail-spec"><span class="spec-value">{{ prop.metros_construidos }}</span><span class="spec-label">m2 Construidos</span></div>
           {% endif %}
           {% if prop.metros_terreno %}
-          <div class="detail-spec"><span class="spec-value">{{ prop.metros_terreno }}</span><span class="spec-label">m² Terreno</span></div>
+          <div class="detail-spec"><span class="spec-value">{{ prop.metros_terreno }}</span><span class="spec-label">m2 Terreno</span></div>
           {% endif %}
           {% if prop.estacionamientos %}
           <div class="detail-spec"><span class="spec-value">{{ prop.estacionamientos }}</span><span class="spec-label">Estacionamientos</span></div>
           {% endif %}
         </div>
 
-        <!-- Descripción -->
+        <!-- Descripcion -->
         {% if prop.descripcion_profesional %}
-        <h3 style="color:var(--text-bright);margin-bottom:12px;font-size:18px">Descripción</h3>
+        <h3 class="detail-section-title">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
+          Descripcion
+        </h3>
         <div class="detail-desc">{{ prop.descripcion_profesional|replace('\n','<br>')|safe }}</div>
         {% elif prop.descripcion_agente %}
-        <h3 style="color:var(--text-bright);margin-bottom:12px;font-size:18px">Descripción</h3>
+        <h3 class="detail-section-title">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zM6 20V4h7v5h5v11H6z"/></svg>
+          Descripcion
+        </h3>
         <div class="detail-desc">{{ prop.descripcion_agente|replace('\n','<br>')|safe }}</div>
         {% endif %}
 
         <!-- Amenidades -->
         {% if amenidades %}
-        <h3 style="color:var(--text-bright);margin-bottom:12px;font-size:18px">Amenidades</h3>
+        <h3 class="detail-section-title">
+          <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+          Amenidades
+        </h3>
         <div class="detail-amenidades">
           {% for a in amenidades %}
           <span class="detail-amenidad">{{ a }}</span>
           {% endfor %}
         </div>
         {% endif %}
+
+        <!-- Mapa -->
+        {% if prop.latitud and prop.longitud %}
+        <h3 class="detail-section-title">
+          <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+          Ubicacion
+        </h3>
+        <div class="detail-map">
+          <iframe src="https://maps.google.com/maps?q={{ prop.latitud }},{{ prop.longitud }}&z=16&output=embed" allowfullscreen loading="lazy"></iframe>
+        </div>
+        {% endif %}
       </div>
 
-      <!-- ─── Sidebar ─── -->
+      <!-- Sidebar -->
       <div class="detail-sidebar">
         <div class="contact-card">
-          <h3>{{ prop.agente_nombre or 'Esteban Castellanos' }}</h3>
+          <h3>{{ prop.agente_nombre or c.agente_nombre }}</h3>
           <div class="contact-rol">Asesor Inmobiliario</div>
-          {% set wa_phone = (prop.agente_telefono or '4737365219')|replace(' ','')|replace('-','')|replace('+','') %}
-          {% set wa_msg = 'Hola, me interesa la propiedad ' + (prop.tipo_propiedad or '') + ' en ' + (prop.ciudad or 'Guanajuato') + ' por ' + (prop.precio_formateado or '') %}
+          {% set wa_phone = (prop.agente_telefono or c.telefono)|replace(' ','')|replace('-','')|replace('+','') %}
+          {% set wa_msg = 'Hola, me interesa la propiedad ' + (prop.nombre_propiedad or prop.tipo_propiedad or '') + ' en ' + (prop.ciudad or 'Guanajuato') + ' por ' + (prop.precio_formateado or '') %}
           <a href="https://wa.me/52{{ wa_phone }}?text={{ wa_msg|urlencode }}" class="btn-cta" target="_blank">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.612.616l4.523-1.471A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.312-.726-5.994-1.956l-.418-.306-2.685.873.896-2.632-.336-.432A9.96 9.96 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.612.616l4.523-1.471A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.312-.726-5.994-1.956l-.418-.306-2.685.873.896-2.632-.336-.432A9.96 9.96 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
             WhatsApp
           </a>
           {% if prop.agente_telefono %}
-          <a href="tel:+52{{ wa_phone }}" class="btn-outline">
-            Llamar
-          </a>
+          <a href="tel:+52{{ wa_phone }}" class="btn-outline">Llamar</a>
           {% endif %}
           {% if prop.agente_email %}
-          <a href="mailto:{{ prop.agente_email }}?subject=Información propiedad {{ prop.id }}" class="btn-outline" style="margin-top:8px">
-            Email
-          </a>
+          <a href="mailto:{{ prop.agente_email }}?subject=Informacion propiedad {{ prop.nombre_propiedad or prop.id }}" class="btn-outline" style="margin-top:8px">Email</a>
           {% endif %}
         </div>
       </div>
@@ -138,7 +189,45 @@
   </div>
 </section>
 
-<!-- ─── Footer ─── -->
+<!-- Propiedades Similares -->
+{% if similares %}
+<section class="similar-section">
+  <div class="section-inner">
+    <h2 class="section-title">Propiedades Similares</h2>
+    <p class="section-subtitle">Otras opciones que podrian interesarte</p>
+    <div class="prop-grid">
+      {% for p in similares[:4] %}
+      <a href="/propiedad/{{ p.id }}" class="prop-card" style="text-decoration:none;color:inherit">
+        <div class="prop-card-img">
+          {% if p.foto_portada_url %}
+          <img src="{{ p.foto_portada_url }}" alt="{{ p.nombre_propiedad or p.tipo_propiedad or 'Propiedad' }}" loading="lazy"/>
+          {% else %}
+          <div style="width:100%;height:100%;background:#222;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">Sin foto</div>
+          {% endif %}
+          <span class="prop-badge {{ 'renta' if p.operacion and 'renta' in p.operacion.lower() else '' }}">{{ p.operacion or 'En Venta' }}</span>
+        </div>
+        <div class="prop-card-body">
+          {% if p.nombre_propiedad %}<div class="prop-nombre">{{ p.nombre_propiedad }}</div>{% endif %}
+          <h3>{{ p.tipo_propiedad or 'Propiedad' }} {{ ('en ' + p.ciudad) if p.ciudad else '' }}</h3>
+          <div class="prop-ubicacion">
+            <svg viewBox="0 0 24 24"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+            {{ p.direccion or p.ciudad or '' }}
+          </div>
+          <div class="prop-precio">{{ p.precio_formateado or 'Consultar' }}</div>
+          <div class="prop-specs">
+            {% if p.recamaras %}<span class="prop-spec">{{ p.recamaras }} rec.</span>{% endif %}
+            {% if p.banos %}<span class="prop-spec">{{ p.banos }} ba.</span>{% endif %}
+            {% if p.metros_construidos %}<span class="prop-spec">{{ p.metros_construidos }} m2</span>{% endif %}
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- Footer -->
 <footer class="footer">
   <div class="footer-inner">
     <div>
@@ -151,13 +240,14 @@
       <ul class="footer-links">
         <li><a href="/propiedades?operacion=venta">En Venta</a></li>
         <li><a href="/propiedades?operacion=renta">En Renta</a></li>
+        <li><a href="/vendidas">Propiedades Vendidas</a></li>
       </ul>
     </div>
     <div>
-      <h4>Desarrollos</h4>
+      <h4>Legal</h4>
       <ul class="footer-links">
-        <li><a href="/desarrollo/carcamos-residencial">Cárcamos Residencial</a></li>
-        <li><a href="/desarrollo/privada-del-fresno">Privada del Fresno</a></li>
+        <li><a href="/aviso-de-privacidad">Aviso de Privacidad</a></li>
+        <li><a href="/terminos-y-condiciones">Terminos y Condiciones</a></li>
       </ul>
     </div>
   </div>
@@ -169,10 +259,10 @@
 
 <!-- WhatsApp Float -->
 <a href="https://wa.me/{{ c.whatsapp }}?text={{ c.wa_mensaje|urlencode }}" class="wa-float" target="_blank">
-  <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.612.616l4.523-1.471A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.312-.726-5.994-1.956l-.418-.306-2.685.873.896-2.632-.336-.432A9.96 9.96 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+  <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.612.616l4.523-1.471A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.312-.726-5.994-1.956l-.418-.306-2.685.873.896-2.632-.336-.432A9.96 9.96 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
 </a>
 
-<!-- ─── Gallery Modal ─── -->
+<!-- Gallery Modal -->
 <div class="gallery-modal" id="galleryModal">
   <button class="close" onclick="cerrarGaleria()">&times;</button>
   <button class="nav-btn prev" onclick="navGaleria(-1)">&#8249;</button>

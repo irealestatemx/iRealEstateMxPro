@@ -89,28 +89,35 @@ img{max-width:100%;height:auto}
 /* ─── Property Grid ─── */
 .prop-grid{
   display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));
-  gap:24px;
+  gap:28px;
 }
 .prop-card{
   background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);
-  overflow:hidden;transition:all .3s;cursor:pointer;
+  overflow:hidden;transition:all .35s cubic-bezier(.25,.8,.25,1);cursor:pointer;
+  box-shadow:0 2px 8px rgba(0,0,0,.2);
 }
-.prop-card:hover{border-color:var(--border-gold);transform:translateY(-4px);box-shadow:var(--shadow)}
+.prop-card:hover{
+  border-color:var(--border-gold);
+  transform:translateY(-8px);
+  box-shadow:0 12px 40px rgba(0,0,0,.5),0 0 0 1px rgba(201,162,39,.15);
+}
 .prop-card-img{
-  position:relative;width:100%;height:220px;overflow:hidden;
+  position:relative;width:100%;height:230px;overflow:hidden;
 }
-.prop-card-img img{width:100%;height:100%;object-fit:cover;transition:transform .4s}
-.prop-card:hover .prop-card-img img{transform:scale(1.05)}
+.prop-card-img img{width:100%;height:100%;object-fit:cover;transition:transform .5s cubic-bezier(.25,.8,.25,1)}
+.prop-card:hover .prop-card-img img{transform:scale(1.08)}
 .prop-badge{
   position:absolute;top:12px;left:12px;
   background:var(--gold);color:#0d0d0d;font-size:11px;font-weight:700;
   padding:4px 10px;border-radius:20px;text-transform:uppercase;
 }
 .prop-badge.renta{background:#00AEEF}
-.prop-card-body{padding:18px}
-.prop-card-body h3{font-size:17px;color:var(--text-bright);margin-bottom:6px;font-weight:600}
-.prop-card-body .prop-ubicacion{font-size:13px;color:var(--text-dim);margin-bottom:12px}
-.prop-card-body .prop-ubicacion::before{content:'';margin-right:4px}
+.prop-badge.vendida{background:#c0392b;color:#fff}
+.prop-card-body{padding:20px}
+.prop-card-body h3{font-size:17px;color:var(--text-bright);margin-bottom:4px;font-weight:600}
+.prop-card-body .prop-nombre{font-size:14px;color:var(--gold-light);margin-bottom:6px;font-weight:500}
+.prop-card-body .prop-ubicacion{font-size:13px;color:var(--text-dim);margin-bottom:12px;display:flex;align-items:center;gap:4px}
+.prop-card-body .prop-ubicacion svg{width:14px;height:14px;fill:var(--text-dim);flex-shrink:0}
 .prop-precio{font-size:20px;font-weight:700;color:var(--gold);margin-bottom:14px}
 .prop-specs{display:flex;gap:16px;flex-wrap:wrap}
 .prop-spec{display:flex;align-items:center;gap:5px;font-size:13px;color:var(--text-dim)}
@@ -224,33 +231,65 @@ img{max-width:100%;height:auto}
 .detail-gallery .side-imgs{display:flex;flex-direction:column;gap:8px}
 .detail-gallery .side-imgs img{flex:1;width:100%;object-fit:cover;cursor:pointer}
 .detail-content{display:grid;grid-template-columns:2fr 1fr;gap:32px}
-.detail-info h1{font-family:'Playfair Display',serif;font-size:28px;color:var(--text-bright);margin-bottom:8px}
-.detail-info .detail-ubicacion{font-size:15px;color:var(--text-dim);margin-bottom:16px}
-.detail-info .detail-precio{font-size:26px;font-weight:700;color:var(--gold);margin-bottom:24px}
+.detail-info h1{font-family:'Playfair Display',serif;font-size:28px;color:var(--text-bright);margin-bottom:4px}
+.detail-info .detail-nombre{font-size:20px;color:var(--gold);font-weight:600;margin-bottom:8px}
+.detail-info .detail-ubicacion{font-size:15px;color:var(--text-dim);margin-bottom:16px;display:flex;align-items:center;gap:6px}
+.detail-info .detail-ubicacion svg{width:16px;height:16px;fill:var(--text-dim);flex-shrink:0}
+.detail-info .detail-precio{font-size:28px;font-weight:700;color:var(--gold);margin-bottom:24px}
 .detail-specs-grid{
   display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:12px;margin-bottom:28px;
 }
 .detail-spec{
   background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius-sm);
-  padding:14px;text-align:center;
+  padding:14px;text-align:center;transition:border-color .2s;
 }
+.detail-spec:hover{border-color:var(--border-gold)}
 .detail-spec .spec-value{font-size:20px;font-weight:700;color:var(--text-bright)}
 .detail-spec .spec-label{font-size:12px;color:var(--text-dim);margin-top:2px}
-.detail-desc{color:var(--text-dim);line-height:1.7;margin-bottom:28px;font-size:15px}
+.detail-desc{color:var(--text-dim);line-height:1.8;margin-bottom:28px;font-size:15px}
 .detail-amenidades{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:28px}
 .detail-amenidad{
   background:var(--gold-dim);color:var(--gold);font-size:12px;font-weight:600;
   padding:6px 14px;border-radius:20px;
 }
+.detail-section-title{color:var(--text-bright);font-size:18px;margin-bottom:16px;font-weight:600;display:flex;align-items:center;gap:8px}
+.detail-section-title svg{width:20px;height:20px;fill:var(--gold)}
+.detail-map{
+  border-radius:var(--radius);overflow:hidden;margin-bottom:28px;
+  border:1px solid var(--border);height:300px;
+}
+.detail-map iframe{width:100%;height:100%;border:0}
 .detail-sidebar{position:sticky;top:80px;align-self:start}
 .contact-card{
   background:var(--bg-card);border:1px solid var(--border-gold);border-radius:var(--radius);
   padding:24px;text-align:center;
 }
+.contact-card img{width:80px;height:80px;border-radius:50%;object-fit:cover;border:2px solid var(--gold);margin-bottom:12px}
 .contact-card h3{font-size:16px;color:var(--text-bright);margin-bottom:4px}
 .contact-card .contact-rol{font-size:13px;color:var(--text-dim);margin-bottom:16px}
 .contact-card .btn-cta{width:100%;justify-content:center;margin-bottom:10px}
 .contact-card .btn-outline{width:100%;justify-content:center}
+.similar-section{padding:48px 32px;background:#0a0a0a}
+.similar-section .section-inner{max-width:var(--max-w);margin:0 auto}
+
+/* ─── Legal Pages ─── */
+.legal-page{padding:40px 32px;max-width:var(--max-w-narrow);margin:0 auto}
+.legal-page h1{font-family:'Playfair Display',serif;font-size:28px;color:var(--text-bright);margin-bottom:24px}
+.legal-page h2{font-size:18px;color:var(--gold);margin:28px 0 12px;font-weight:600}
+.legal-page p,.legal-page li{color:var(--text-dim);font-size:14px;line-height:1.8;margin-bottom:12px}
+.legal-page ul{padding-left:20px;margin-bottom:16px}
+.legal-page .last-updated{font-size:12px;color:var(--text-dim);margin-bottom:32px}
+
+/* ─── Sold Badge ─── */
+.sold-overlay{
+  position:absolute;inset:0;background:rgba(0,0,0,.5);
+  display:flex;align-items:center;justify-content:center;z-index:2;
+}
+.sold-overlay span{
+  background:#c0392b;color:#fff;font-size:16px;font-weight:700;
+  padding:8px 24px;border-radius:4px;transform:rotate(-15deg);
+  text-transform:uppercase;letter-spacing:2px;
+}
 
 /* ─── Listing Page ─── */
 .listing-header{padding:32px;text-align:center}
@@ -292,6 +331,8 @@ img{max-width:100%;height:auto}
   .detail-gallery .side-imgs img{height:120px}
   .detail-content{grid-template-columns:1fr}
   .detail-sidebar{position:static}
+  .detail-map{height:220px}
+  .similar-section{padding:32px 16px}
   .footer-inner{grid-template-columns:1fr}
   .footer-bottom{flex-direction:column;gap:8px;text-align:center}
   .search-bar{flex-direction:column}
