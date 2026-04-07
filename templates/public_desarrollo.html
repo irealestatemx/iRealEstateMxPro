@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>{{ desarrollo.nombre }} — iRealEstateMx</title>
+  <meta name="description" content="{{ desarrollo.descripcion_corta }}"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/public.css"/>
+  <link rel="icon" href="/static/logo-header.png"/>
+</head>
+<body>
+
+<!-- Topbar -->
+<nav class="topbar">
+  <a href="/"><img src="/static/logo-full.png" alt="iRealEstateMx" class="topbar-logo"/></a>
+  <button class="hamburger" onclick="this.classList.toggle('open');document.getElementById('nav').classList.toggle('open')">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="topbar-nav" id="nav">
+    <a href="/">Inicio</a>
+    <a href="/propiedades">Propiedades</a>
+    <a href="/desarrollos" class="active">Desarrollos</a>
+  </div>
+</nav>
+
+<!-- Hero del desarrollo -->
+<section class="hero" style="padding:60px 32px 48px">
+  <h1><span>{{ desarrollo.nombre }}</span></h1>
+  <p>{{ desarrollo.ubicacion }}</p>
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:20px">
+    <div class="stat-box" style="min-width:140px"><span class="stat-number">{{ desarrollo.precio_desde }}</span><span class="stat-label">Precio desde</span></div>
+    <div class="stat-box" style="min-width:140px"><span class="stat-number">{{ desarrollo.tipo }}</span><span class="stat-label">Tipo</span></div>
+    {% if desarrollo.unidades %}<div class="stat-box" style="min-width:140px"><span class="stat-number">{{ desarrollo.unidades }}</span><span class="stat-label">Unidades</span></div>{% endif %}
+  </div>
+</section>
+
+<!-- Descripción -->
+<section class="section">
+  <div class="section-inner" style="max-width:800px">
+    <h2 class="section-title">Sobre {{ desarrollo.nombre }}</h2>
+    <div class="detail-desc" style="margin-top:16px">{{ desarrollo.descripcion|replace('\n','<br>')|safe }}</div>
+
+    {% if desarrollo.diferenciales %}
+    <h3 style="color:var(--text-bright);margin:28px 0 16px;font-size:18px">Diferenciales</h3>
+    <div class="detail-amenidades">
+      {% for d in desarrollo.diferenciales %}
+      <span class="detail-amenidad">{{ d }}</span>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Brochure PDF -->
+    {% if desarrollo.pdf_url %}
+    <div style="margin-top:32px;text-align:center">
+      <a href="{{ desarrollo.pdf_url }}" class="btn-outline" target="_blank" style="font-size:15px">
+        📄 Descargar Brochure PDF
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- Propiedades del desarrollo -->
+{% if propiedades %}
+<section class="section section-alt">
+  <div class="section-inner">
+    <h2 class="section-title">Propiedades Disponibles</h2>
+    <p class="section-subtitle">{{ propiedades|length }} propiedad{{ 'es' if propiedades|length != 1 else '' }} en {{ desarrollo.nombre }}</p>
+    <div class="prop-grid">
+      {% for p in propiedades %}
+      <a href="/propiedad/{{ p.id }}" class="prop-card" style="text-decoration:none;color:inherit">
+        <div class="prop-card-img">
+          {% if p.foto_portada_url %}
+          <img src="{{ p.foto_portada_url }}" alt="{{ p.tipo_propiedad or 'Propiedad' }}" loading="lazy"/>
+          {% else %}
+          <div style="width:100%;height:100%;background:#222;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">Sin foto</div>
+          {% endif %}
+          <span class="prop-badge">{{ p.operacion or 'En Venta' }}</span>
+        </div>
+        <div class="prop-card-body">
+          <h3>{{ p.tipo_propiedad or 'Propiedad' }}</h3>
+          <div class="prop-ubicacion">{{ p.direccion or '' }}</div>
+          <div class="prop-precio">{{ p.precio_formateado or 'Consultar' }}</div>
+          <div class="prop-specs">
+            {% if p.recamaras %}<span class="prop-spec">{{ p.recamaras }} rec.</span>{% endif %}
+            {% if p.banos %}<span class="prop-spec">{{ p.banos }} ba.</span>{% endif %}
+            {% if p.metros_construidos %}<span class="prop-spec">{{ p.metros_construidos }} m²</span>{% endif %}
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- CTA -->
+<section class="section">
+  <div class="cta-section">
+    <h2 class="section-title" style="margin-bottom:12px">¿Te interesa {{ desarrollo.nombre }}?</h2>
+    <p style="color:var(--text-dim);margin-bottom:24px">Agenda una visita y conoce el desarrollo en persona</p>
+    <a href="https://wa.me/524737365219?text={{ ('Hola, me interesa ' + desarrollo.nombre + '. ¿Podrían darme más información?')|urlencode }}" class="btn-cta" target="_blank">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.612.616l4.523-1.471A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.312-.726-5.994-1.956l-.418-.306-2.685.873.896-2.632-.336-.432A9.96 9.96 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+      Agendar visita por WhatsApp
+    </a>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div>
+      <img src="/static/logo-full.png" alt="iRealEstateMx" style="height:32px;margin-bottom:16px;filter:brightness(2)"/>
+      <p>Asesores inmobiliarios certificados en Guanajuato.</p>
+      <p style="margin-top:12px">Tel: <a href="tel:+524737365219">473 736 5219</a> | Email: <a href="mailto:irealestatemx@gmail.com">irealestatemx@gmail.com</a></p>
+    </div>
+    <div>
+      <h4>Desarrollos</h4>
+      <ul class="footer-links">
+        <li><a href="/desarrollo/carcamos-residencial">Cárcamos Residencial</a></li>
+        <li><a href="/desarrollo/privada-del-fresno">Privada del Fresno</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Propiedades</h4>
+      <ul class="footer-links">
+        <li><a href="/propiedades?operacion=venta">En Venta</a></li>
+        <li><a href="/propiedades?operacion=renta">En Renta</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom"><span>&copy; 2026 iRealEstateMx.</span></div>
+</footer>
+
+<!-- WhatsApp Float -->
+<a href="https://wa.me/524737365219?text=Hola%2C%20me%20interesa%20información" class="wa-float" target="_blank">
+  <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.612.616l4.523-1.471A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.312-.726-5.994-1.956l-.418-.306-2.685.873.896-2.632-.336-.432A9.96 9.96 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+</a>
+
+</body>
+</html>

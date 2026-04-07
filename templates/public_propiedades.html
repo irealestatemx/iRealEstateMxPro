@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Propiedades {{ ('en ' + filtro_operacion.title()) if filtro_operacion else '' }} — iRealEstateMx</title>
+  <meta name="description" content="Encuentra propiedades en venta y renta en Guanajuato, León e Irapuato. Casas, departamentos, terrenos y locales comerciales."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/public.css"/>
+  <link rel="icon" href="/static/logo-header.png"/>
+</head>
+<body>
+
+<!-- ─── Topbar ─── -->
+<nav class="topbar">
+  <a href="/"><img src="/static/logo-full.png" alt="iRealEstateMx" class="topbar-logo"/></a>
+  <button class="hamburger" onclick="this.classList.toggle('open');document.getElementById('nav').classList.toggle('open')">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="topbar-nav" id="nav">
+    <a href="/">Inicio</a>
+    <a href="/propiedades" class="{{ 'active' if not filtro_operacion else '' }}">Todas</a>
+    <a href="/propiedades?operacion=venta" class="{{ 'active' if filtro_operacion == 'venta' else '' }}">Venta</a>
+    <a href="/propiedades?operacion=renta" class="{{ 'active' if filtro_operacion == 'renta' else '' }}">Renta</a>
+    <a href="/desarrollos">Desarrollos</a>
+    <a href="#contacto">Contacto</a>
+  </div>
+</nav>
+
+<!-- ─── Header + Filtros ─── -->
+<section class="listing-header">
+  <h1 class="section-title">
+    {% if filtro_operacion == 'venta' %}Propiedades en Venta
+    {% elif filtro_operacion == 'renta' %}Propiedades en Renta
+    {% else %}Todas las Propiedades{% endif %}
+  </h1>
+  <p class="section-subtitle">{{ total }} propiedad{{ 'es' if total != 1 else '' }} encontrada{{ 's' if total != 1 else '' }}</p>
+
+  <form class="filters-bar" method="GET" action="/propiedades" id="filterForm">
+    <select name="operacion" onchange="document.getElementById('filterForm').submit()">
+      <option value="">Operación</option>
+      <option value="venta" {{ 'selected' if filtro_operacion == 'venta' else '' }}>En Venta</option>
+      <option value="renta" {{ 'selected' if filtro_operacion == 'renta' else '' }}>En Renta</option>
+    </select>
+    <select name="tipo" onchange="document.getElementById('filterForm').submit()">
+      <option value="">Tipo</option>
+      <option value="casa" {{ 'selected' if filtro_tipo == 'casa' else '' }}>Casa</option>
+      <option value="departamento" {{ 'selected' if filtro_tipo == 'departamento' else '' }}>Departamento</option>
+      <option value="terreno" {{ 'selected' if filtro_tipo == 'terreno' else '' }}>Terreno</option>
+      <option value="local" {{ 'selected' if filtro_tipo == 'local' else '' }}>Local Comercial</option>
+    </select>
+    <select name="ciudad" onchange="document.getElementById('filterForm').submit()">
+      <option value="">Ciudad</option>
+      <option value="guanajuato" {{ 'selected' if filtro_ciudad == 'guanajuato' else '' }}>Guanajuato</option>
+      <option value="leon" {{ 'selected' if filtro_ciudad == 'leon' else '' }}>León</option>
+      <option value="irapuato" {{ 'selected' if filtro_ciudad == 'irapuato' else '' }}>Irapuato</option>
+    </select>
+    <select name="precio_max" onchange="document.getElementById('filterForm').submit()">
+      <option value="">Precio máximo</option>
+      <option value="1000000" {{ 'selected' if filtro_precio_max == '1000000' else '' }}>Hasta $1M</option>
+      <option value="2000000" {{ 'selected' if filtro_precio_max == '2000000' else '' }}>Hasta $2M</option>
+      <option value="3000000" {{ 'selected' if filtro_precio_max == '3000000' else '' }}>Hasta $3M</option>
+      <option value="5000000" {{ 'selected' if filtro_precio_max == '5000000' else '' }}>Hasta $5M</option>
+      <option value="10000000" {{ 'selected' if filtro_precio_max == '10000000' else '' }}>Hasta $10M</option>
+    </select>
+    <button type="submit" class="btn-search">Filtrar</button>
+  </form>
+</section>
+
+<!-- ─── Grid ─── -->
+<section class="section" style="padding-top:0">
+  <div class="section-inner">
+    {% if propiedades %}
+    <div class="prop-grid">
+      {% for p in propiedades %}
+      <a href="/propiedad/{{ p.id }}" class="prop-card" style="text-decoration:none;color:inherit">
+        <div class="prop-card-img">
+          {% if p.foto_portada_url %}
+          <img src="{{ p.foto_portada_url }}" alt="{{ p.direccion or 'Propiedad' }}" loading="lazy"/>
+          {% else %}
+          <div style="width:100%;height:100%;background:#222;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">Sin foto</div>
+          {% endif %}
+          <span class="prop-badge {{ 'renta' if p.operacion and 'renta' in p.operacion.lower() else '' }}">
+            {{ p.operacion or 'En Venta' }}
+          </span>
+        </div>
+        <div class="prop-card-body">
+          <h3>{{ p.tipo_propiedad or 'Propiedad' }} {{ ('en ' + p.ciudad) if p.ciudad else '' }}</h3>
+          <div class="prop-ubicacion">{{ p.direccion or p.ciudad or '' }}</div>
+          <div class="prop-precio">{{ p.precio_formateado or ('$' + '{:,.0f}'.format(p.precio|float) + ' MXN' if p.precio else 'Consultar') }}</div>
+          <div class="prop-specs">
+            {% if p.recamaras %}
+            <span class="prop-spec">
+              <svg viewBox="0 0 24 24"><path d="M7 14c1.66 0 3-1.34 3-3S8.66 8 7 8s-3 1.34-3 3 1.34 3 3 3zm0-4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm12-3h-8v8H3V5H1v15h2v-3h18v3h2V9c0-2.21-1.79-4-4-4zm2 8h-8V9h6c1.1 0 2 .9 2 2v4z"/></svg>
+              {{ p.recamaras }} rec.
+            </span>
+            {% endif %}
+            {% if p.banos %}
+            <span class="prop-spec">
+              <svg viewBox="0 0 24 24"><path d="M7 7V4c0-1.1.9-2 2-2h6c1.1 0 2 .9 2 2v3h2c1.1 0 2 .9 2 2v9h-2l-1 2h-1l-1-2H7l-1 2H5l-1-2H2V9c0-1.1.9-2 2-2h3zm2-3v3h6V4H9zm10 7H5v5h14v-5z"/></svg>
+              {{ p.banos }} ba.
+            </span>
+            {% endif %}
+            {% if p.metros_construidos %}
+            <span class="prop-spec">
+              <svg viewBox="0 0 24 24"><path d="M19 12h-2v3h-3v2h5v-5zM7 9h3V7H5v5h2V9zm14-6H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16.01H3V4.99h18v14.02z"/></svg>
+              {{ p.metros_construidos }} m²
+            </span>
+            {% endif %}
+            {% if p.estacionamientos %}
+            <span class="prop-spec">
+              <svg viewBox="0 0 24 24"><path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/></svg>
+              {{ p.estacionamientos }} est.
+            </span>
+            {% endif %}
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+
+    {% if tiene_mas %}
+    <button class="load-more" onclick="cargarMas()">Cargar más propiedades</button>
+    {% endif %}
+
+    {% else %}
+    <div class="no-results">
+      <p style="font-size:40px;margin-bottom:16px">🏠</p>
+      <p>No encontramos propiedades con esos filtros.</p>
+      <p style="margin-top:8px"><a href="/propiedades">Ver todas las propiedades</a></p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- ─── Footer ─── -->
+<footer class="footer" id="contacto">
+  <div class="footer-inner">
+    <div>
+      <img src="/static/logo-full.png" alt="iRealEstateMx" style="height:32px;margin-bottom:16px;filter:brightness(2)"/>
+      <p>Asesores inmobiliarios certificados en Guanajuato.</p>
+      <p style="margin-top:12px">Tel: <a href="tel:+524737365219">473 736 5219</a></p>
+      <p>Email: <a href="mailto:irealestatemx@gmail.com">irealestatemx@gmail.com</a></p>
+    </div>
+    <div>
+      <h4>Propiedades</h4>
+      <ul class="footer-links">
+        <li><a href="/propiedades?operacion=venta">En Venta</a></li>
+        <li><a href="/propiedades?operacion=renta">En Renta</a></li>
+        <li><a href="/propiedades?tipo=casa">Casas</a></li>
+        <li><a href="/propiedades?tipo=terreno">Terrenos</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Desarrollos</h4>
+      <ul class="footer-links">
+        <li><a href="/desarrollo/carcamos-residencial">Cárcamos Residencial</a></li>
+        <li><a href="/desarrollo/privada-del-fresno">Privada del Fresno</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>&copy; 2026 iRealEstateMx.</span>
+    <span>Guanajuato, León e Irapuato</span>
+  </div>
+</footer>
+
+<!-- WhatsApp Float -->
+<a href="https://wa.me/524737365219?text=Hola%2C%20me%20interesa%20información%20sobre%20sus%20propiedades" class="wa-float" target="_blank" title="WhatsApp">
+  <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.612.616l4.523-1.471A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.312-.726-5.994-1.956l-.418-.306-2.685.873.896-2.632-.336-.432A9.96 9.96 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+</a>
+
+<script>
+let offset = {{ propiedades|length }};
+async function cargarMas() {
+  const params = new URLSearchParams(window.location.search);
+  params.set('offset', offset);
+  params.set('limit', '12');
+  params.set('activas', 'true');
+  const r = await fetch('/api/propiedades?' + params.toString());
+  const data = await r.json();
+  if (!data.propiedades || data.propiedades.length === 0) {
+    document.querySelector('.load-more').style.display = 'none';
+    return;
+  }
+  const grid = document.querySelector('.prop-grid');
+  data.propiedades.forEach(p => {
+    const op = (p.operacion || '').toLowerCase();
+    const card = document.createElement('a');
+    card.href = '/propiedad/' + p.id;
+    card.className = 'prop-card';
+    card.style = 'text-decoration:none;color:inherit';
+    card.innerHTML = `
+      <div class="prop-card-img">
+        ${p.foto_portada_url ? `<img src="${p.foto_portada_url}" loading="lazy"/>` : '<div style="width:100%;height:100%;background:#222;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">Sin foto</div>'}
+        <span class="prop-badge ${op.includes('renta')?'renta':''}">${p.operacion||'En Venta'}</span>
+      </div>
+      <div class="prop-card-body">
+        <h3>${p.tipo_propiedad||'Propiedad'} ${p.ciudad?'en '+p.ciudad:''}</h3>
+        <div class="prop-ubicacion">${p.direccion||p.ciudad||''}</div>
+        <div class="prop-precio">${p.precio_formateado||'Consultar'}</div>
+        <div class="prop-specs">
+          ${p.recamaras?`<span class="prop-spec">${p.recamaras} rec.</span>`:''}
+          ${p.banos?`<span class="prop-spec">${p.banos} ba.</span>`:''}
+          ${p.metros_construidos?`<span class="prop-spec">${p.metros_construidos} m²</span>`:''}
+        </div>
+      </div>`;
+    grid.appendChild(card);
+  });
+  offset += data.propiedades.length;
+  if (offset >= data.total) document.querySelector('.load-more').style.display = 'none';
+}
+</script>
+
+</body>
+</html>

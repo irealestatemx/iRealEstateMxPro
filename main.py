@@ -1792,7 +1792,14 @@ async def logout():
 async def index(request: Request):
     user = await require_auth(request)
     if not user:
-        return RedirectResponse("/login", status_code=302)
+        # Visitante no autenticado → web pública
+        props = await get_all_properties(active_only=True, limit=12, offset=0)
+        desarrollos_list = list(DESARROLLOS_DATA.values())
+        return templates.TemplateResponse("public_home.html", {
+            "request": request,
+            "propiedades": props,
+            "desarrollos": desarrollos_list,
+        })
     return templates.TemplateResponse(request=request, name="wizard.html", context={"user": user})
 
 
@@ -3934,6 +3941,173 @@ async def api_registrar_prospecto(request: Request):
         "ok": True,
         "prospecto_id": prospecto_id,
         "referido": referido["nombre"] if referido else None,
+    })
+
+
+# ─── Páginas Públicas (web pública) ───
+
+# Datos estáticos de desarrollos (editables desde aquí o futuro panel)
+DESARROLLOS_DATA = {
+    "carcamos-residencial": {
+        "slug": "carcamos-residencial",
+        "nombre": "Cárcamos Residencial",
+        "ubicacion": "Cerca de ALAÏA, Guanajuato",
+        "tipo": "Casas nuevas",
+        "precio_desde": "$2,990,000 MXN",
+        "unidades": "",
+        "imagen": "/static/uploads/carcamos-hero.jpg",  # Subir imagen 800x400
+        "descripcion_corta": "Casas nuevas residenciales en zona de alta plusvalía cerca de ALAÏA.",
+        "descripcion": "Cárcamos Residencial es un desarrollo de casas nuevas residenciales ubicado en una de las zonas con mayor crecimiento y plusvalía en Guanajuato.\n\nIdeal para familias y profesionistas que buscan un hogar con concepto moderno y funcional, con opción de personalización de acabados.",
+        "diferenciales": [
+            "Zona con alta plusvalía",
+            "Ideal para familias",
+            "Personalización de acabados",
+            "Concepto moderno y funcional",
+            "Promoción vigente",
+        ],
+        "tags": ["Alta plusvalía", "Casas nuevas", "Personalizable"],
+        "pdf_url": "/static/docs/carcamos-residencial.pdf",
+    },
+    "privada-del-fresno": {
+        "slug": "privada-del-fresno",
+        "nombre": "Privada del Fresno",
+        "ubicacion": "Cerca de Las Teresas, Guanajuato",
+        "tipo": "24 casas exclusivas",
+        "precio_desde": "Consultar",
+        "unidades": "24",
+        "imagen": "/static/uploads/fresno-hero.jpg",  # Subir imagen 800x400
+        "descripcion_corta": "Desarrollo exclusivo de solo 24 casas con gimnasio y áreas verdes.",
+        "descripcion": "Privada del Fresno es un desarrollo exclusivo de solo 24 casas, lo que garantiza baja densidad y alta plusvalía.\n\nCuenta con amenidades como gimnasio y áreas verdes. Esquemas de preventa con enganches accesibles y posibilidad de elegir acabados.\n\nEntrega aproximada en 7 meses con seguimiento de obra mensual.",
+        "diferenciales": [
+            "Solo 24 casas",
+            "Baja densidad",
+            "Gimnasio y áreas verdes",
+            "Enganches accesibles",
+            "Elegir acabados",
+            "Entrega en 7 meses",
+        ],
+        "tags": ["Exclusivo", "Preventa", "Amenidades"],
+        "pdf_url": "/static/docs/privada-del-fresno.pdf",
+    },
+}
+
+
+@app.get("/web")
+async def public_home(request: Request):
+    """Página principal pública."""
+    props = await get_all_properties(active_only=True, limit=12, offset=0)
+    desarrollos = list(DESARROLLOS_DATA.values())
+    return templates.TemplateResponse("public_home.html", {
+        "request": request,
+        "propiedades": props,
+        "desarrollos": desarrollos,
+    })
+
+
+@app.get("/propiedades")
+async def public_propiedades(
+    request: Request,
+    operacion: Optional[str] = None,
+    tipo: Optional[str] = None,
+    ciudad: Optional[str] = None,
+    precio_max: Optional[str] = None,
+    limit: int = 12,
+    offset: int = 0,
+):
+    """Listado público de propiedades con filtros."""
+    precio_max_f = float(precio_max) if precio_max else None
+    if any([operacion, tipo, ciudad, precio_max_f]):
+        props = await search_properties(
+            ciudad=ciudad, operacion=operacion, tipo=tipo,
+            precio_max=precio_max_f, limit=limit
+        )
+        total = len(props)
+    else:
+        props = await get_all_properties(active_only=True, limit=limit, offset=offset)
+        total = await count_properties(active_only=True)
+
+    return templates.TemplateResponse("public_propiedades.html", {
+        "request": request,
+        "propiedades": props,
+        "total": total,
+        "tiene_mas": total > offset + limit,
+        "filtro_operacion": operacion or "",
+        "filtro_tipo": tipo or "",
+        "filtro_ciudad": ciudad or "",
+        "filtro_precio_max": precio_max or "",
+    })
+
+
+@app.get("/propiedad/{prop_id}")
+async def public_propiedad_detalle(request: Request, prop_id: int):
+    """Detalle público de una propiedad."""
+    prop = await get_property_by_id(prop_id)
+    if not prop:
+        return templates.TemplateResponse("public_propiedades.html", {
+            "request": request, "propiedades": [], "total": 0,
+            "tiene_mas": False, "filtro_operacion": "", "filtro_tipo": "",
+            "filtro_ciudad": "", "filtro_precio_max": "",
+        })
+
+    # Parsear fotos extra
+    fotos_extra = prop.get("fotos_extra_urls") or []
+    if isinstance(fotos_extra, str):
+        import json as _json
+        try:
+            fotos_extra = _json.loads(fotos_extra)
+        except Exception:
+            fotos_extra = []
+
+    # Parsear amenidades
+    amenidades = prop.get("amenidades") or []
+    if isinstance(amenidades, str):
+        import json as _json
+        try:
+            amenidades = _json.loads(amenidades)
+        except Exception:
+            amenidades = []
+
+    return templates.TemplateResponse("public_propiedad.html", {
+        "request": request,
+        "prop": prop,
+        "fotos_extra": fotos_extra,
+        "amenidades": amenidades,
+    })
+
+
+@app.get("/desarrollos")
+async def public_desarrollos(request: Request):
+    """Listado de desarrollos."""
+    return templates.TemplateResponse("public_desarrollos.html", {
+        "request": request,
+        "desarrollos": list(DESARROLLOS_DATA.values()),
+    })
+
+
+@app.get("/desarrollo/{slug}")
+async def public_desarrollo_detalle(request: Request, slug: str):
+    """Detalle de un desarrollo con sus propiedades."""
+    desarrollo = DESARROLLOS_DATA.get(slug)
+    if not desarrollo:
+        return templates.TemplateResponse("public_desarrollos.html", {
+            "request": request,
+            "desarrollos": list(DESARROLLOS_DATA.values()),
+        })
+
+    # Buscar propiedades relacionadas al desarrollo por nombre
+    nombre_dev = desarrollo["nombre"]
+    all_props = await get_all_properties(active_only=True, limit=50)
+    props_dev = [
+        p for p in all_props
+        if nombre_dev.lower() in (p.get("direccion", "") or "").lower()
+        or nombre_dev.lower() in (p.get("descripcion_agente", "") or "").lower()
+        or nombre_dev.lower() in (p.get("descripcion_profesional", "") or "").lower()
+    ]
+
+    return templates.TemplateResponse("public_desarrollo.html", {
+        "request": request,
+        "desarrollo": desarrollo,
+        "propiedades": props_dev,
     })
 
 

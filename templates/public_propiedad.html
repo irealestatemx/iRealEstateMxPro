@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>{{ prop.tipo_propiedad or 'Propiedad' }} en {{ prop.ciudad or 'Guanajuato' }} — iRealEstateMx</title>
+  <meta name="description" content="{{ (prop.descripcion_profesional or prop.descripcion_agente or '')[:160] }}"/>
+  <meta property="og:title" content="{{ prop.tipo_propiedad or 'Propiedad' }} en {{ prop.ciudad or 'Guanajuato' }} — iRealEstateMx"/>
+  <meta property="og:description" content="{{ prop.precio_formateado or '' }} — {{ prop.direccion or '' }}"/>
+  {% if prop.foto_portada_url %}<meta property="og:image" content="{{ prop.foto_portada_url }}"/>{% endif %}
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/public.css"/>
+  <link rel="icon" href="/static/logo-header.png"/>
+  <style>
+    .gallery-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:200;align-items:center;justify-content:center;flex-direction:column}
+    .gallery-modal.open{display:flex}
+    .gallery-modal img{max-width:90vw;max-height:80vh;object-fit:contain;border-radius:8px}
+    .gallery-modal .close{position:absolute;top:20px;right:24px;color:#fff;font-size:32px;cursor:pointer;background:none;border:none}
+    .gallery-modal .nav-btn{position:absolute;top:50%;transform:translateY(-50%);background:rgba(201,162,39,.2);border:none;color:#fff;font-size:28px;padding:12px 16px;cursor:pointer;border-radius:8px}
+    .gallery-modal .nav-btn:hover{background:rgba(201,162,39,.4)}
+    .gallery-modal .prev{left:16px}
+    .gallery-modal .next{right:16px}
+    .gallery-counter{color:var(--text-dim);font-size:14px;margin-top:12px}
+  </style>
+</head>
+<body>
+
+<!-- ─── Topbar ─── -->
+<nav class="topbar">
+  <a href="/"><img src="/static/logo-full.png" alt="iRealEstateMx" class="topbar-logo"/></a>
+  <button class="hamburger" onclick="this.classList.toggle('open');document.getElementById('nav').classList.toggle('open')">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="topbar-nav" id="nav">
+    <a href="/">Inicio</a>
+    <a href="/propiedades">Propiedades</a>
+    <a href="/propiedades?operacion=venta">Venta</a>
+    <a href="/propiedades?operacion=renta">Renta</a>
+    <a href="/desarrollos">Desarrollos</a>
+  </div>
+</nav>
+
+<!-- ─── Gallery ─── -->
+<section class="detail-hero">
+  <div class="detail-inner">
+    <div class="detail-gallery">
+      {% if prop.foto_portada_url %}
+      <img src="{{ prop.foto_portada_url }}" alt="Foto principal" class="main-img" onclick="abrirGaleria(0)"/>
+      {% else %}
+      <div class="main-img" style="background:#222;display:flex;align-items:center;justify-content:center;color:var(--text-dim)">Sin fotos</div>
+      {% endif %}
+      <div class="side-imgs">
+        {% for foto in fotos_extra[:2] %}
+        <img src="{{ foto }}" alt="Foto {{ loop.index + 1 }}" onclick="abrirGaleria({{ loop.index }})" loading="lazy"/>
+        {% endfor %}
+        {% if fotos_extra|length > 2 %}
+        <div style="flex:1;background:var(--bg-card);display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:0" onclick="abrirGaleria(2)">
+          <span style="color:var(--gold);font-weight:600">+{{ fotos_extra|length - 2 }} fotos</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- ─── Content ─── -->
+    <div class="detail-content">
+      <div class="detail-info">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+          <span class="prop-badge {{ 'renta' if prop.operacion and 'renta' in prop.operacion.lower() else '' }}" style="position:static">{{ prop.operacion or 'En Venta' }}</span>
+        </div>
+        <h1>{{ prop.tipo_propiedad or 'Propiedad' }} en {{ prop.ciudad or 'Guanajuato' }}</h1>
+        <div class="detail-ubicacion">{{ prop.direccion or '' }}{{ (', ' + prop.ciudad) if prop.ciudad and prop.direccion else (prop.ciudad or '') }}{{ (', ' + prop.estado) if prop.estado else '' }}</div>
+        <div class="detail-precio">{{ prop.precio_formateado or ('$' + '{:,.0f}'.format(prop.precio|float) + ' MXN' if prop.precio else 'Consultar precio') }}</div>
+
+        <!-- Specs -->
+        <div class="detail-specs-grid">
+          {% if prop.recamaras %}
+          <div class="detail-spec"><span class="spec-value">{{ prop.recamaras }}</span><span class="spec-label">Recámaras</span></div>
+          {% endif %}
+          {% if prop.banos %}
+          <div class="detail-spec"><span class="spec-value">{{ prop.banos }}</span><span class="spec-label">Baños</span></div>
+          {% endif %}
+          {% if prop.metros_construidos %}
+          <div class="detail-spec"><span class="spec-value">{{ prop.metros_construidos }}</span><span class="spec-label">m² Construidos</span></div>
+          {% endif %}
+          {% if prop.metros_terreno %}
+          <div class="detail-spec"><span class="spec-value">{{ prop.metros_terreno }}</span><span class="spec-label">m² Terreno</span></div>
+          {% endif %}
+          {% if prop.estacionamientos %}
+          <div class="detail-spec"><span class="spec-value">{{ prop.estacionamientos }}</span><span class="spec-label">Estacionamientos</span></div>
+          {% endif %}
+        </div>
+
+        <!-- Descripción -->
+        {% if prop.descripcion_profesional %}
+        <h3 style="color:var(--text-bright);margin-bottom:12px;font-size:18px">Descripción</h3>
+        <div class="detail-desc">{{ prop.descripcion_profesional|replace('\n','<br>')|safe }}</div>
+        {% elif prop.descripcion_agente %}
+        <h3 style="color:var(--text-bright);margin-bottom:12px;font-size:18px">Descripción</h3>
+        <div class="detail-desc">{{ prop.descripcion_agente|replace('\n','<br>')|safe }}</div>
+        {% endif %}
+
+        <!-- Amenidades -->
+        {% if amenidades %}
+        <h3 style="color:var(--text-bright);margin-bottom:12px;font-size:18px">Amenidades</h3>
+        <div class="detail-amenidades">
+          {% for a in amenidades %}
+          <span class="detail-amenidad">{{ a }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+
+      <!-- ─── Sidebar ─── -->
+      <div class="detail-sidebar">
+        <div class="contact-card">
+          <h3>{{ prop.agente_nombre or 'Esteban Castellanos' }}</h3>
+          <div class="contact-rol">Asesor Inmobiliario</div>
+          {% set wa_phone = (prop.agente_telefono or '4737365219')|replace(' ','')|replace('-','')|replace('+','') %}
+          {% set wa_msg = 'Hola, me interesa la propiedad ' + (prop.tipo_propiedad or '') + ' en ' + (prop.ciudad or 'Guanajuato') + ' por ' + (prop.precio_formateado or '') %}
+          <a href="https://wa.me/52{{ wa_phone }}?text={{ wa_msg|urlencode }}" class="btn-cta" target="_blank">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.612.616l4.523-1.471A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.312-.726-5.994-1.956l-.418-.306-2.685.873.896-2.632-.336-.432A9.96 9.96 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+            WhatsApp
+          </a>
+          {% if prop.agente_telefono %}
+          <a href="tel:+52{{ wa_phone }}" class="btn-outline">
+            Llamar
+          </a>
+          {% endif %}
+          {% if prop.agente_email %}
+          <a href="mailto:{{ prop.agente_email }}?subject=Información propiedad {{ prop.id }}" class="btn-outline" style="margin-top:8px">
+            Email
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─── Footer ─── -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div>
+      <img src="/static/logo-full.png" alt="iRealEstateMx" style="height:32px;margin-bottom:16px;filter:brightness(2)"/>
+      <p>Asesores inmobiliarios certificados en Guanajuato.</p>
+      <p style="margin-top:12px">Tel: <a href="tel:+524737365219">473 736 5219</a> | Email: <a href="mailto:irealestatemx@gmail.com">irealestatemx@gmail.com</a></p>
+    </div>
+    <div>
+      <h4>Propiedades</h4>
+      <ul class="footer-links">
+        <li><a href="/propiedades?operacion=venta">En Venta</a></li>
+        <li><a href="/propiedades?operacion=renta">En Renta</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Desarrollos</h4>
+      <ul class="footer-links">
+        <li><a href="/desarrollo/carcamos-residencial">Cárcamos Residencial</a></li>
+        <li><a href="/desarrollo/privada-del-fresno">Privada del Fresno</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>&copy; 2026 iRealEstateMx.</span>
+    <span>Guanajuato, León e Irapuato</span>
+  </div>
+</footer>
+
+<!-- WhatsApp Float -->
+<a href="https://wa.me/524737365219?text=Hola%2C%20me%20interesa%20información" class="wa-float" target="_blank">
+  <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.612.616l4.523-1.471A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.312-.726-5.994-1.956l-.418-.306-2.685.873.896-2.632-.336-.432A9.96 9.96 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+</a>
+
+<!-- ─── Gallery Modal ─── -->
+<div class="gallery-modal" id="galleryModal">
+  <button class="close" onclick="cerrarGaleria()">&times;</button>
+  <button class="nav-btn prev" onclick="navGaleria(-1)">&#8249;</button>
+  <img id="galleryImg" src="" alt=""/>
+  <button class="nav-btn next" onclick="navGaleria(1)">&#8250;</button>
+  <div class="gallery-counter" id="galleryCounter"></div>
+</div>
+
+<script>
+const fotos = [
+  {% if prop.foto_portada_url %}'{{ prop.foto_portada_url }}',{% endif %}
+  {% for f in fotos_extra %}'{{ f }}',{% endfor %}
+];
+let gIdx = 0;
+function abrirGaleria(i) {
+  gIdx = i + ({{ 1 if prop.foto_portada_url else 0 }});
+  if (gIdx >= fotos.length) gIdx = 0;
+  mostrarFoto();
+  document.getElementById('galleryModal').classList.add('open');
+}
+function cerrarGaleria() { document.getElementById('galleryModal').classList.remove('open'); }
+function navGaleria(d) { gIdx = (gIdx + d + fotos.length) % fotos.length; mostrarFoto(); }
+function mostrarFoto() {
+  document.getElementById('galleryImg').src = fotos[gIdx];
+  document.getElementById('galleryCounter').textContent = (gIdx+1) + ' / ' + fotos.length;
+}
+document.addEventListener('keydown', e => {
+  if (!document.getElementById('galleryModal').classList.contains('open')) return;
+  if (e.key === 'Escape') cerrarGaleria();
+  if (e.key === 'ArrowLeft') navGaleria(-1);
+  if (e.key === 'ArrowRight') navGaleria(1);
+});
+</script>
+
+</body>
+</html>

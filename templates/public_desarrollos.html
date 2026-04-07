@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Desarrollos Inmobiliarios — iRealEstateMx</title>
+  <meta name="description" content="Conoce nuestros desarrollos inmobiliarios exclusivos en Guanajuato. Preventas, casas nuevas y oportunidades de inversión."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/public.css"/>
+  <link rel="icon" href="/static/logo-header.png"/>
+</head>
+<body>
+
+<nav class="topbar">
+  <a href="/"><img src="/static/logo-full.png" alt="iRealEstateMx" class="topbar-logo"/></a>
+  <button class="hamburger" onclick="this.classList.toggle('open');document.getElementById('nav').classList.toggle('open')">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="topbar-nav" id="nav">
+    <a href="/">Inicio</a>
+    <a href="/propiedades">Propiedades</a>
+    <a href="/propiedades?operacion=venta">Venta</a>
+    <a href="/propiedades?operacion=renta">Renta</a>
+    <a href="/desarrollos" class="active">Desarrollos</a>
+  </div>
+</nav>
+
+<section class="hero" style="padding:60px 32px 48px">
+  <h1>Nuestros <span>Desarrollos</span></h1>
+  <p>Desarrollos exclusivos con alta plusvalía en Guanajuato</p>
+</section>
+
+<section class="section">
+  <div class="section-inner">
+    <div class="desarrollo-grid">
+      {% for d in desarrollos %}
+      <a href="/desarrollo/{{ d.slug }}" class="desarrollo-card" style="text-decoration:none;color:inherit">
+        <div class="desarrollo-card-img">
+          <img src="{{ d.imagen }}" alt="{{ d.nombre }}" loading="lazy" onerror="this.parentElement.innerHTML='<div style=\'width:100%;height:100%;background:#1a1a1a;display:flex;align-items:center;justify-content:center;color:#c9a227;font-size:18px;font-weight:600\'>'+this.alt+'</div>'"/>
+        </div>
+        <div class="desarrollo-card-body">
+          <h3>{{ d.nombre }}</h3>
+          <div class="desarrollo-desde">Desde {{ d.precio_desde }}</div>
+          <p>{{ d.descripcion_corta }}</p>
+          <div class="desarrollo-tags">
+            {% for tag in d.tags %}
+            <span class="desarrollo-tag">{{ tag }}</span>
+            {% endfor %}
+          </div>
+        </div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="footer-inner">
+    <div>
+      <img src="/static/logo-full.png" alt="iRealEstateMx" style="height:32px;margin-bottom:16px;filter:brightness(2)"/>
+      <p>Asesores inmobiliarios certificados en Guanajuato.</p>
+      <p style="margin-top:12px">Tel: <a href="tel:+524737365219">473 736 5219</a></p>
+    </div>
+    <div>
+      <h4>Propiedades</h4>
+      <ul class="footer-links">
+        <li><a href="/propiedades?operacion=venta">En Venta</a></li>
+        <li><a href="/propiedades?operacion=renta">En Renta</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Desarrollos</h4>
+      <ul class="footer-links">
+        <li><a href="/desarrollo/carcamos-residencial">Cárcamos Residencial</a></li>
+        <li><a href="/desarrollo/privada-del-fresno">Privada del Fresno</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom"><span>&copy; 2026 iRealEstateMx.</span></div>
+</footer>
+
+<a href="https://wa.me/524737365219?text=Hola%2C%20me%20interesa%20información" class="wa-float" target="_blank">
+  <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492a.5.5 0 00.612.616l4.523-1.471A11.955 11.955 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 22c-2.24 0-4.312-.726-5.994-1.956l-.418-.306-2.685.873.896-2.632-.336-.432A9.96 9.96 0 012 12C2 6.486 6.486 2 12 2s10 4.486 10 10-4.486 10-10 10z"/></svg>
+</a>
+
+</body>
+</html>
