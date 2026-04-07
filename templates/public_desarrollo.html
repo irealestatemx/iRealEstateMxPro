@@ -8,13 +8,13 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/static/css/public.css"/>
-  <link rel="icon" href="/static/logo-header.png"/>
+  <link rel="icon" href="/static/img/logo-header.png"/>
 </head>
 <body>
 
 <!-- Topbar -->
 <nav class="topbar">
-  <a href="/"><img src="/static/logo-full.png" alt="iRealEstateMx" class="topbar-logo"/></a>
+  <a href="/"><img src="/static/img/logo-full.png" alt="iRealEstateMx" class="topbar-logo"/></a>
   <button class="hamburger" onclick="this.classList.toggle('open');document.getElementById('nav').classList.toggle('open')">
     <span></span><span></span><span></span>
   </button>
@@ -29,7 +29,7 @@
 <section class="hero" style="padding:60px 32px 48px">
   <h1><span>{{ desarrollo.nombre }}</span></h1>
   <p>{{ desarrollo.ubicacion }}</p>
-  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:20px">
+  <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-top:20px;position:relative;z-index:1">
     <div class="stat-box" style="min-width:140px"><span class="stat-number">{{ desarrollo.precio_desde }}</span><span class="stat-label">Precio desde</span></div>
     <div class="stat-box" style="min-width:140px"><span class="stat-number">{{ desarrollo.tipo }}</span><span class="stat-label">Tipo</span></div>
     {% if desarrollo.unidades %}<div class="stat-box" style="min-width:140px"><span class="stat-number">{{ desarrollo.unidades }}</span><span class="stat-label">Unidades</span></div>{% endif %}
@@ -112,7 +112,7 @@
 <footer class="footer">
   <div class="footer-inner">
     <div>
-      <img src="/static/logo-full.png" alt="iRealEstateMx" style="height:32px;margin-bottom:16px;filter:brightness(2)"/>
+      <img src="/static/img/logo-full.png" alt="iRealEstateMx" style="height:32px;margin-bottom:16px;filter:brightness(2)"/>
       <p>{{ c.footer_texto }}</p>
       <p style="margin-top:12px">Tel: <a href="tel:+52{{ c.telefono }}">{{ c.telefono }}</a> | Email: <a href="mailto:{{ c.email }}">{{ c.email }}</a></p>
     </div>

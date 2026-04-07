@@ -41,26 +41,27 @@ img{max-width:100%;height:auto}
 
 /* ─── Hero ─── */
 .hero{
-  background:linear-gradient(135deg,#0a0a0a 0%,#1a1a2e 50%,#0d0d0d 100%);
-  padding:80px 32px 60px;text-align:center;position:relative;overflow:hidden;
+  background:url('/static/img/hero-bg.jpg') center/cover no-repeat;
+  padding:100px 32px 80px;text-align:center;position:relative;overflow:hidden;
 }
 .hero::before{
-  content:'';position:absolute;top:-50%;left:-50%;width:200%;height:200%;
-  background:radial-gradient(circle at 30% 40%,rgba(201,162,39,.06) 0%,transparent 50%);
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(10,10,10,.88) 0%,rgba(26,26,46,.75) 50%,rgba(13,13,13,.9) 100%);
   pointer-events:none;
 }
 .hero h1{
-  font-family:'Playfair Display',serif;font-size:clamp(28px,5vw,48px);
-  color:var(--text-bright);margin-bottom:12px;position:relative;
+  font-family:'Playfair Display',serif;font-size:clamp(32px,5vw,52px);
+  color:var(--text-bright);margin-bottom:16px;position:relative;z-index:1;
+  text-shadow:0 2px 12px rgba(0,0,0,.5);
 }
 .hero h1 span{color:var(--gold)}
-.hero p{color:var(--text-dim);font-size:clamp(15px,2vw,18px);max-width:600px;margin:0 auto 32px}
+.hero p{color:rgba(255,255,255,.7);font-size:clamp(15px,2vw,18px);max-width:600px;margin:0 auto 36px;position:relative;z-index:1;text-shadow:0 1px 8px rgba(0,0,0,.4)}
 
 /* ─── Search Bar ─── */
 .search-bar{
   display:flex;gap:12px;max-width:800px;margin:0 auto;flex-wrap:wrap;justify-content:center;
-  background:var(--bg-card);border:1px solid var(--border-gold);border-radius:var(--radius);
-  padding:16px 20px;position:relative;
+  background:rgba(26,26,26,.9);border:1px solid var(--border-gold);border-radius:var(--radius);
+  padding:16px 20px;position:relative;z-index:1;backdrop-filter:blur(8px);
 }
 .search-bar select,.search-bar input{
   background:#111;border:1px solid var(--border);border-radius:var(--radius-sm);
@@ -320,7 +321,7 @@ img{max-width:100%;height:auto}
   .topbar-nav{display:none;width:100%;flex-direction:column;gap:0;padding-top:12px;border-top:1px solid rgba(255,255,255,.1);margin-top:12px}
   .topbar-nav.open{display:flex}
   .topbar-nav a{padding:10px 0;font-size:15px}
-  .hero{padding:50px 20px 40px}
+  .hero{padding:60px 20px 48px}
   .section{padding:40px 16px}
   .prop-grid{grid-template-columns:1fr}
   .desarrollo-grid{grid-template-columns:1fr}

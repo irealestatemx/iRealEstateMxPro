@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/static/css/public.css"/>
-  <link rel="icon" href="/static/logo-header.png"/>
+  <link rel="icon" href="/static/img/logo-header.png"/>
   <style>
     .gallery-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.95);z-index:200;align-items:center;justify-content:center;flex-direction:column}
     .gallery-modal.open{display:flex}
@@ -23,7 +23,7 @@
     .gallery-modal .next{right:16px}
     .gallery-counter{color:var(--text-dim);font-size:14px;margin-top:12px}
     .share-bar{display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap}
-    .share-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid var(--border);color:var(--text-dim);transition:all .2s;text-decoration:none}
+    .share-btn{display:inline-flex;align-items:center;gap:6px;padding:6px 14px;border-radius:20px;font-size:12px;font-weight:600;border:1px solid var(--border);color:var(--text-dim);transition:all .2s;text-decoration:none;background:transparent;cursor:pointer;font-family:'Inter',sans-serif}
     .share-btn:hover{border-color:var(--gold);color:var(--gold)}
     .share-btn svg{width:14px;height:14px;fill:currentColor}
   </style>
@@ -32,7 +32,7 @@
 
 <!-- Topbar -->
 <nav class="topbar">
-  <a href="/"><img src="/static/logo-full.png" alt="iRealEstateMx" class="topbar-logo"/></a>
+  <a href="/"><img src="/static/img/logo-full.png" alt="iRealEstateMx" class="topbar-logo"/></a>
   <button class="hamburger" onclick="this.classList.toggle('open');document.getElementById('nav').classList.toggle('open')">
     <span></span><span></span><span></span>
   </button>
@@ -231,7 +231,7 @@
 <footer class="footer">
   <div class="footer-inner">
     <div>
-      <img src="/static/logo-full.png" alt="iRealEstateMx" style="height:32px;margin-bottom:16px;filter:brightness(2)"/>
+      <img src="/static/img/logo-full.png" alt="iRealEstateMx" style="height:32px;margin-bottom:16px;filter:brightness(2)"/>
       <p>{{ c.footer_texto }}</p>
       <p style="margin-top:12px">Tel: <a href="tel:+52{{ c.telefono }}">{{ c.telefono }}</a> | Email: <a href="mailto:{{ c.email }}">{{ c.email }}</a></p>
     </div>
