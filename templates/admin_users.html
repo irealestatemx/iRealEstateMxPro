@@ -111,7 +111,7 @@
         <div><strong>Contraseña:</strong> {{ c_password }}</div>
         <div><strong>Rol:</strong> {{ c_rol }}</div>
         {% if c_prefijo %}<div><strong>Prefijo WA:</strong> {{ c_prefijo }}</div>{% endif %}
-        <div><strong>URL de acceso:</strong> https://api.irealestatemx.cloud/login</div>
+        <div><strong>URL de acceso:</strong> https://irealestatemx.com/login</div>
       </div>
       <div style="margin-top:12px;display:flex;gap:8px;">
         <button onclick="copiarCredenciales()" class="btn-add" style="font-size:12px;padding:8px 16px;">📋 Copiar credenciales</button>
@@ -225,7 +225,7 @@
       texto += '🔒 Contraseña: ' + password + '\n';
       texto += '🏷️ Rol: ' + rol + '\n';
       if (prefijo) texto += '📱 Prefijo WA: ' + prefijo + '\n';
-      texto += '\n🌐 Entra aquí: https://api.irealestatemx.cloud/login';
+      texto += '\n🌐 Entra aquí: https://irealestatemx.com/login';
       navigator.clipboard.writeText(texto).then(function() {
         alert('✅ Credenciales copiadas al portapapeles');
       });

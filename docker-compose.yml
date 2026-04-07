@@ -13,10 +13,16 @@ services:
       - "8000"
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.fastapi.rule=Host(`api.irealestatemx.cloud`)"
+      # ─── Router principal: dominio público ───
+      - "traefik.http.routers.fastapi.rule=Host(`irealestatemx.com`) || Host(`www.irealestatemx.com`) || Host(`api.irealestatemx.cloud`)"
       - "traefik.http.routers.fastapi.entrypoints=websecure"
       - "traefik.http.routers.fastapi.tls.certresolver=mytlschallenge"
       - "traefik.http.services.fastapi.loadbalancer.server.port=8000"
+      # ─── Redirect www → sin www ───
+      - "traefik.http.middlewares.www-redirect.redirectregex.regex=^https://www\\.irealestatemx\\.com/(.*)"
+      - "traefik.http.middlewares.www-redirect.redirectregex.replacement=https://irealestatemx.com/$${1}"
+      - "traefik.http.middlewares.www-redirect.redirectregex.permanent=true"
+      - "traefik.http.routers.fastapi.middlewares=www-redirect"
     depends_on:
       - postgres
     networks:

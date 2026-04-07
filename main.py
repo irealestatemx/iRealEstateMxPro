@@ -1638,7 +1638,7 @@ async def disparar_notificaciones(tipo: str, user_id: int, propiedad_id: int, me
     asyncio.create_task(enviar_email_notificacion(user["email"], user["nombre"], asunto, cuerpo))
 
     # WhatsApp: ya no se envía automático, el agente lo manda desde el dashboard
-APP_URL = os.getenv("APP_URL", "https://api.irealestatemx.cloud")
+APP_URL = os.getenv("APP_URL", "https://irealestatemx.com")
 
 
 def _send_reset_email(to_email: str, to_name: str, reset_link: str):
