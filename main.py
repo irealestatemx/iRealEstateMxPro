@@ -3449,9 +3449,17 @@ _kommo_created: Dict[str, float] = {}  # telefono -> timestamp de ultimo lead cr
 _paused_chats: Dict[str, float] = {}  # telefono -> timestamp de cuando se pauso
 _active_chats: Dict[str, float] = {}  # telefono -> timestamp de cuando se activo la conversacion
 _bot_last_sent: Dict[str, float] = {}  # telefono -> timestamp de cuando el bot envio su ultima respuesta
-PAUSE_DURATION = 3600 * 4  # 4 horas de pausa por defecto
+PAUSE_DURATION = 3600 * 24  # 24 horas de pausa cuando Esteban escribe manualmente
 ACTIVE_DURATION = 60 * 30  # 30 minutos de actividad máxima del bot
 BOT_ECHO_WINDOW = 90  # segundos para considerar un fromMe como eco del bot (no de Esteban)
+
+# Números bloqueados: el bot NUNCA se activa con estos teléfonos
+# (desarrolladores, dueños de fraccionamiento, proveedores, etc.)
+# Formato: últimos 10 dígitos del teléfono (sin 52, sin +)
+BOT_BLOCKED_PHONES: set = set()
+_blocked_phones_raw = os.getenv("BOT_BLOCKED_PHONES", "")
+if _blocked_phones_raw:
+    BOT_BLOCKED_PHONES = {p.strip()[-10:] for p in _blocked_phones_raw.split(",") if p.strip()}
 
 # Palabras clave que activan el bot (sin importar mayúsculas)
 BOT_KEYWORDS = [
@@ -3481,14 +3489,30 @@ KOMMO_STATUS_ID = 103949563
 
 def _has_bot_keyword(text: str) -> bool:
     """Verifica si el mensaje contiene alguna palabra clave que activa el bot.
-    Ignora URLs para evitar falsos positivos con enlaces."""
-    # Quitar URLs del texto antes de buscar keywords
+    Ignora URLs y saludos genéricos para evitar falsos positivos."""
     import re as _re
+    # Quitar URLs del texto antes de buscar keywords
     text_sin_urls = _re.sub(r'https?://\S+', '', text)
     text_sin_urls = _re.sub(r'www\.\S+', '', text_sin_urls)
 
     # Si solo quedó espacio vacío (era solo un enlace), no activar
     if not text_sin_urls.strip():
+        return False
+
+    # Saludos genéricos que NO deben activar el bot por sí solos
+    text_clean = text_sin_urls.strip().lower()
+    text_clean = _re.sub(r'[!¡?¿.,\s]+', ' ', text_clean).strip()
+    SALUDOS_GENERICOS = {
+        "hola", "hola buen dia", "hola buenos dias", "hola buenas tardes",
+        "hola buenas noches", "buen dia", "buenos dias", "buenas tardes",
+        "buenas noches", "buenas", "que tal", "hola que tal",
+        "hey", "hi", "hello", "como estas", "hola como estas",
+        "que onda", "hola que onda", "saludos", "hola saludos",
+        "gracias", "muchas gracias", "ok", "okay", "va", "sale",
+        "si", "sí", "no", "claro", "perfecto", "listo",
+        "hola buen dia como estas", "hola buenas tardes como estas",
+    }
+    if text_clean in SALUDOS_GENERICOS:
         return False
 
     text_lower = text_sin_urls.lower()
@@ -3758,6 +3782,12 @@ async def whatsapp_debounce(request: Request):
     from_me = body.get("fromMe", False)
 
     now = time.time()
+
+    # ─── 0. Verificar si el teléfono está bloqueado ───
+    phone_last10 = phone[-10:] if phone else ""
+    if phone_last10 in BOT_BLOCKED_PHONES:
+        print(f"[BOT] Teléfono {phone} está BLOQUEADO → ignorar")
+        return JSONResponse({"process": False, "reason": "blocked_phone"})
 
     # ─── 1. Si fromMe → ¿es eco del bot o Esteban escribiendo? ───
     if from_me:
