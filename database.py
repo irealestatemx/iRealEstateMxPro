@@ -184,19 +184,25 @@ MIGRATIONS = [
     "ALTER TABLE prospectos ADD COLUMN IF NOT EXISTS email_cliente VARCHAR(300);",
     "ALTER TABLE prospectos ADD COLUMN IF NOT EXISTS cita_data JSONB DEFAULT '{}';",
     "ALTER TABLE prospectos ADD COLUMN IF NOT EXISTS historial JSONB DEFAULT '[]';",
-    """CREATE TABLE IF NOT EXISTS citas_chatbot (
-        id              SERIAL PRIMARY KEY,
-        prospecto_id    INTEGER REFERENCES prospectos(id) ON DELETE CASCADE,
-        titulo          VARCHAR(500),
-        desarrollo      VARCHAR(300),
-        fecha           DATE,
-        hora_inicio     TIME,
-        hora_fin        TIME,
-        estado          VARCHAR(50) DEFAULT 'pendiente',
-        google_event_id VARCHAR(300),
-        notas           TEXT,
-        created_at      TIMESTAMP DEFAULT NOW()
-    );""",
+]
+
+CREATE_CITAS_CHATBOT = """
+CREATE TABLE IF NOT EXISTS citas_chatbot (
+    id              SERIAL PRIMARY KEY,
+    prospecto_id    INTEGER REFERENCES prospectos(id) ON DELETE CASCADE,
+    titulo          VARCHAR(500),
+    desarrollo      VARCHAR(300),
+    fecha           DATE,
+    hora_inicio     TIME,
+    hora_fin        TIME,
+    estado          VARCHAR(50) DEFAULT 'pendiente',
+    google_event_id VARCHAR(300),
+    notas           TEXT,
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+"""
+
+CREATE_INDEXES_CITAS = [
     "CREATE INDEX IF NOT EXISTS idx_citas_prospecto ON citas_chatbot(prospecto_id);",
     "CREATE INDEX IF NOT EXISTS idx_citas_fecha ON citas_chatbot(fecha);",
     "CREATE INDEX IF NOT EXISTS idx_citas_estado ON citas_chatbot(estado);",
@@ -220,6 +226,13 @@ async def init_db():
     for mig in MIGRATIONS:
         try:
             await database.execute(mig)
+        except Exception:
+            pass
+    # Tabla de citas chatbot (después de migrations para que fuente exista)
+    await database.execute(CREATE_CITAS_CHATBOT)
+    for idx in CREATE_INDEXES_CITAS:
+        try:
+            await database.execute(idx)
         except Exception:
             pass
 
@@ -728,10 +741,10 @@ async def create_prospecto(data: dict) -> int:
     query = """
     INSERT INTO prospectos (
         referido_id, agente_id, nombre_cliente, telefono_cliente,
-        mensaje_original, prefijo, desarrollo_interes, estado, notas
+        mensaje_original, prefijo, desarrollo_interes, estado, notas, fuente
     ) VALUES (
         :referido_id, :agente_id, :nombre_cliente, :telefono_cliente,
-        :mensaje_original, :prefijo, :desarrollo_interes, :estado, :notas
+        :mensaje_original, :prefijo, :desarrollo_interes, :estado, :notas, :fuente
     ) RETURNING id
     """
     values = {
@@ -744,6 +757,7 @@ async def create_prospecto(data: dict) -> int:
         "desarrollo_interes": data.get("desarrollo_interes", ""),
         "estado": data.get("estado", "nuevo"),
         "notas": data.get("notas", ""),
+        "fuente": data.get("fuente", "chatbot"),
     }
     return await database.execute(query=query, values=values)
 

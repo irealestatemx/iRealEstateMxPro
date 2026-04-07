@@ -3588,92 +3588,99 @@ async def whatsapp_paused_list():
 async def chatbot_registrar_cita(request: Request):
     """Registra un prospecto y su cita desde el chatbot de n8n.
     Reemplaza a Kommo: registra en BD, envía email al agente."""
-    body = await request.json()
+    try:
+        body = await request.json()
+    except Exception as e:
+        return JSONResponse({"error": f"JSON inválido: {e}"}, status_code=400)
 
-    telefono = body.get("telefono_cliente", "")
-    nombre = body.get("nombre_cliente", "")
-    desarrollo = body.get("desarrollo", "")
-    es_cita = body.get("es_cita", False)
-    fecha = body.get("fecha", "")
-    hora = body.get("hora", "")
-    hora_fin = body.get("hora_fin", "")
-    titulo = body.get("titulo_evento", "")
-    mensaje = body.get("mensaje_original", "")
+    try:
+        telefono = body.get("telefono_cliente", "")
+        nombre = body.get("nombre_cliente", "")
+        desarrollo = body.get("desarrollo", "")
+        es_cita = body.get("es_cita", False)
+        fecha = body.get("fecha", "")
+        hora = body.get("hora", "")
+        hora_fin = body.get("hora_fin", "")
+        titulo = body.get("titulo_evento", "")
+        mensaje = body.get("mensaje_original", "")
 
-    # 1. Buscar o crear prospecto
-    prospecto = await get_prospecto_by_telefono(telefono) if telefono else None
+        # 1. Buscar o crear prospecto
+        prospecto = await get_prospecto_by_telefono(telefono) if telefono else None
 
-    if prospecto:
-        prospecto_id = prospecto["id"]
-        # Actualizar datos si hay nuevos
-        updates = {}
-        if nombre and not prospecto.get("nombre_cliente"):
-            updates["nombre_cliente"] = nombre
-        if desarrollo:
-            updates["desarrollo_interes"] = desarrollo
-        if es_cita:
-            updates["estado"] = "cita_agendada"
-        if updates:
-            await update_prospecto(prospecto_id, updates)
-    else:
-        prospecto_id = await create_prospecto({
-            "nombre_cliente": nombre,
-            "telefono_cliente": telefono,
-            "desarrollo_interes": desarrollo,
-            "mensaje_original": mensaje,
-            "estado": "cita_agendada" if es_cita else "nuevo",
-            "fuente": "chatbot",
+        if prospecto:
+            prospecto_id = prospecto["id"]
+            updates = {}
+            if nombre and not prospecto.get("nombre_cliente"):
+                updates["nombre_cliente"] = nombre
+            if desarrollo:
+                updates["desarrollo_interes"] = desarrollo
+            if es_cita:
+                updates["estado"] = "cita_agendada"
+            if updates:
+                await update_prospecto(prospecto_id, updates)
+        else:
+            prospecto_id = await create_prospecto({
+                "nombre_cliente": nombre,
+                "telefono_cliente": telefono,
+                "desarrollo_interes": desarrollo,
+                "mensaje_original": mensaje,
+                "estado": "cita_agendada" if es_cita else "nuevo",
+                "fuente": "chatbot",
+            })
+
+        # 2. Agregar al historial
+        from datetime import datetime as dt
+        await agregar_historial_prospecto(prospecto_id, {
+            "tipo": "cita_agendada" if es_cita else "mensaje_chatbot",
+            "mensaje": mensaje,
+            "fecha": str(dt.now()),
+            "datos": {"desarrollo": desarrollo, "fecha_cita": fecha, "hora": hora},
         })
 
-    # 2. Agregar al historial
-    from datetime import datetime as dt
-    await agregar_historial_prospecto(prospecto_id, {
-        "tipo": "cita_agendada" if es_cita else "mensaje_chatbot",
-        "mensaje": mensaje,
-        "fecha": str(dt.now()),
-        "datos": {"desarrollo": desarrollo, "fecha_cita": fecha, "hora": hora},
-    })
+        # 3. Si es cita, registrarla
+        cita_id = None
+        if es_cita and fecha:
+            cita_id = await create_cita_chatbot({
+                "prospecto_id": prospecto_id,
+                "titulo": titulo or f"Visita {desarrollo} - {nombre}",
+                "desarrollo": desarrollo,
+                "fecha": fecha,
+                "hora_inicio": hora or None,
+                "hora_fin": hora_fin or None,
+                "estado": "pendiente",
+            })
 
-    # 3. Si es cita, registrarla
-    cita_id = None
-    if es_cita and fecha:
-        cita_id = await create_cita_chatbot({
+            # 4. Enviar email al agente
+            import asyncio
+            admin_email = os.getenv("ADMIN_EMAIL", "")
+            admin_name = os.getenv("ADMIN_NAME", "Agente")
+            if admin_email:
+                cuerpo_email = (
+                    f"Se agendó una nueva cita desde el chatbot de WhatsApp.\n\n"
+                    f"<b>Cliente:</b> {nombre}\n"
+                    f"<b>Teléfono:</b> {telefono}\n"
+                    f"<b>Desarrollo:</b> {desarrollo}\n"
+                    f"<b>Fecha:</b> {fecha}\n"
+                    f"<b>Hora:</b> {hora} - {hora_fin}\n"
+                    f"<b>Título:</b> {titulo}\n\n"
+                    f"Revisa tu calendario y da seguimiento al prospecto."
+                )
+                asyncio.create_task(enviar_email_notificacion(
+                    admin_email, admin_name,
+                    f"Nueva cita: {nombre} - {desarrollo}", cuerpo_email
+                ))
+
+        return JSONResponse({
+            "ok": True,
             "prospecto_id": prospecto_id,
-            "titulo": titulo or f"Visita {desarrollo} - {nombre}",
-            "desarrollo": desarrollo,
-            "fecha": fecha,
-            "hora_inicio": hora or None,
-            "hora_fin": hora_fin or None,
-            "estado": "pendiente",
+            "cita_id": cita_id,
+            "nombre": nombre,
+            "telefono": telefono,
         })
-
-        # 4. Enviar email al agente (admin por ahora)
-        import asyncio
-        admin_email = os.getenv("ADMIN_EMAIL", "")
-        admin_name = os.getenv("ADMIN_NAME", "Agente")
-        if admin_email:
-            cuerpo_email = (
-                f"Se agendó una nueva cita desde el chatbot de WhatsApp.\n\n"
-                f"<b>Cliente:</b> {nombre}\n"
-                f"<b>Teléfono:</b> {telefono}\n"
-                f"<b>Desarrollo:</b> {desarrollo}\n"
-                f"<b>Fecha:</b> {fecha}\n"
-                f"<b>Hora:</b> {hora} - {hora_fin}\n"
-                f"<b>Título:</b> {titulo}\n\n"
-                f"Revisa tu calendario y da seguimiento al prospecto."
-            )
-            asyncio.create_task(enviar_email_notificacion(
-                admin_email, admin_name,
-                f"Nueva cita: {nombre} - {desarrollo}", cuerpo_email
-            ))
-
-    return JSONResponse({
-        "ok": True,
-        "prospecto_id": prospecto_id,
-        "cita_id": cita_id,
-        "nombre": nombre,
-        "telefono": telefono,
-    })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @app.post("/api/chatbot/registrar-mensaje")
