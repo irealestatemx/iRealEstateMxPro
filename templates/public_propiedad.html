@@ -70,7 +70,7 @@
         </div>
         <h1>{{ prop.tipo_propiedad or 'Propiedad' }} en {{ prop.ciudad or 'Guanajuato' }}</h1>
         <div class="detail-ubicacion">{{ prop.direccion or '' }}{{ (', ' + prop.ciudad) if prop.ciudad and prop.direccion else (prop.ciudad or '') }}{{ (', ' + prop.estado) if prop.estado else '' }}</div>
-        <div class="detail-precio">{{ prop.precio_formateado or ('$' + '{:,.0f}'.format(prop.precio|float) + ' MXN' if prop.precio else 'Consultar precio') }}</div>
+        <div class="detail-precio">{{ prop.precio_formateado or 'Consultar precio' }}</div>
 
         <!-- Specs -->
         <div class="detail-specs-grid">

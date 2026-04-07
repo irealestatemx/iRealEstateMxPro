@@ -76,7 +76,7 @@
         <div class="prop-card-body">
           <h3>{{ p.tipo_propiedad or 'Propiedad' }} {{ ('en ' + p.ciudad) if p.ciudad else '' }}</h3>
           <div class="prop-ubicacion">{{ p.direccion or p.ciudad or '' }}</div>
-          <div class="prop-precio">{{ p.precio_formateado or ('$' + '{:,.0f}'.format(p.precio|float) + ' MXN' if p.precio else 'Consultar') }}</div>
+          <div class="prop-precio">{{ p.precio_formateado or 'Consultar' }}</div>
           <div class="prop-specs">
             {% if p.recamaras %}
             <span class="prop-spec">
