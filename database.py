@@ -876,13 +876,33 @@ async def create_cita_chatbot(data: dict) -> int:
         :estado, :google_event_id, :notas
     ) RETURNING id
     """
+    from datetime import date, time
+    # Convertir strings a objetos date/time para asyncpg
+    fecha_raw = data.get("fecha")
+    hora_ini_raw = data.get("hora_inicio")
+    hora_fin_raw = data.get("hora_fin")
+
+    fecha_val = None
+    if fecha_raw:
+        if isinstance(fecha_raw, str):
+            fecha_val = date.fromisoformat(fecha_raw)
+        else:
+            fecha_val = fecha_raw
+
+    def parse_time(val):
+        if not val:
+            return None
+        if isinstance(val, str):
+            return time.fromisoformat(val)
+        return val
+
     values = {
         "prospecto_id": data.get("prospecto_id"),
         "titulo": data.get("titulo", ""),
         "desarrollo": data.get("desarrollo", ""),
-        "fecha": data.get("fecha"),
-        "hora_inicio": data.get("hora_inicio"),
-        "hora_fin": data.get("hora_fin"),
+        "fecha": fecha_val,
+        "hora_inicio": parse_time(hora_ini_raw),
+        "hora_fin": parse_time(hora_fin_raw),
         "estado": data.get("estado", "pendiente"),
         "google_event_id": data.get("google_event_id", ""),
         "notas": data.get("notas", ""),
