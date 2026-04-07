@@ -1795,8 +1795,7 @@ async def index(request: Request):
         # Visitante no autenticado → web pública
         props = await get_all_properties(active_only=True, limit=12, offset=0)
         desarrollos_list = list(DESARROLLOS_DATA.values())
-        return templates.TemplateResponse("public_home.html", {
-            "request": request,
+        return templates.TemplateResponse(request=request, name="public_home.html", context={
             "propiedades": props,
             "desarrollos": desarrollos_list,
         })
@@ -3997,8 +3996,7 @@ async def public_home(request: Request):
     """Página principal pública."""
     props = await get_all_properties(active_only=True, limit=12, offset=0)
     desarrollos = list(DESARROLLOS_DATA.values())
-    return templates.TemplateResponse("public_home.html", {
-        "request": request,
+    return templates.TemplateResponse(request=request, name="public_home.html", context={
         "propiedades": props,
         "desarrollos": desarrollos,
     })
@@ -4026,8 +4024,7 @@ async def public_propiedades(
         props = await get_all_properties(active_only=True, limit=limit, offset=offset)
         total = await count_properties(active_only=True)
 
-    return templates.TemplateResponse("public_propiedades.html", {
-        "request": request,
+    return templates.TemplateResponse(request=request, name="public_propiedades.html", context={
         "propiedades": props,
         "total": total,
         "tiene_mas": total > offset + limit,
@@ -4043,8 +4040,8 @@ async def public_propiedad_detalle(request: Request, prop_id: int):
     """Detalle público de una propiedad."""
     prop = await get_property_by_id(prop_id)
     if not prop:
-        return templates.TemplateResponse("public_propiedades.html", {
-            "request": request, "propiedades": [], "total": 0,
+        return templates.TemplateResponse(request=request, name="public_propiedades.html", context={
+            "propiedades": [], "total": 0,
             "tiene_mas": False, "filtro_operacion": "", "filtro_tipo": "",
             "filtro_ciudad": "", "filtro_precio_max": "",
         })
@@ -4067,8 +4064,7 @@ async def public_propiedad_detalle(request: Request, prop_id: int):
         except Exception:
             amenidades = []
 
-    return templates.TemplateResponse("public_propiedad.html", {
-        "request": request,
+    return templates.TemplateResponse(request=request, name="public_propiedad.html", context={
         "prop": prop,
         "fotos_extra": fotos_extra,
         "amenidades": amenidades,
@@ -4078,8 +4074,7 @@ async def public_propiedad_detalle(request: Request, prop_id: int):
 @app.get("/desarrollos")
 async def public_desarrollos(request: Request):
     """Listado de desarrollos."""
-    return templates.TemplateResponse("public_desarrollos.html", {
-        "request": request,
+    return templates.TemplateResponse(request=request, name="public_desarrollos.html", context={
         "desarrollos": list(DESARROLLOS_DATA.values()),
     })
 
@@ -4089,8 +4084,7 @@ async def public_desarrollo_detalle(request: Request, slug: str):
     """Detalle de un desarrollo con sus propiedades."""
     desarrollo = DESARROLLOS_DATA.get(slug)
     if not desarrollo:
-        return templates.TemplateResponse("public_desarrollos.html", {
-            "request": request,
+        return templates.TemplateResponse(request=request, name="public_desarrollos.html", context={
             "desarrollos": list(DESARROLLOS_DATA.values()),
         })
 
@@ -4104,8 +4098,7 @@ async def public_desarrollo_detalle(request: Request, slug: str):
         or nombre_dev.lower() in (p.get("descripcion_profesional", "") or "").lower()
     ]
 
-    return templates.TemplateResponse("public_desarrollo.html", {
-        "request": request,
+    return templates.TemplateResponse(request=request, name="public_desarrollo.html", context={
         "desarrollo": desarrollo,
         "propiedades": props_dev,
     })
