@@ -179,6 +179,29 @@ MIGRATIONS = [
     "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS tipo_compra VARCHAR(50);",
     "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS telefono VARCHAR(20);",
     "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS cierre_data JSONB DEFAULT '{}';",
+    # Prospectos chatbot
+    "ALTER TABLE prospectos ADD COLUMN IF NOT EXISTS fuente VARCHAR(50) DEFAULT 'chatbot';",
+    "ALTER TABLE prospectos ADD COLUMN IF NOT EXISTS email_cliente VARCHAR(300);",
+    "ALTER TABLE prospectos ADD COLUMN IF NOT EXISTS cita_data JSONB DEFAULT '{}';",
+    "ALTER TABLE prospectos ADD COLUMN IF NOT EXISTS historial JSONB DEFAULT '[]';",
+    """CREATE TABLE IF NOT EXISTS citas_chatbot (
+        id              SERIAL PRIMARY KEY,
+        prospecto_id    INTEGER REFERENCES prospectos(id) ON DELETE CASCADE,
+        titulo          VARCHAR(500),
+        desarrollo      VARCHAR(300),
+        fecha           DATE,
+        hora_inicio     TIME,
+        hora_fin        TIME,
+        estado          VARCHAR(50) DEFAULT 'pendiente',
+        google_event_id VARCHAR(300),
+        notas           TEXT,
+        created_at      TIMESTAMP DEFAULT NOW()
+    );""",
+    "CREATE INDEX IF NOT EXISTS idx_citas_prospecto ON citas_chatbot(prospecto_id);",
+    "CREATE INDEX IF NOT EXISTS idx_citas_fecha ON citas_chatbot(fecha);",
+    "CREATE INDEX IF NOT EXISTS idx_citas_estado ON citas_chatbot(estado);",
+    "CREATE INDEX IF NOT EXISTS idx_prospectos_fuente ON prospectos(fuente);",
+    "CREATE INDEX IF NOT EXISTS idx_prospectos_telefono ON prospectos(telefono_cliente);",
 ]
 
 
@@ -793,6 +816,99 @@ async def delete_prospecto(prospecto_id: int):
     """Elimina un prospecto permanentemente."""
     query = "DELETE FROM prospectos WHERE id = :id"
     await database.execute(query=query, values={"id": prospecto_id})
+
+
+async def get_prospecto_by_telefono(telefono: str):
+    """Busca prospecto por teléfono (últimos 10 dígitos)."""
+    tel_limpio = "".join(c for c in str(telefono) if c.isdigit())
+    if len(tel_limpio) > 10:
+        tel_limpio = tel_limpio[-10:]
+    query = """
+    SELECT p.*, u.nombre as referido_nombre
+    FROM prospectos p
+    LEFT JOIN usuarios u ON p.referido_id = u.id
+    WHERE RIGHT(p.telefono_cliente, 10) = :tel
+    ORDER BY p.created_at DESC LIMIT 1
+    """
+    row = await database.fetch_one(query=query, values={"tel": tel_limpio})
+    return dict(row._mapping) if row else None
+
+
+async def agregar_historial_prospecto(prospecto_id: int, entrada: dict):
+    """Agrega una entrada al historial JSONB del prospecto."""
+    query = """
+    UPDATE prospectos
+    SET historial = COALESCE(historial, '[]'::jsonb) || :entrada::jsonb,
+        updated_at = NOW()
+    WHERE id = :id
+    """
+    import json
+    await database.execute(query=query, values={
+        "id": prospecto_id,
+        "entrada": json.dumps(entrada),
+    })
+
+
+# ─── Citas chatbot ───
+
+async def create_cita_chatbot(data: dict) -> int:
+    """Crea una cita desde el chatbot y retorna su ID."""
+    query = """
+    INSERT INTO citas_chatbot (
+        prospecto_id, titulo, desarrollo, fecha, hora_inicio, hora_fin,
+        estado, google_event_id, notas
+    ) VALUES (
+        :prospecto_id, :titulo, :desarrollo, :fecha, :hora_inicio, :hora_fin,
+        :estado, :google_event_id, :notas
+    ) RETURNING id
+    """
+    values = {
+        "prospecto_id": data.get("prospecto_id"),
+        "titulo": data.get("titulo", ""),
+        "desarrollo": data.get("desarrollo", ""),
+        "fecha": data.get("fecha"),
+        "hora_inicio": data.get("hora_inicio"),
+        "hora_fin": data.get("hora_fin"),
+        "estado": data.get("estado", "pendiente"),
+        "google_event_id": data.get("google_event_id", ""),
+        "notas": data.get("notas", ""),
+    }
+    return await database.execute(query=query, values=values)
+
+
+async def get_citas_chatbot(prospecto_id: int = None, fecha: str = None, limit: int = 50):
+    """Lista citas. Filtra por prospecto o fecha."""
+    conditions = []
+    values = {"limit": limit}
+    if prospecto_id:
+        conditions.append("c.prospecto_id = :prospecto_id")
+        values["prospecto_id"] = prospecto_id
+    if fecha:
+        conditions.append("c.fecha = :fecha")
+        values["fecha"] = fecha
+    where = "WHERE " + " AND ".join(conditions) if conditions else ""
+    query = f"""
+    SELECT c.*, p.nombre_cliente, p.telefono_cliente, p.desarrollo_interes
+    FROM citas_chatbot c
+    LEFT JOIN prospectos p ON c.prospecto_id = p.id
+    {where}
+    ORDER BY c.fecha DESC, c.hora_inicio DESC LIMIT :limit
+    """
+    rows = await database.fetch_all(query=query, values=values)
+    return [dict(r._mapping) for r in rows]
+
+
+async def update_cita_chatbot(cita_id: int, updates: dict):
+    """Actualiza una cita (estado, google_event_id, notas)."""
+    allowed = {"estado", "google_event_id", "notas"}
+    fields = {k: v for k, v in updates.items() if k in allowed}
+    if not fields:
+        return False
+    set_clause = ", ".join(f"{k} = :{k}" for k in fields)
+    fields["id"] = cita_id
+    query = f"UPDATE citas_chatbot SET {set_clause} WHERE id = :id"
+    await database.execute(query=query, values=fields)
+    return True
 
 
 # ─── Documentos ───

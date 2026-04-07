@@ -35,6 +35,8 @@ from database import (
     get_user_by_prefijo, get_all_referidos,
     create_prospecto, get_all_prospectos, get_prospecto_by_id,
     update_prospecto, count_prospectos, delete_prospecto,
+    get_prospecto_by_telefono, agregar_historial_prospecto,
+    create_cita_chatbot, get_citas_chatbot, update_cita_chatbot,
     save_documento, get_documentos_by_propiedad, update_documento_estado,
     get_properties_by_vendedor, get_properties_by_comprador,
     get_propiedades_seguimiento, set_tipo_compra,
@@ -3448,7 +3450,7 @@ _paused_chats: Dict[str, float] = {}  # telefono -> timestamp de cuando se pauso
 _active_chats: Dict[str, float] = {}  # telefono -> timestamp de cuando se activo la conversacion
 _bot_last_sent: Dict[str, float] = {}  # telefono -> timestamp de cuando el bot envio su ultima respuesta
 PAUSE_DURATION = 3600 * 4  # 4 horas de pausa por defecto
-ACTIVE_DURATION = 3600 * 2  # 2 horas de actividad máxima del bot
+ACTIVE_DURATION = 60 * 30  # 30 minutos de actividad máxima del bot
 BOT_ECHO_WINDOW = 90  # segundos para considerar un fromMe como eco del bot (no de Esteban)
 
 # Palabras clave que activan el bot (sin importar mayúsculas)
@@ -3473,18 +3475,28 @@ BOT_KEYWORDS = [
 
 KOMMO_SUBDOMAIN = os.getenv("KOMMO_SUBDOMAIN", "irealestatemxclaude")
 KOMMO_ACCESS_TOKEN = os.getenv("KOMMO_ACCESS_TOKEN", "")
-KOMMO_PIPELINE_ID = 13474343
+KOMMO_PIPELINE_ID = 13489919
 KOMMO_STATUS_ID = 103949563
 
 
 def _has_bot_keyword(text: str) -> bool:
-    """Verifica si el mensaje contiene alguna palabra clave que activa el bot."""
-    text_lower = text.lower()
+    """Verifica si el mensaje contiene alguna palabra clave que activa el bot.
+    Ignora URLs para evitar falsos positivos con enlaces."""
+    # Quitar URLs del texto antes de buscar keywords
+    import re as _re
+    text_sin_urls = _re.sub(r'https?://\S+', '', text)
+    text_sin_urls = _re.sub(r'www\.\S+', '', text_sin_urls)
+
+    # Si solo quedó espacio vacío (era solo un enlace), no activar
+    if not text_sin_urls.strip():
+        return False
+
+    text_lower = text_sin_urls.lower()
     for kw in BOT_KEYWORDS:
         if kw in text_lower:
             return True
     # También detectar prefijos de referidos (ej: N-, A-, etc.)
-    if re.search(r'[A-Z]\s*-\s', text, re.IGNORECASE):
+    if re.search(r'[A-Z]\s*-\s', text_sin_urls, re.IGNORECASE):
         return True
     return False
 
@@ -3570,6 +3582,130 @@ async def whatsapp_paused_list():
     paused = {k: round((PAUSE_DURATION - (now - v)) / 60) for k, v in _paused_chats.items() if now - v < PAUSE_DURATION}
     active = {k: round((ACTIVE_DURATION - (now - v)) / 60) for k, v in _active_chats.items() if now - v < ACTIVE_DURATION}
     return JSONResponse({"paused": paused, "active_chats": active})
+
+
+@app.post("/api/chatbot/registrar-cita")
+async def chatbot_registrar_cita(request: Request):
+    """Registra un prospecto y su cita desde el chatbot de n8n.
+    Reemplaza a Kommo: registra en BD, envía email al agente."""
+    body = await request.json()
+
+    telefono = body.get("telefono_cliente", "")
+    nombre = body.get("nombre_cliente", "")
+    desarrollo = body.get("desarrollo", "")
+    es_cita = body.get("es_cita", False)
+    fecha = body.get("fecha", "")
+    hora = body.get("hora", "")
+    hora_fin = body.get("hora_fin", "")
+    titulo = body.get("titulo_evento", "")
+    mensaje = body.get("mensaje_original", "")
+
+    # 1. Buscar o crear prospecto
+    prospecto = await get_prospecto_by_telefono(telefono) if telefono else None
+
+    if prospecto:
+        prospecto_id = prospecto["id"]
+        # Actualizar datos si hay nuevos
+        updates = {}
+        if nombre and not prospecto.get("nombre_cliente"):
+            updates["nombre_cliente"] = nombre
+        if desarrollo:
+            updates["desarrollo_interes"] = desarrollo
+        if es_cita:
+            updates["estado"] = "cita_agendada"
+        if updates:
+            await update_prospecto(prospecto_id, updates)
+    else:
+        prospecto_id = await create_prospecto({
+            "nombre_cliente": nombre,
+            "telefono_cliente": telefono,
+            "desarrollo_interes": desarrollo,
+            "mensaje_original": mensaje,
+            "estado": "cita_agendada" if es_cita else "nuevo",
+            "fuente": "chatbot",
+        })
+
+    # 2. Agregar al historial
+    from datetime import datetime as dt
+    await agregar_historial_prospecto(prospecto_id, {
+        "tipo": "cita_agendada" if es_cita else "mensaje_chatbot",
+        "mensaje": mensaje,
+        "fecha": str(dt.now()),
+        "datos": {"desarrollo": desarrollo, "fecha_cita": fecha, "hora": hora},
+    })
+
+    # 3. Si es cita, registrarla
+    cita_id = None
+    if es_cita and fecha:
+        cita_id = await create_cita_chatbot({
+            "prospecto_id": prospecto_id,
+            "titulo": titulo or f"Visita {desarrollo} - {nombre}",
+            "desarrollo": desarrollo,
+            "fecha": fecha,
+            "hora_inicio": hora or None,
+            "hora_fin": hora_fin or None,
+            "estado": "pendiente",
+        })
+
+        # 4. Enviar email al agente (admin por ahora)
+        import asyncio
+        admin_email = os.getenv("ADMIN_EMAIL", "")
+        admin_name = os.getenv("ADMIN_NAME", "Agente")
+        if admin_email:
+            cuerpo_email = (
+                f"Se agendó una nueva cita desde el chatbot de WhatsApp.\n\n"
+                f"<b>Cliente:</b> {nombre}\n"
+                f"<b>Teléfono:</b> {telefono}\n"
+                f"<b>Desarrollo:</b> {desarrollo}\n"
+                f"<b>Fecha:</b> {fecha}\n"
+                f"<b>Hora:</b> {hora} - {hora_fin}\n"
+                f"<b>Título:</b> {titulo}\n\n"
+                f"Revisa tu calendario y da seguimiento al prospecto."
+            )
+            asyncio.create_task(enviar_email_notificacion(
+                admin_email, admin_name,
+                f"Nueva cita: {nombre} - {desarrollo}", cuerpo_email
+            ))
+
+    return JSONResponse({
+        "ok": True,
+        "prospecto_id": prospecto_id,
+        "cita_id": cita_id,
+        "nombre": nombre,
+        "telefono": telefono,
+    })
+
+
+@app.post("/api/chatbot/registrar-mensaje")
+async def chatbot_registrar_mensaje(request: Request):
+    """Registra un mensaje del chatbot (sin cita) — actualiza historial del prospecto."""
+    body = await request.json()
+    telefono = body.get("telefono_cliente", "")
+    nombre = body.get("nombre_cliente", "")
+    desarrollo = body.get("desarrollo", "")
+    mensaje = body.get("mensaje", "")
+
+    prospecto = await get_prospecto_by_telefono(telefono) if telefono else None
+
+    if prospecto:
+        prospecto_id = prospecto["id"]
+        from datetime import datetime as dt
+        await agregar_historial_prospecto(prospecto_id, {
+            "tipo": "mensaje_chatbot",
+            "mensaje": mensaje,
+            "fecha": str(dt.now()),
+        })
+    else:
+        prospecto_id = await create_prospecto({
+            "nombre_cliente": nombre,
+            "telefono_cliente": telefono,
+            "desarrollo_interes": desarrollo,
+            "mensaje_original": mensaje,
+            "estado": "nuevo",
+            "fuente": "chatbot",
+        })
+
+    return JSONResponse({"ok": True, "prospecto_id": prospecto_id})
 
 
 @app.post("/api/whatsapp/deactivate")
