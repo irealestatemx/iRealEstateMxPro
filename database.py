@@ -530,9 +530,9 @@ async def save_desarrollo(data: dict) -> int:
         foto_portada_url, fotos_urls, pdf_url
     ) VALUES (
         :nombre, :descripcion, :ubicacion, :ciudad, :estado,
-        :precio_desde, :precio_hasta, :tipo_propiedad, :amenidades::jsonb,
+        :precio_desde, :precio_hasta, :tipo_propiedad, CAST(:amenidades AS jsonb),
         :caracteristicas, :agente_nombre, :agente_telefono, :agente_email,
-        :foto_portada_url, :fotos_urls::jsonb, :pdf_url
+        :foto_portada_url, CAST(:fotos_urls AS jsonb), :pdf_url
     ) RETURNING id
     """
     values = {
@@ -852,7 +852,7 @@ async def agregar_historial_prospecto(prospecto_id: int, entrada: dict):
     """Agrega una entrada al historial JSONB del prospecto."""
     query = """
     UPDATE prospectos
-    SET historial = COALESCE(historial, '[]'::jsonb) || :entrada::jsonb,
+    SET historial = COALESCE(historial, '[]'::jsonb) || CAST(:entrada AS jsonb),
         updated_at = NOW()
     WHERE id = :id
     """
