@@ -742,6 +742,11 @@ async def delete_user_permanent(user_id: int):
     await database.execute("UPDATE propiedades SET user_id = NULL WHERE user_id = :id", values=v)
     await database.execute("UPDATE propiedades SET vendedor_id = NULL WHERE vendedor_id = :id", values=v)
     await database.execute("UPDATE propiedades SET comprador_id = NULL WHERE comprador_id = :id", values=v)
+    # Desasociar documentos
+    await database.execute("UPDATE documentos SET subido_por = NULL WHERE subido_por = :id", values=v)
+    # Desasociar seguimientos
+    await database.execute("UPDATE seguimiento_mensajes SET comprador_id = NULL WHERE comprador_id = :id", values=v)
+    await database.execute("UPDATE seguimiento_mensajes SET agente_id = NULL WHERE agente_id = :id", values=v)
     # Eliminar notificaciones del usuario
     await database.execute("DELETE FROM notificaciones WHERE user_id = :id", values=v)
     # Eliminar usuario
