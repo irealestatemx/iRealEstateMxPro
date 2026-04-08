@@ -553,7 +553,7 @@
               <div class="divider"></div>
               <button type="submit" form="storyForm" onclick="closeAllDropdowns()">&#x2B07;&#xFE0F; Descargar imagen</button>
               <div class="divider"></div>
-              <button type="button" onclick="publishToInstagram('story')">&#x1F680; Publicar en Instagram</button>
+              <button type="button" onclick="showToast('Instagram no permite publicar Stories por API. Descarga la imagen y súbela desde la app.', false)">&#x26A0;&#xFE0F; Stories no disponible por API</button>
             </div>
           </div>
         </div>
@@ -943,14 +943,15 @@
     var fd = new FormData(srcForm);
     fd.append('instagram_copy', document.getElementById('instagram-copy') ? document.getElementById('instagram-copy').innerText : '');
     fd.append('session_id', '{{ session_id }}');
+    fd.append('publish_type', type);
 
-    showToast('Publicando en Instagram...', false);
+    showToast('Publicando en Instagram...', true);
 
     fetch('/publish-instagram', { method: 'POST', body: fd })
     .then(function(r) { return r.json(); })
     .then(function(data) {
       if (data.success) {
-        showToast(data.message || 'Publicado exitosamente', false);
+        showToast(data.message || 'Publicado exitosamente en Instagram', true);
       } else {
         showToast('Error: ' + (data.error || 'No se pudo publicar'), false);
       }

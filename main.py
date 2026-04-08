@@ -5298,47 +5298,70 @@ async def download_carousel(
 
 
 @app.post("/publish-instagram")
-async def publish_instagram(
-    request: Request,
-    tipo_propiedad: str = Form(""),
-    operacion: str = Form(""),
-    direccion: str = Form(""),
-    ciudad: str = Form(""),
-    estado: str = Form(""),
-    precio_formateado: str = Form(""),
-    recamaras: Optional[str] = Form(None),
-    banos: Optional[str] = Form(None),
-    metros_construidos: Optional[str] = Form(None),
-    metros_terreno: Optional[str] = Form(None),
-    estacionamientos: Optional[str] = Form(None),
-    foto_portada_url: Optional[str] = Form(None),
-    instagram_copy: str = Form(""),
-):
-    """Genera la imagen IG y la publica via Upload Post API."""
-    api_key = os.getenv("UPLOADPOST_API_KEY", "")
-    user = os.getenv("UPLOADPOST_USER", "")
+async def publish_instagram(request: Request):
+    """Genera imagen(es) IG y publica via Upload Post API. Soporta post, story y carousel."""
+    form = await request.form()
 
-    if not api_key or not user:
+    api_key = os.getenv("UPLOADPOST_API_KEY", "")
+    ig_user = os.getenv("UPLOADPOST_USER", "")
+
+    if not api_key or not ig_user:
         return {"success": False, "error": "Faltan las variables UPLOADPOST_API_KEY o UPLOADPOST_USER en el .env"}
 
-    # Generar la imagen
-    data = {
-        "tipo_propiedad": tipo_propiedad,
-        "operacion": operacion,
-        "direccion": direccion,
-        "ciudad": ciudad,
-        "estado": estado,
-        "precio_formateado": precio_formateado,
-        "recamaras": recamaras,
-        "banos": banos,
-        "metros_construidos": metros_construidos,
-        "metros_terreno": metros_terreno,
-        "estacionamientos": estacionamientos,
-        "foto_portada_url": foto_portada_url,
-    }
-    img_bytes = generate_instagram_image(data)
+    publish_type = form.get("publish_type", "post")  # post | story | carousel
+    instagram_copy = form.get("instagram_copy", "")
+    session_id = form.get("session_id", "")
 
-    # Llamar a Upload Post API
+    # Datos comunes para generar imágenes
+    data = {
+        "tipo_propiedad": form.get("tipo_propiedad", ""),
+        "operacion": form.get("operacion", ""),
+        "direccion": form.get("direccion", ""),
+        "ciudad": form.get("ciudad", ""),
+        "estado": form.get("estado", ""),
+        "precio_formateado": form.get("precio_formateado", ""),
+        "recamaras": form.get("recamaras"),
+        "banos": form.get("banos"),
+        "metros_construidos": form.get("metros_construidos"),
+        "metros_terreno": form.get("metros_terreno"),
+        "estacionamientos": form.get("estacionamientos"),
+        "foto_portada_url": form.get("foto_portada_url"),
+        "agente_nombre": form.get("agente_nombre", ""),
+        "agente_telefono": form.get("agente_telefono", ""),
+        "agente_email": form.get("agente_email", ""),
+        "descripcion_profesional": form.get("descripcion_profesional", ""),
+    }
+    # Amenidades y fotos extra (pueden venir múltiples valores)
+    data["amenidades"] = form.getlist("amenidades") if hasattr(form, "getlist") else []
+    fotos_extra = form.getlist("fotos_extra_urls") if hasattr(form, "getlist") else []
+    data["fotos_extra_urls"] = fotos_extra
+
+    # ─── Stories: no soportadas por la API de Instagram ───
+    if publish_type == "story":
+        return {
+            "success": False,
+            "error": "Instagram no permite publicar Stories por API (limitación de Meta). Descarga la imagen y súbela manualmente desde la app."
+        }
+
+    # ─── Generar imágenes según tipo ───
+    files_list = []
+
+    if publish_type == "carousel":
+        try:
+            slides = generate_instagram_carousel(data)
+            for i, slide_bytes in enumerate(slides):
+                files_list.append(("photos[]", (f"carousel_{i+1}.jpg", slide_bytes, "image/jpeg")))
+        except Exception as e:
+            return {"success": False, "error": f"Error generando carrusel: {e}"}
+    else:
+        # Post normal (1080x1080)
+        try:
+            img_bytes = generate_instagram_image(data)
+            files_list.append(("photos[]", ("instagram_post.jpg", img_bytes, "image/jpeg")))
+        except Exception as e:
+            return {"success": False, "error": f"Error generando imagen: {e}"}
+
+    # ─── Llamar a Upload Post API ───
     try:
         async with httpx.AsyncClient(timeout=120.0) as client_http:
             response = await client_http.post(
@@ -5347,13 +5370,11 @@ async def publish_instagram(
                     "Authorization": f"Apikey {api_key}",
                 },
                 data={
-                    "user": user,
+                    "user": ig_user,
                     "platform[]": "instagram",
                     "title": instagram_copy,
                 },
-                files={
-                    "photos[]": ("instagram_post.jpg", img_bytes, "image/jpeg"),
-                },
+                files=files_list,
             )
 
         result = response.json()
@@ -5361,26 +5382,25 @@ async def publish_instagram(
         if response.status_code == 200 and result.get("success"):
             ig_result = result.get("results", {}).get("instagram", {})
             post_url = ig_result.get("url", "")
-            # Marcar como publicada en DB si tenemos el session_id
+            # Marcar como publicada en DB
             try:
-                form = await request.form()
-                sid = form.get("session_id", "")
-                if sid:
+                if session_id:
                     from database import get_property_by_session
-                    prop = await get_property_by_session(sid)
+                    prop = await get_property_by_session(session_id)
                     if prop:
                         await update_property(prop["id"], {"publicada_instagram": True})
             except Exception:
                 pass
+            tipo_label = "Carrusel publicado" if publish_type == "carousel" else "Publicado"
             return {
                 "success": True,
-                "message": "Publicado exitosamente en Instagram",
+                "message": f"{tipo_label} exitosamente en Instagram",
                 "post_url": post_url,
             }
         elif response.status_code == 202:
             return {
                 "success": True,
-                "message": "Publicacion programada exitosamente",
+                "message": "Publicación programada exitosamente",
                 "job_id": result.get("job_id", ""),
             }
         else:
@@ -5388,7 +5408,7 @@ async def publish_instagram(
             return {"success": False, "error": error_msg}
 
     except httpx.TimeoutException:
-        return {"success": False, "error": "Timeout: la publicacion esta siendo procesada en segundo plano"}
+        return {"success": False, "error": "Timeout: la publicación está siendo procesada en segundo plano"}
     except Exception as e:
         return {"success": False, "error": str(e)}
 
