@@ -155,7 +155,6 @@ CREATE_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_propiedades_operacion ON propiedades(operacion);",
     "CREATE INDEX IF NOT EXISTS idx_propiedades_activa ON propiedades(activa);",
     "CREATE INDEX IF NOT EXISTS idx_propiedades_created ON propiedades(created_at DESC);",
-    "CREATE INDEX IF NOT EXISTS idx_propiedades_desarrollo ON propiedades(desarrollo_slug);",
     "CREATE INDEX IF NOT EXISTS idx_desarrollos_ciudad ON desarrollos(ciudad);",
     "CREATE INDEX IF NOT EXISTS idx_desarrollos_activo ON desarrollos(activo);",
     "CREATE INDEX IF NOT EXISTS idx_desarrollos_nombre ON desarrollos(nombre);",
@@ -197,6 +196,7 @@ MIGRATIONS = [
     "ALTER TABLE prospectos ADD COLUMN IF NOT EXISTS historial JSONB DEFAULT '[]';",
     # Vincular propiedades a desarrollos
     "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS desarrollo_slug VARCHAR(100);",
+    "CREATE INDEX IF NOT EXISTS idx_propiedades_desarrollo ON propiedades(desarrollo_slug);",
 ]
 
 CREATE_CITAS_CHATBOT = """
