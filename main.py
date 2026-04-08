@@ -4643,6 +4643,7 @@ async def public_vender_submit(
             await crear_notificacion(
                 tipo="lead_vendedor",
                 user_id=admin["id"],
+                propiedad_id=None,
                 metadata=lead_meta,
             )
             admin_email = admin.get("email", "")
