@@ -1315,6 +1315,11 @@ NOTIF_MENSAJES = {
         "cuerpo": "Se han calculado los gastos de cierre para la propiedad en {direccion}.\n\n{desglose_gastos}\n\n💰 Total a tu cargo: ${total_gastos}\n\nSi tienes dudas sobre algún concepto, contacta a tu agente.",
         "whatsapp": "💰 *GASTOS DE CIERRE — COMPRADOR*\n\nPropiedad: _{direccion}_\n\n{desglose_gastos}\n\n🔸 *Total a tu cargo: ${total_gastos}*\n\nSi tienes dudas, contacta a tu agente.",
     },
+    "lead_vendedor": {
+        "asunto": "Nuevo lead de propietario — {nombre}",
+        "cuerpo": "Nuevo propietario interesado en {operacion} su propiedad:\n\n👤 {nombre}\n📱 {telefono}\n📧 {email}\n🏠 {tipo_propiedad} en {ciudad}\n💬 {mensaje}",
+        "whatsapp": "🏠 *Nuevo lead de propietario*\n\n👤 *{nombre}*\n📱 {telefono}\n📧 {email}\n🔑 {operacion} — {tipo_propiedad}\n📍 {ciudad}\n💬 {mensaje}\n\n👉 https://irealestatemx.com/admin/prospectos",
+    },
 }
 
 
@@ -4550,24 +4555,64 @@ async def public_vender_submit(
             }],
         })
 
-    # Notificar por WhatsApp (opcional, si hay integración)
+    # ─── Notificar a admins por email + WhatsApp + notificación interna ───
+    lead_meta = {
+        "nombre": nombre,
+        "telefono": telefono,
+        "email": email or "No proporcionado",
+        "operacion": operacion,
+        "tipo_propiedad": tipo_propiedad,
+        "ciudad": ciudad,
+        "mensaje": mensaje or "Sin mensaje adicional",
+        "prospecto_id": prospecto_id,
+    }
+
+    email_body = f"""
+    <strong>Nuevo lead de propietario desde la web:</strong><br><br>
+    <table style="border-collapse:collapse;width:100%;font-size:14px;">
+      <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#888;width:120px;">Nombre</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600;">{nombre}</td></tr>
+      <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#888;">Teléfono</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600;"><a href="tel:+52{telefono}">{telefono}</a></td></tr>
+      <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#888;">Email</td><td style="padding:8px;border-bottom:1px solid #eee;">{email or 'No proporcionado'}</td></tr>
+      <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#888;">Operación</td><td style="padding:8px;border-bottom:1px solid #eee;font-weight:600;">{operacion}</td></tr>
+      <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#888;">Tipo</td><td style="padding:8px;border-bottom:1px solid #eee;">{tipo_propiedad}</td></tr>
+      <tr><td style="padding:8px;border-bottom:1px solid #eee;color:#888;">Ciudad</td><td style="padding:8px;border-bottom:1px solid #eee;">{ciudad}</td></tr>
+      <tr><td style="padding:8px;color:#888;">Mensaje</td><td style="padding:8px;">{mensaje or 'Sin mensaje adicional'}</td></tr>
+    </table>
+    <br>
+    <a href="https://irealestatemx.com/admin/prospectos" style="background:#c9a227;color:#1a3c5e;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;display:inline-block;">
+      Ver en el panel
+    </a>
+    """
+
     try:
         admin_users = await get_users_by_rol("admin")
         for admin in admin_users:
+            # Notificación interna en BD
             await crear_notificacion(
                 tipo="lead_vendedor",
                 user_id=admin["id"],
-                metadata={
-                    "nombre": nombre,
-                    "telefono": telefono,
-                    "operacion": operacion,
-                    "tipo_propiedad": tipo_propiedad,
-                    "ciudad": ciudad,
-                    "prospecto_id": prospecto_id,
-                },
+                metadata=lead_meta,
             )
-    except Exception:
-        pass
+            admin_email = admin.get("email", "")
+            admin_nombre = admin.get("nombre", "Admin")
+            # Email al admin
+            if admin_email:
+                await enviar_email_notificacion(
+                    to_email=admin_email,
+                    to_name=admin_nombre,
+                    asunto=f"Nuevo lead: {nombre} quiere {operacion.lower()} {tipo_propiedad} en {ciudad}",
+                    cuerpo=email_body,
+                )
+            # WhatsApp al admin (usa plantilla NOTIF_MENSAJES["lead_vendedor"])
+            admin_tel = admin.get("telefono", "")
+            if admin_tel:
+                await enviar_whatsapp_waha(
+                    tipo="lead_vendedor",
+                    destinatario={"telefono": admin_tel, "nombre": admin_nombre},
+                    metadata=lead_meta,
+                )
+    except Exception as e:
+        print(f"[VENDER] Error notificando admins: {e}")
 
     c = await load_public_config()
     return templates.TemplateResponse(request=request, name="public_vender.html", context={
