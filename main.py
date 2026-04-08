@@ -1801,6 +1801,7 @@ async def index(request: Request):
         return templates.TemplateResponse(request=request, name="public_home.html", context={
             "propiedades": props,
             "desarrollos": desarrollos_list,
+            "desarrollos_dict": DESARROLLOS_DATA,
             "c": c,
         })
     return templates.TemplateResponse(request=request, name="wizard.html", context={
