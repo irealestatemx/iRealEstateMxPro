@@ -1877,6 +1877,58 @@ async def admin_create_user(
     return RedirectResponse("/admin/usuarios", status_code=302)
 
 
+@app.get("/admin/usuarios/{user_id}/editar", response_class=HTMLResponse)
+async def admin_edit_user_page(request: Request, user_id: int):
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    target = await get_user_by_id(user_id)
+    if not target:
+        return RedirectResponse("/admin/usuarios", status_code=302)
+    all_users = await get_all_users()
+    return templates.TemplateResponse(request=request, name="admin_users.html", context={
+        "user": user,
+        "users": all_users,
+        "edit_user": target,
+    })
+
+
+@app.post("/admin/usuarios/{user_id}/editar")
+async def admin_edit_user_submit(
+    request: Request,
+    user_id: int,
+    nombre: str = Form(...),
+    email: str = Form(...),
+    rol: str = Form("agente"),
+    prefijo_whatsapp: str = Form(""),
+    telefono: str = Form(""),
+    password: str = Form(""),
+):
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    target = await get_user_by_id(user_id)
+    if not target:
+        return RedirectResponse("/admin/usuarios", status_code=302)
+
+    updates = {
+        "nombre": nombre,
+        "email": email,
+        "rol": rol,
+        "prefijo_whatsapp": prefijo_whatsapp.strip().upper() or None,
+        "telefono": telefono.strip() or None,
+    }
+    if password.strip():
+        updates["password"] = password.strip()
+
+    try:
+        await update_user(user_id, updates)
+    except Exception as e:
+        print(f"[ADMIN] Error editando usuario {user_id}: {e}")
+
+    return RedirectResponse("/admin/usuarios", status_code=302)
+
+
 @app.post("/admin/usuarios/{user_id}/toggle")
 async def admin_toggle_user(request: Request, user_id: int):
     user = await require_auth(request)

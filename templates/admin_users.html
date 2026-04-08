@@ -63,6 +63,38 @@
     .btn-toggle:hover { background: rgba(255,255,255,.15); }
     .btn-delete { background: #c0392b; color: #fff; }
     .btn-delete:hover { background: #e74c3c; }
+    .btn-edit { background: rgba(201,162,39,.2); color: #c9a227; }
+    .btn-edit:hover { background: rgba(201,162,39,.35); }
+    /* Modal */
+    .modal-overlay {
+      position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;
+      display:flex;align-items:center;justify-content:center;
+      opacity:0;pointer-events:none;transition:opacity .25s;
+    }
+    .modal-overlay.open { opacity:1;pointer-events:auto; }
+    .modal {
+      background:#1a1a1a;border:1px solid rgba(201,162,39,.2);border-radius:12px;
+      padding:32px;width:95%;max-width:560px;max-height:90vh;overflow-y:auto;
+      transform:translateY(20px);transition:transform .25s;
+    }
+    .modal-overlay.open .modal { transform:translateY(0); }
+    .modal h2 { color:#c9a227;font-size:18px;margin-bottom:20px; }
+    .modal-grid { display:grid;grid-template-columns:1fr 1fr;gap:14px; }
+    .modal-grid .full { grid-column:1/-1; }
+    .modal-grid label { display:block;font-size:12px;font-weight:600;color:rgba(255,255,255,.5);margin-bottom:4px; }
+    .modal-grid input,.modal-grid select {
+      width:100%;padding:10px 12px;border:1px solid rgba(201,162,39,.2);
+      border-radius:8px;font-size:14px;font-family:'Inter',sans-serif;
+      background:#111;color:#e0e0e0;
+    }
+    .modal-grid input:focus,.modal-grid select:focus { border-color:#c9a227;outline:none; }
+    .modal-actions { display:flex;gap:10px;justify-content:flex-end;margin-top:20px; }
+    .modal-actions .btn-add { padding:10px 24px; }
+    .modal-actions .btn-cancel {
+      padding:10px 24px;background:rgba(255,255,255,.08);color:rgba(255,255,255,.6);
+      border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;
+    }
+    .modal-actions .btn-cancel:hover { background:rgba(255,255,255,.15); }
     .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
     .form-row .fg { flex: 1; min-width: 140px; }
     .form-row label { display: block; font-size: 12px; font-weight: 600; color: rgba(255,255,255,.5); margin-bottom: 4px; }
@@ -184,7 +216,8 @@
             <td>{{ u.prefijo_whatsapp or '—' }}</td>
             <td>{{ u.telefono or '—' }}</td>
             <td><span class="badge {{ 'badge-activo' if u.activo else 'badge-inactivo' }}">{{ 'Activo' if u.activo else 'Inactivo' }}</span></td>
-            <td>
+            <td style="white-space:nowrap">
+              <button type="button" class="btn-sm btn-edit" onclick="openEditModal({{ u.id }}, '{{ u.nombre|e }}', '{{ u.email|e }}', '{{ u.rol }}', '{{ u.prefijo_whatsapp or '' }}', '{{ u.telefono or '' }}')">Editar</button>
               {% if u.id != user.id %}
               <form method="post" action="/admin/usuarios/{{ u.id }}/toggle" style="display:inline">
                 <button type="submit" class="btn-sm btn-toggle">
@@ -205,6 +238,51 @@
       </table>
     </div>
   </div>
+  <!-- Modal Editar Usuario -->
+  <div class="modal-overlay" id="editModal">
+    <div class="modal">
+      <h2>Editar Usuario</h2>
+      <form method="post" id="editForm">
+        <div class="modal-grid">
+          <div>
+            <label>Nombre *</label>
+            <input type="text" name="nombre" id="edit-nombre" required/>
+          </div>
+          <div>
+            <label>Email *</label>
+            <input type="email" name="email" id="edit-email" required/>
+          </div>
+          <div>
+            <label>Rol</label>
+            <select name="rol" id="edit-rol" onchange="toggleEditPrefijo()">
+              <option value="agente">Agente</option>
+              <option value="vendedor">Vendedor</option>
+              <option value="comprador">Comprador</option>
+              <option value="referido">Referido</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+          <div id="edit-prefijo-group">
+            <label>Prefijo WA</label>
+            <input type="text" name="prefijo_whatsapp" id="edit-prefijo" maxlength="5" style="text-transform:uppercase" placeholder="Ej: N"/>
+          </div>
+          <div>
+            <label>Teléfono</label>
+            <input type="text" name="telefono" id="edit-telefono" placeholder="Ej: 4771234567" maxlength="20"/>
+          </div>
+          <div>
+            <label>Nueva contraseña</label>
+            <input type="password" name="password" id="edit-password" placeholder="Dejar vacío para no cambiar" autocomplete="new-password"/>
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn-cancel" onclick="closeEditModal()">Cancelar</button>
+          <button type="submit" class="btn-add">Guardar cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <script>
     function togglePrefijo() {
       var rol = document.getElementById('rol-select').value;
@@ -212,6 +290,35 @@
       prefijoGroup.style.display = (rol === 'referido') ? 'block' : 'none';
     }
     togglePrefijo();
+
+    function toggleEditPrefijo() {
+      var rol = document.getElementById('edit-rol').value;
+      document.getElementById('edit-prefijo-group').style.display = (rol === 'referido') ? 'block' : 'none';
+    }
+
+    function openEditModal(id, nombre, email, rol, prefijo, telefono) {
+      document.getElementById('editForm').action = '/admin/usuarios/' + id + '/editar';
+      document.getElementById('edit-nombre').value = nombre;
+      document.getElementById('edit-email').value = email;
+      document.getElementById('edit-rol').value = rol;
+      document.getElementById('edit-prefijo').value = prefijo;
+      document.getElementById('edit-telefono').value = telefono;
+      document.getElementById('edit-password').value = '';
+      toggleEditPrefijo();
+      document.getElementById('editModal').classList.add('open');
+    }
+
+    function closeEditModal() {
+      document.getElementById('editModal').classList.remove('open');
+    }
+
+    // Cerrar modal con Escape o click fuera
+    document.getElementById('editModal').addEventListener('click', function(e) {
+      if (e.target === this) closeEditModal();
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') closeEditModal();
+    });
 
     function copiarCredenciales() {
       var nombre = '{{ c_nombre|default("") }}';
