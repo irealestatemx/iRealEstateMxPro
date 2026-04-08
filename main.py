@@ -4099,6 +4099,14 @@ async def api_registrar_prospecto(request: Request):
     nombre = body.get("nombre", "")
     desarrollo = body.get("desarrollo", "")
 
+    # Auto-detectar prefijo del mensaje si no viene explícito
+    if not prefijo and mensaje:
+        import re
+        prefix_match = re.match(r'^([A-Za-z]{1,5})\s*[-–—]\s*', mensaje)
+        if prefix_match:
+            prefijo = prefix_match.group(1).upper()
+            mensaje = mensaje[prefix_match.end():].strip()  # Limpiar prefijo del mensaje
+
     # Buscar referido por prefijo
     referido = None
     if prefijo:
