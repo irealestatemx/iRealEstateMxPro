@@ -1002,6 +1002,70 @@ async def get_citas_chatbot(prospecto_id: int = None, fecha: str = None, limit: 
     return [dict(r._mapping) for r in rows]
 
 
+async def check_disponibilidad_citas(fecha: str, hora: str = None):
+    """Revisa las citas de un día. Si se pasa hora, verifica si esa hora está ocupada."""
+    from datetime import date as date_cls, time as time_cls, timedelta
+    fecha_val = date_cls.fromisoformat(fecha) if isinstance(fecha, str) else fecha
+
+    # Traer todas las citas del día que no estén canceladas
+    query = """
+    SELECT c.id, c.hora_inicio, c.hora_fin, c.desarrollo, c.estado,
+           p.nombre_cliente
+    FROM citas_chatbot c
+    LEFT JOIN prospectos p ON c.prospecto_id = p.id
+    WHERE c.fecha = :fecha AND c.estado != 'cancelada'
+    ORDER BY c.hora_inicio ASC
+    """
+    rows = await database.fetch_all(query=query, values={"fecha": fecha_val})
+    citas_dia = []
+    for r in rows:
+        d = dict(r._mapping)
+        d["hora_inicio"] = str(d["hora_inicio"])[:5] if d["hora_inicio"] else ""
+        d["hora_fin"] = str(d["hora_fin"])[:5] if d["hora_fin"] else ""
+        citas_dia.append(d)
+
+    ocupada = False
+    if hora:
+        # Verificar si la hora solicitada choca con alguna cita existente
+        hora_solicitada = time_cls.fromisoformat(hora if len(hora) == 5 else hora + ":00")
+        hora_fin_solicitada = (
+            (lambda dt: (dt + timedelta(hours=1)).time())(
+                __import__("datetime").datetime.combine(fecha_val, hora_solicitada)
+            )
+        )
+        for c in citas_dia:
+            if c["hora_inicio"] and c["hora_fin"]:
+                ci = time_cls.fromisoformat(c["hora_inicio"])
+                cf = time_cls.fromisoformat(c["hora_fin"])
+                # Hay empalme si: inicio_solicitado < fin_existente AND fin_solicitado > inicio_existente
+                if hora_solicitada < cf and hora_fin_solicitada > ci:
+                    ocupada = True
+                    break
+
+    # Generar horarios disponibles del día (9 AM a 7 PM, bloques de 1 hora)
+    disponibles = []
+    for h in range(9, 19):  # 9:00 a 18:00 (última cita a las 18:00, termina 19:00)
+        slot_inicio = time_cls(h, 0)
+        slot_fin = time_cls(h + 1, 0) if h < 23 else time_cls(23, 59)
+        libre = True
+        for c in citas_dia:
+            if c["hora_inicio"] and c["hora_fin"]:
+                ci = time_cls.fromisoformat(c["hora_inicio"])
+                cf = time_cls.fromisoformat(c["hora_fin"])
+                if slot_inicio < cf and slot_fin > ci:
+                    libre = False
+                    break
+        if libre:
+            disponibles.append(f"{h:02d}:00")
+
+    return {
+        "fecha": fecha,
+        "citas_del_dia": citas_dia,
+        "hora_solicitada_ocupada": ocupada,
+        "horarios_disponibles": disponibles,
+    }
+
+
 async def update_cita_chatbot(cita_id: int, updates: dict):
     """Actualiza una cita (estado, google_event_id, notas)."""
     allowed = {"estado", "google_event_id", "notas"}

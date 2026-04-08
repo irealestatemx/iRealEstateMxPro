@@ -37,7 +37,7 @@ from database import (
     create_prospecto, get_all_prospectos, get_prospecto_by_id,
     update_prospecto, count_prospectos, delete_prospecto,
     get_prospecto_by_telefono, agregar_historial_prospecto,
-    create_cita_chatbot, get_citas_chatbot, update_cita_chatbot,
+    create_cita_chatbot, get_citas_chatbot, update_cita_chatbot, check_disponibilidad_citas,
     save_documento, get_documentos_by_propiedad, update_documento_estado,
     get_properties_by_vendedor, get_properties_by_comprador, get_properties_by_desarrollo,
     get_propiedades_seguimiento, set_tipo_compra,
@@ -4085,6 +4085,94 @@ async def whatsapp_debounce(request: Request):
         })
 
     return JSONResponse({"process": False})
+
+
+# ─── API: Disponibilidad de citas (para el chatbot) ───
+
+@app.get("/api/citas/disponibilidad")
+async def api_citas_disponibilidad(fecha: str, hora: str = None):
+    """
+    Consulta disponibilidad de citas para una fecha.
+    - GET /api/citas/disponibilidad?fecha=2026-04-14
+    - GET /api/citas/disponibilidad?fecha=2026-04-14&hora=10:00
+    Retorna: citas del día, si la hora está ocupada, y horarios disponibles.
+    """
+    try:
+        result = await check_disponibilidad_citas(fecha, hora)
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=400)
+
+
+@app.post("/api/citas/registrar")
+async def api_citas_registrar(request: Request):
+    """
+    Registra una cita confirmada desde n8n.
+    Body: { telefono, nombre, fecha, hora, desarrollo, notas }
+    Verifica disponibilidad antes de crear.
+    """
+    body = await request.json()
+    telefono = body.get("telefono", "")
+    nombre = body.get("nombre", "")
+    fecha = body.get("fecha", "")
+    hora = body.get("hora", "")
+    desarrollo = body.get("desarrollo", "")
+    notas = body.get("notas", "")
+
+    if not fecha or not hora:
+        return JSONResponse({"ok": False, "error": "Fecha y hora son requeridas"}, status_code=400)
+
+    # Verificar disponibilidad
+    disp = await check_disponibilidad_citas(fecha, hora)
+    if disp["hora_solicitada_ocupada"]:
+        return JSONResponse({
+            "ok": False,
+            "error": "Horario ocupado",
+            "mensaje": f"Ya hay una cita agendada a esa hora. Horarios disponibles: {', '.join(disp['horarios_disponibles'])}",
+            "horarios_disponibles": disp["horarios_disponibles"],
+        })
+
+    # Buscar prospecto por teléfono
+    prospecto = await get_prospecto_by_telefono(telefono) if telefono else None
+    prospecto_id = prospecto["id"] if prospecto else None
+
+    # Calcular hora fin (1 hora después)
+    from datetime import time as time_cls, datetime as dt_cls, timedelta
+    hora_obj = time_cls.fromisoformat(hora if len(hora) == 5 else hora + ":00")
+    hora_fin_dt = dt_cls.combine(dt_cls.today(), hora_obj) + timedelta(hours=1)
+    hora_fin = hora_fin_dt.time().strftime("%H:%M")
+
+    cita_id = await create_cita_chatbot({
+        "prospecto_id": prospecto_id,
+        "titulo": f"Visita {desarrollo} - {nombre}",
+        "desarrollo": desarrollo,
+        "fecha": fecha,
+        "hora_inicio": hora,
+        "hora_fin": hora_fin,
+        "estado": "pendiente",
+        "google_event_id": "",
+        "notas": notas,
+    })
+
+    # Actualizar prospecto con datos de cita
+    if prospecto_id:
+        await update_prospecto(prospecto_id, {"estado": "cita_agendada"})
+        await agregar_historial_prospecto(prospecto_id, {
+            "tipo": "cita_agendada",
+            "mensaje": f"Cita {fecha} a las {hora} - {desarrollo}",
+            "fecha": str(dt_cls.now()),
+            "datos": {"cita_id": cita_id, "fecha": fecha, "hora": hora},
+        })
+
+    print(f"[CITA] Nueva cita #{cita_id} — {nombre} → {fecha} {hora} ({desarrollo})")
+    return JSONResponse({
+        "ok": True,
+        "cita_id": cita_id,
+        "fecha": fecha,
+        "hora": hora,
+        "hora_fin": hora_fin,
+        "desarrollo": desarrollo,
+    })
 
 
 # ─── API: Registro automatico de prospectos desde n8n/WhatsApp ───
