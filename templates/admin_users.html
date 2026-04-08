@@ -32,32 +32,25 @@
       .topbar-nav a, .topbar-nav span { padding:10px 0; font-size:15px; }
       .topbar-nav a.active { border-left:3px solid #c9a227; padding-left:10px; }
     }
-    .container { max-width: 900px; margin: 32px auto; padding: 0 20px; }
+    .container { max-width: 960px; margin: 32px auto; padding: 0 20px; }
     h1 { font-size: 24px; color: #c9a227; font-family: 'Playfair Display', serif; margin-bottom: 24px; }
     .card {
       background: #1a1a1a; border: 1px solid rgba(201,162,39,.1);
       border-radius: 12px; padding: 28px; margin-bottom: 24px;
     }
     .card h2 { font-size: 18px; color: #c9a227; margin-bottom: 16px; }
-    table { width: 100%; border-collapse: collapse; }
-    th {
-      text-align: left; font-size: 12px; font-weight: 600;
-      color: rgba(255,255,255,.4); text-transform: uppercase;
-      padding: 8px 12px; border-bottom: 1px solid rgba(201,162,39,.15);
-    }
-    td {
-      padding: 12px; font-size: 14px;
-      border-bottom: 1px solid rgba(255,255,255,.05); color: #e0e0e0;
-    }
     .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 600; }
     .badge-admin { background: rgba(201,162,39,.2); color: #c9a227; }
     .badge-agente { background: rgba(255,255,255,.08); color: rgba(255,255,255,.6); }
     .badge-referido { background: rgba(39,174,96,.2); color: #2ecc71; }
+    .badge-vendedor { background: rgba(52,152,219,.2); color: #3498db; }
+    .badge-comprador { background: rgba(155,89,182,.2); color: #9b59b6; }
     .badge-activo { background: rgba(39,174,96,.2); color: #2ecc71; }
     .badge-inactivo { background: rgba(192,57,43,.2); color: #e74c3c; }
     .btn-sm {
       padding: 6px 14px; border: none; border-radius: 6px;
       font-size: 12px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;
+      transition: background .2s;
     }
     .btn-toggle { background: rgba(255,255,255,.08); color: rgba(255,255,255,.6); }
     .btn-toggle:hover { background: rgba(255,255,255,.15); }
@@ -65,6 +58,26 @@
     .btn-delete:hover { background: #e74c3c; }
     .btn-edit { background: rgba(201,162,39,.2); color: #c9a227; }
     .btn-edit:hover { background: rgba(201,162,39,.35); }
+
+    /* ─── User Cards ─── */
+    .user-list { display:flex; flex-direction:column; gap:12px; }
+    .user-card {
+      background:#111; border:1px solid rgba(255,255,255,.06); border-radius:10px;
+      padding:16px 20px; display:grid;
+      grid-template-columns: 1fr auto;
+      gap:12px; align-items:center;
+      transition: border-color .2s;
+    }
+    .user-card:hover { border-color:rgba(201,162,39,.2); }
+    .user-info { display:flex; flex-direction:column; gap:6px; min-width:0; }
+    .user-name { font-size:15px; font-weight:600; color:#fff; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+    .user-meta { font-size:13px; color:rgba(255,255,255,.4); display:flex; gap:16px; flex-wrap:wrap; }
+    .user-meta span { display:inline-flex; align-items:center; gap:4px; }
+    .user-actions { display:flex; gap:6px; flex-wrap:wrap; align-items:center; justify-content:flex-end; }
+    @media(max-width:640px){
+      .user-card { grid-template-columns:1fr; }
+      .user-actions { justify-content:flex-start; }
+    }
     /* Modal */
     .modal-overlay {
       position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;
@@ -95,22 +108,35 @@
       border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;
     }
     .modal-actions .btn-cancel:hover { background:rgba(255,255,255,.15); }
-    .form-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: end; }
-    .form-row .fg { flex: 1; min-width: 140px; }
-    .form-row label { display: block; font-size: 12px; font-weight: 600; color: rgba(255,255,255,.5); margin-bottom: 4px; }
-    .form-row input, .form-row select {
+    @media(max-width:480px){
+      .modal { padding:24px 16px; }
+      .modal-grid { grid-template-columns:1fr; }
+      .modal-grid .full { grid-column:1; }
+      .modal-actions { flex-direction:column; }
+      .modal-actions button { width:100%; }
+    }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .form-grid .full { grid-column: 1/-1; }
+    .form-grid label { display: block; font-size: 12px; font-weight: 600; color: rgba(255,255,255,.5); margin-bottom: 4px; }
+    .form-grid input, .form-grid select {
       width: 100%; padding: 10px 12px; border: 1px solid rgba(201,162,39,.2);
       border-radius: 8px; font-size: 14px; font-family: 'Inter', sans-serif;
       background: #111; color: #e0e0e0;
     }
-    .form-row input:focus, .form-row select:focus { border-color: #c9a227; outline: none; }
+    .form-grid input:focus, .form-grid select:focus { border-color: #c9a227; outline: none; }
     .btn-add {
-      padding: 10px 24px; background: linear-gradient(135deg, #c9a227, #d4af37);
+      padding: 12px 28px; background: linear-gradient(135deg, #c9a227, #d4af37);
       color: #0d0d0d; border: none; border-radius: 8px;
       font-size: 14px; font-weight: 700; cursor: pointer;
-      font-family: 'Inter', sans-serif; white-space: nowrap;
+      font-family: 'Inter', sans-serif; white-space: nowrap; width:100%;
     }
     .btn-add:hover { box-shadow: 0 2px 10px rgba(201,162,39,0.4); }
+    @media(max-width:640px){
+      .form-grid { grid-template-columns: 1fr; }
+      .form-grid .full { grid-column: 1; }
+      .container { padding: 0 12px; }
+      .card { padding: 20px 16px; }
+    }
   </style>
 </head>
 <body>
@@ -156,20 +182,20 @@
     <div class="card">
       <h2>Agregar usuario</h2>
       <form method="post" action="/admin/usuarios/crear">
-        <div class="form-row">
-          <div class="fg">
-            <label>Nombre</label>
-            <input type="text" name="nombre" placeholder="Nombre completo" required />
+        <div class="form-grid">
+          <div>
+            <label>Nombre *</label>
+            <input type="text" name="nombre" placeholder="Nombre completo" required/>
           </div>
-          <div class="fg">
-            <label>Email</label>
-            <input type="email" name="email" placeholder="email@ejemplo.com" required />
+          <div>
+            <label>Email *</label>
+            <input type="email" name="email" placeholder="email@ejemplo.com" required/>
           </div>
-          <div class="fg">
-            <label>Contrasena</label>
-            <input type="password" name="password" placeholder="Minimo 6 caracteres" required />
+          <div>
+            <label>Contraseña *</label>
+            <input type="password" name="password" placeholder="Mínimo 6 caracteres" required/>
           </div>
-          <div class="fg" style="max-width:130px">
+          <div>
             <label>Rol</label>
             <select name="rol" id="rol-select" onchange="togglePrefijo()">
               <option value="agente">Agente</option>
@@ -179,63 +205,58 @@
               <option value="admin">Admin</option>
             </select>
           </div>
-          <div class="fg" style="max-width:100px" id="prefijo-group">
+          <div id="prefijo-group">
             <label>Prefijo WA</label>
-            <input type="text" name="prefijo_whatsapp" placeholder="Ej: N" maxlength="5" style="text-transform:uppercase" />
+            <input type="text" name="prefijo_whatsapp" placeholder="Ej: N" maxlength="5" style="text-transform:uppercase"/>
           </div>
-          <div class="fg" style="max-width:160px">
+          <div>
             <label>Teléfono</label>
-            <input type="text" name="telefono" placeholder="Ej: 524771234567" maxlength="20" />
+            <input type="text" name="telefono" placeholder="Ej: 4771234567" maxlength="20"/>
           </div>
-          <button type="submit" class="btn-add">Agregar</button>
+          <div class="full">
+            <button type="submit" class="btn-add">Agregar usuario</button>
+          </div>
         </div>
       </form>
     </div>
 
     <!-- Lista usuarios -->
     <div class="card">
-      <h2>Usuarios registrados</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>Nombre</th>
-            <th>Email</th>
-            <th>Rol</th>
-            <th>Prefijo</th>
-            <th>Teléfono</th>
-            <th>Estado</th>
-            <th>Acciones</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for u in users %}
-          <tr>
-            <td>{{ u.nombre }}</td>
-            <td>{{ u.email }}</td>
-            <td><span class="badge badge-{{ u.rol }}">{{ u.rol }}</span></td>
-            <td>{{ u.prefijo_whatsapp or '—' }}</td>
-            <td>{{ u.telefono or '—' }}</td>
-            <td><span class="badge {{ 'badge-activo' if u.activo else 'badge-inactivo' }}">{{ 'Activo' if u.activo else 'Inactivo' }}</span></td>
-            <td style="white-space:nowrap">
-              <button type="button" class="btn-sm btn-edit" onclick="openEditModal({{ u.id }}, '{{ u.nombre|e }}', '{{ u.email|e }}', '{{ u.rol }}', '{{ u.prefijo_whatsapp or '' }}', '{{ u.telefono or '' }}')">Editar</button>
-              {% if u.id != user.id %}
-              <form method="post" action="/admin/usuarios/{{ u.id }}/toggle" style="display:inline">
-                <button type="submit" class="btn-sm btn-toggle">
-                  {{ 'Desactivar' if u.activo else 'Activar' }}
-                </button>
-              </form>
-              <form method="post" action="/admin/usuarios/{{ u.id }}/eliminar" style="display:inline"
-                    onsubmit="return confirm('¿Eliminar permanentemente a {{ u.nombre }}? Los prospectos asociados se conservarán pero sin referido.')">
-                <button type="submit" class="btn-sm btn-delete">Eliminar</button>
-              </form>
-              {% else %}
-              <span style="color:#a0aec0;font-size:12px">Tu cuenta</span>
-              {% endif %}
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+      <h2>Usuarios registrados ({{ users|length }})</h2>
+      <div class="user-list">
+        {% for u in users %}
+        <div class="user-card">
+          <div class="user-info">
+            <div class="user-name">
+              {{ u.nombre }}
+              <span class="badge badge-{{ u.rol }}">{{ u.rol }}</span>
+              <span class="badge {{ 'badge-activo' if u.activo else 'badge-inactivo' }}">{{ 'Activo' if u.activo else 'Inactivo' }}</span>
+            </div>
+            <div class="user-meta">
+              <span>📧 {{ u.email }}</span>
+              {% if u.prefijo_whatsapp %}<span>🏷️ {{ u.prefijo_whatsapp }}</span>{% endif %}
+              {% if u.telefono %}<span>📱 {{ u.telefono }}</span>{% endif %}
+            </div>
+          </div>
+          <div class="user-actions">
+            <button type="button" class="btn-sm btn-edit" onclick="openEditModal({{ u.id }}, '{{ u.nombre|e }}', '{{ u.email|e }}', '{{ u.rol }}', '{{ u.prefijo_whatsapp or '' }}', '{{ u.telefono or '' }}')">Editar</button>
+            {% if u.id != user.id %}
+            <form method="post" action="/admin/usuarios/{{ u.id }}/toggle" style="display:inline">
+              <button type="submit" class="btn-sm btn-toggle">
+                {{ 'Desactivar' if u.activo else 'Activar' }}
+              </button>
+            </form>
+            <form method="post" action="/admin/usuarios/{{ u.id }}/eliminar" style="display:inline"
+                  onsubmit="return confirm('¿Eliminar permanentemente a {{ u.nombre }}?')">
+              <button type="submit" class="btn-sm btn-delete">Eliminar</button>
+            </form>
+            {% else %}
+            <span style="color:#a0aec0;font-size:12px">Tu cuenta</span>
+            {% endif %}
+          </div>
+        </div>
+        {% endfor %}
+      </div>
     </div>
   </div>
   <!-- Modal Editar Usuario -->
