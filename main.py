@@ -1594,7 +1594,7 @@ async def enviar_whatsapp_waha(tipo: str, destinatario: dict, metadata: dict):
     }
 
     headers = {
-        "Authorization": f"Bearer {WAHA_API_KEY}",
+        "X-Api-Key": WAHA_API_KEY,
         "Content-Type": "application/json",
     }
 
