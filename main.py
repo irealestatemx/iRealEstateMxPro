@@ -11,7 +11,8 @@ from pathlib import Path
 from typing import List, Optional, Dict
 
 from fastapi import FastAPI, Request, Form, File, UploadFile, Depends
-from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse, JSONResponse, RedirectResponse, PlainTextResponse
+from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse, JSONResponse, RedirectResponse
+from starlette.responses import PlainTextResponse, Response as StarletteResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from openai import OpenAI
@@ -4551,8 +4552,7 @@ async def sitemap_xml():
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 {chr(10).join(urls)}
 </urlset>"""
-    from starlette.responses import Response
-    return Response(content=xml, media_type="application/xml")
+    return StarletteResponse(content=xml, media_type="application/xml")
 
 
 # ─── API REST de Propiedades (para web, chatbot, n8n) ───
