@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Vende o Renta tu Propiedad en Guanajuato — iRealEstateMx</title>
+  <meta name="description" content="Publica tu casa, departamento o terreno con nosotros. Asesoría profesional, fotos de alta calidad y difusión en múltiples canales para vender o rentar rápido en León, Guanajuato."/>
+  <link rel="canonical" href="https://irealestatemx.com/vender"/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:locale" content="es_MX"/>
+  <meta property="og:site_name" content="iRealEstateMx"/>
+  <meta property="og:title" content="Vende o Renta tu Propiedad — iRealEstateMx"/>
+  <meta property="og:description" content="Te ayudamos a vender o rentar tu propiedad con asesoría profesional en Guanajuato."/>
+  <meta property="og:url" content="https://irealestatemx.com/vender"/>
+  <meta property="og:image" content="https://irealestatemx.com/static/img/hero-bg.jpg"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="robots" content="index, follow"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/public.css"/>
+  <link rel="icon" href="/static/img/logo-header.png"/>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    "itemListElement": [
+      {"@type": "ListItem", "position": 1, "name": "Inicio", "item": "https://irealestatemx.com/"},
+      {"@type": "ListItem", "position": 2, "name": "Vende o Renta tu Propiedad"}
+    ]
+  }
+  </script>
+</head>
+<body>
+
+<nav class="topbar">
+  <a href="/"><img src="/static/img/logo-full.png" alt="iRealEstateMx" class="topbar-logo"/></a>
+  <button class="hamburger" onclick="this.classList.toggle('open');document.getElementById('nav').classList.toggle('open')">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="topbar-nav" id="nav">
+    <a href="/">Inicio</a>
+    <a href="/propiedades">Propiedades</a>
+    <a href="/desarrollos">Desarrollos</a>
+    <a href="/vender" class="active">Vender/Rentar</a>
+  </div>
+</nav>
+
+<nav class="breadcrumbs" aria-label="Breadcrumb">
+  <a href="/">Inicio</a><span class="sep">/</span>
+  <span>Vende o Renta tu Propiedad</span>
+</nav>
+
+<!-- Hero -->
+<section class="vender-hero" style="background:url('/static/img/hero-bg.jpg') center/cover no-repeat">
+  <h1 style="font-family:'Playfair Display',serif;font-size:clamp(28px,5vw,48px);color:var(--text-bright);margin-bottom:12px">
+    Vende o Renta tu <span style="color:var(--gold)">Propiedad</span>
+  </h1>
+  <p style="color:var(--text-dim);font-size:17px;max-width:600px;margin:0 auto 24px">
+    Nos encargamos de todo: desde la publicación hasta el cierre. Déjanos tu información y te contactamos en menos de 24 horas.
+  </p>
+  <div class="vender-stats">
+    <div class="vender-stat"><div class="num">50+</div><div class="lbl">Propiedades publicadas</div></div>
+    <div class="vender-stat"><div class="num">95%</div><div class="lbl">Clientes satisfechos</div></div>
+    <div class="vender-stat"><div class="num">30</div><div class="lbl">Días promedio de venta</div></div>
+  </div>
+</section>
+
+<!-- Formulario -->
+<section class="section">
+  <div class="section-inner">
+    <div class="vender-form-section">
+
+      {% if enviado %}
+      <div class="vender-success">
+        <h2>¡Mensaje enviado!</h2>
+        <p style="color:var(--text-dim);font-size:15px;margin-bottom:24px">
+          Recibimos tu información. Un asesor te contactará en las próximas horas para ayudarte con tu propiedad.
+        </p>
+        <a href="/" class="btn-cta" style="display:inline-flex">Volver al inicio</a>
+      </div>
+      {% else %}
+
+      <h2 class="section-title">Cuéntanos sobre tu propiedad</h2>
+      <p class="section-subtitle">Llena el formulario y un asesor especializado te contactará</p>
+
+      <form class="vender-form" method="POST" action="/vender">
+        <div>
+          <label>Nombre completo *</label>
+          <input type="text" name="nombre" required placeholder="Tu nombre"/>
+        </div>
+        <div>
+          <label>Teléfono *</label>
+          <input type="tel" name="telefono" required placeholder="Ej: 477 123 4567" inputmode="tel"/>
+        </div>
+        <div>
+          <label>Email</label>
+          <input type="email" name="email" placeholder="tu@email.com"/>
+        </div>
+        <div>
+          <label>¿Qué quieres hacer? *</label>
+          <select name="operacion" required>
+            <option value="" disabled selected>Selecciona...</option>
+            <option value="Vender">Vender mi propiedad</option>
+            <option value="Rentar">Rentar mi propiedad</option>
+            <option value="Ambos">Vender o Rentar</option>
+          </select>
+        </div>
+        <div>
+          <label>Tipo de propiedad *</label>
+          <select name="tipo_propiedad" required>
+            <option value="" disabled selected>Selecciona...</option>
+            <option value="Casa">Casa</option>
+            <option value="Departamento">Departamento</option>
+            <option value="Terreno">Terreno</option>
+            <option value="Local Comercial">Local Comercial</option>
+            <option value="Oficina">Oficina</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div>
+          <label>Ciudad *</label>
+          <select name="ciudad" required>
+            <option value="León" selected>León</option>
+            <option value="Guanajuato">Guanajuato</option>
+            <option value="Irapuato">Irapuato</option>
+            <option value="Celaya">Celaya</option>
+            <option value="San Miguel de Allende">San Miguel de Allende</option>
+            <option value="Otra">Otra</option>
+          </select>
+        </div>
+        <div class="full">
+          <label>Cuéntanos más sobre tu propiedad</label>
+          <textarea name="mensaje" placeholder="Ubicación aproximada, número de recámaras, precio estimado, o cualquier detalle que nos ayude a asesorarte mejor..."></textarea>
+        </div>
+        <button type="submit" class="submit-btn">
+          Enviar información
+        </button>
+        <p class="full" style="text-align:center;color:var(--text-dim);font-size:12px;margin-top:-8px">
+          O escríbenos directo por
+          <a href="https://wa.me/{{ c.whatsapp }}?text=Hola%2C%20quiero%20vender%2Frentar%20mi%20propiedad" target="_blank" style="color:var(--gold);font-weight:600">WhatsApp</a>
+        </p>
+      </form>
+
+      {% endif %}
+
+      <!-- Beneficios -->
+      <div style="margin-top:48px">
+        <h3 class="section-title" style="font-size:22px">¿Por qué elegirnos?</h3>
+        <div class="seller-benefits" style="margin-top:24px">
+          <div class="seller-benefit">
+            <span class="seller-benefit-icon">📸</span>
+            <div><strong>Contenido profesional</strong><br><span>Fotos, descripciones y publicaciones diseñadas para atraer compradores</span></div>
+          </div>
+          <div class="seller-benefit">
+            <span class="seller-benefit-icon">📊</span>
+            <div><strong>Análisis de mercado</strong><br><span>Definimos el precio justo basado en datos reales del mercado</span></div>
+          </div>
+          <div class="seller-benefit">
+            <span class="seller-benefit-icon">🔑</span>
+            <div><strong>Gestión integral</strong><br><span>Desde la publicación hasta la firma. Visitas, negociación y cierre</span></div>
+          </div>
+          <div class="seller-benefit">
+            <span class="seller-benefit-icon">📱</span>
+            <div><strong>Máxima exposición</strong><br><span>Tu propiedad en nuestro sitio, Instagram, WhatsApp y portales inmobiliarios</span></div>
+          </div>
+          <div class="seller-benefit">
+            <span class="seller-benefit-icon">💰</span>
+            <div><strong>Sin costo inicial</strong><br><span>Solo cobramos al cerrar la operación. Sin riesgo para ti</span></div>
+          </div>
+          <div class="seller-benefit">
+            <span class="seller-benefit-icon">⚡</span>
+            <div><strong>Respuesta rápida</strong><br><span>Te contactamos en menos de 24 horas con un plan personalizado</span></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <div class="footer-inner">
+    <div>
+      <img src="/static/img/logo-full.png" alt="iRealEstateMx" style="height:32px;margin-bottom:16px;filter:brightness(2)"/>
+      <p>{{ c.footer_texto }}</p>
+      <p style="margin-top:12px">Tel: <a href="tel:+52{{ c.telefono }}">{{ c.telefono }}</a></p>
+      <p>Email: <a href="mailto:{{ c.email }}">{{ c.email }}</a></p>
+    </div>
+    <div>
+      <h4>Propiedades</h4>
+      <ul class="footer-links">
+        <li><a href="/propiedades?operacion=venta">En Venta</a></li>
+        <li><a href="/propiedades?operacion=renta">En Renta</a></li>
+        <li><a href="/propiedades?tipo=Casa">Casas</a></li>
+        <li><a href="/propiedades?tipo=Departamento">Departamentos</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Servicios</h4>
+      <ul class="footer-links">
+        <li><a href="/vender">Vende tu propiedad</a></li>
+        <li><a href="/desarrollos">Desarrollos</a></li>
+        <li><a href="/vendidas">Propiedades Vendidas</a></li>
+      </ul>
+    </div>
+    <div>
+      <h4>Legal</h4>
+      <ul class="footer-links">
+        <li><a href="/aviso-de-privacidad">Aviso de Privacidad</a></li>
+        <li><a href="/terminos-y-condiciones">Términos y Condiciones</a></li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>&copy; 2026 iRealEstateMx. Todos los derechos reservados.</span>
+  </div>
+</footer>
+
+<a href="https://wa.me/{{ c.whatsapp }}?text=Hola%2C%20quiero%20vender%2Frentar%20mi%20propiedad" class="wa-float" target="_blank" title="WhatsApp">
+  <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51l-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/></svg>
+</a>
+
+</body>
+</html>

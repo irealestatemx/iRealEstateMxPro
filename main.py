@@ -4486,6 +4486,96 @@ async def terminos_condiciones(request: Request):
     return templates.TemplateResponse(request=request, name="public_terminos.html", context={"c": c})
 
 
+# ─── Vende/Renta tu Propiedad ───
+
+@app.get("/vender", response_class=HTMLResponse)
+async def public_vender(request: Request):
+    """Página para captar propietarios que quieran vender o rentar."""
+    c = await load_public_config()
+    return templates.TemplateResponse(request=request, name="public_vender.html", context={
+        "c": c,
+        "enviado": False,
+    })
+
+
+@app.post("/vender", response_class=HTMLResponse)
+async def public_vender_submit(
+    request: Request,
+    nombre: str = Form(...),
+    telefono: str = Form(...),
+    email: Optional[str] = Form(None),
+    operacion: str = Form(...),
+    tipo_propiedad: str = Form(...),
+    ciudad: str = Form("León"),
+    mensaje: Optional[str] = Form(None),
+):
+    """Recibe el formulario de propietarios y crea un prospecto."""
+    # Verificar si ya existe un prospecto con ese teléfono
+    existente = await get_prospecto_by_telefono(telefono)
+    nota = f"[WEB-VENDEDOR] Quiere {operacion.lower()} un(a) {tipo_propiedad} en {ciudad}."
+    if mensaje:
+        nota += f" Mensaje: {mensaje}"
+
+    if existente:
+        prospecto_id = existente["id"]
+        updates = {}
+        if nombre and not existente.get("nombre_cliente"):
+            updates["nombre_cliente"] = nombre
+        if email and not existente.get("email_cliente"):
+            updates["email_cliente"] = email
+        if updates:
+            await update_prospecto(prospecto_id, updates)
+        await agregar_historial_prospecto(prospecto_id, {
+            "tipo": "formulario_vendedor",
+            "nota": nota,
+            "operacion": operacion,
+            "tipo_propiedad": tipo_propiedad,
+            "ciudad": ciudad,
+        })
+    else:
+        prospecto_id = await create_prospecto({
+            "nombre_cliente": nombre,
+            "telefono_cliente": telefono,
+            "email_cliente": email or "",
+            "mensaje_original": nota,
+            "desarrollo_interes": "",
+            "estado": "nuevo",
+            "fuente": "web_vendedor",
+            "historial": [{
+                "tipo": "formulario_vendedor",
+                "nota": nota,
+                "operacion": operacion,
+                "tipo_propiedad": tipo_propiedad,
+                "ciudad": ciudad,
+            }],
+        })
+
+    # Notificar por WhatsApp (opcional, si hay integración)
+    try:
+        admin_users = await get_users_by_rol("admin")
+        for admin in admin_users:
+            await crear_notificacion(
+                tipo="lead_vendedor",
+                user_id=admin["id"],
+                metadata={
+                    "nombre": nombre,
+                    "telefono": telefono,
+                    "operacion": operacion,
+                    "tipo_propiedad": tipo_propiedad,
+                    "ciudad": ciudad,
+                    "prospecto_id": prospecto_id,
+                },
+            )
+    except Exception:
+        pass
+
+    c = await load_public_config()
+    return templates.TemplateResponse(request=request, name="public_vender.html", context={
+        "c": c,
+        "enviado": True,
+    })
+
+
 # ─── SEO: Sitemap y Robots ───
 
 @app.get("/robots.txt", response_class=PlainTextResponse)
@@ -4517,6 +4607,7 @@ async def sitemap_xml():
         ("/propiedades?operacion=venta", "0.8", "daily"),
         ("/propiedades?operacion=renta", "0.8", "daily"),
         ("/propiedades?operacion=preventa", "0.8", "weekly"),
+        ("/vender", "0.8", "monthly"),
         ("/vendidas", "0.5", "weekly"),
         ("/aviso-de-privacidad", "0.3", "yearly"),
         ("/terminos-y-condiciones", "0.3", "yearly"),
