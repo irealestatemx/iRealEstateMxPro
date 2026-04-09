@@ -6,25 +6,11 @@
   <title>iRealEstateMxPro — Configuración del Sitio</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/sidebar.css"/>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:'Inter',sans-serif;background:#0d0d0d;color:#e0e0e0;min-height:100vh}
-    .topbar{background:#111;border-bottom:1px solid rgba(201,162,39,.15);padding:16px 32px;display:flex;align-items:center;justify-content:space-between}
-    .topbar-logo{height:36px}
-    .topbar-nav{display:flex;gap:16px;align-items:center}
-    .topbar-nav a{color:rgba(255,255,255,.6);text-decoration:none;font-size:14px;font-weight:500;transition:color .2s}
-    .topbar-nav a:hover{color:#c9a227}
-    .topbar-nav a.active{color:#c9a227;border-bottom:2px solid #c9a227;padding-bottom:2px}
-    .topbar-user{color:rgba(255,255,255,.4);font-size:13px}
-    .hamburger{display:none;background:none;border:none;cursor:pointer;padding:4px}
-    .hamburger span{display:block;width:22px;height:2px;background:#c9a227;margin:5px 0;border-radius:2px}
-    @media(max-width:768px){
-      .hamburger{display:block}
-      .topbar{flex-wrap:wrap;padding:12px 16px}
-      .topbar-nav{display:none;width:100%;flex-direction:column;gap:0;padding-top:12px;border-top:1px solid rgba(255,255,255,.1);margin-top:12px}
-      .topbar-nav.open{display:flex}
-      .topbar-nav a,.topbar-nav span{padding:10px 0;font-size:15px}
-    }
+    /* topbar replaced by sidebar */
     .container{max-width:900px;margin:24px auto;padding:0 20px}
     h1{font-size:24px;color:#c9a227;font-family:'Playfair Display',serif;margin-bottom:24px}
     .card{background:#1a1a1a;border:1px solid rgba(201,162,39,.15);border-radius:12px;padding:24px;margin-bottom:24px}
@@ -56,22 +42,10 @@
 </head>
 <body>
 
-<div class="topbar">
-  <img src="/static/img/logo-header.png" alt="iRealEstateMx" class="topbar-logo"/>
-  <button class="hamburger" onclick="this.classList.toggle('open');document.querySelector('.topbar-nav').classList.toggle('open')">
-    <span></span><span></span><span></span>
-  </button>
-  <div class="topbar-nav">
-    <a href="/">Nueva Propiedad</a>
-    <a href="/dashboard">Propiedades</a>
-    <a href="/admin/prospectos">Prospectos</a>
-    <a href="/admin/desarrollos">Desarrollos</a>
-    <a href="/admin/config" class="active">Configuración</a>
-    <a href="/admin/usuarios">Usuarios</a>
-    <span class="topbar-user">{{ user.nombre }}</span>
-    <a href="/logout">Salir</a>
-  </div>
-</div>
+{% set page = 'config' %}
+{% include '_sidebar.html' %}
+<div class="layout">
+<div class="layout-main">
 
 <div class="container">
   <h1>Configuración del Sitio Web</h1>
@@ -231,6 +205,40 @@
       </div>
     </div>
 
+    <!-- ─── Vender/Rentar ─── -->
+    <div class="card">
+      <h2>Página Vender/Rentar</h2>
+      <div class="field">
+        <label>Título hero</label>
+        <input type="text" name="vender_titulo" value="{{ c.vender_titulo or '' }}"/>
+        <div class="hint">Usa {gold}texto{/gold} para resaltar. Ej: "Vende o Renta tu {gold}Propiedad{/gold}"</div>
+      </div>
+      <div class="field">
+        <label>Subtítulo</label>
+        <textarea name="vender_subtitulo">{{ c.vender_subtitulo or '' }}</textarea>
+      </div>
+      <div class="row">
+        <div class="field"><label>Estadística 1 — número</label><input type="text" name="vender_stat1_num" value="{{ c.vender_stat1_num or '50+' }}"/></div>
+        <div class="field"><label>Estadística 1 — texto</label><input type="text" name="vender_stat1_label" value="{{ c.vender_stat1_label or 'Propiedades publicadas' }}"/></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Estadística 2 — número</label><input type="text" name="vender_stat2_num" value="{{ c.vender_stat2_num or '95%' }}"/></div>
+        <div class="field"><label>Estadística 2 — texto</label><input type="text" name="vender_stat2_label" value="{{ c.vender_stat2_label or 'Clientes satisfechos' }}"/></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Estadística 3 — número</label><input type="text" name="vender_stat3_num" value="{{ c.vender_stat3_num or '30' }}"/></div>
+        <div class="field"><label>Estadística 3 — texto</label><input type="text" name="vender_stat3_label" value="{{ c.vender_stat3_label or 'Días promedio de venta' }}"/></div>
+      </div>
+      <h3 style="font-size:14px;color:rgba(255,255,255,.5);margin:20px 0 12px;border-top:1px solid rgba(201,162,39,.1);padding-top:16px">Beneficios (6 tarjetas)</h3>
+      {% for i in range(1, 7) %}
+      <div class="row" style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid rgba(255,255,255,.05)">
+        <div class="field" style="max-width:60px"><label>Icono {{ i }}</label><input type="text" name="vender_beneficio{{ i }}_icono" value="{{ c['vender_beneficio' ~ i ~ '_icono'] or '' }}" style="text-align:center"/></div>
+        <div class="field"><label>Título {{ i }}</label><input type="text" name="vender_beneficio{{ i }}_titulo" value="{{ c['vender_beneficio' ~ i ~ '_titulo'] or '' }}"/></div>
+        <div class="field" style="flex:2"><label>Descripción {{ i }}</label><input type="text" name="vender_beneficio{{ i }}_desc" value="{{ c['vender_beneficio' ~ i ~ '_desc'] or '' }}"/></div>
+      </div>
+      {% endfor %}
+    </div>
+
     <!-- ─── Footer ─── -->
     <div class="card">
       <h2>Footer</h2>
@@ -260,5 +268,7 @@
   </div>
 </div>
 
+</div><!-- layout-main -->
+</div><!-- layout -->
 </body>
 </html>

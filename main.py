@@ -2204,8 +2204,133 @@ async def edit_property_submit(
         "agente_email": agente_email,
         "desarrollo_slug": desarrollo_slug or None,
     }
+    # Si cambian operación a "Vendida", marcar como vendida
+    if operacion == "Vendida":
+        from datetime import datetime as _dt
+        updates["vendida"] = True
+        if not prop.get("fecha_venta"):
+            updates["fecha_venta"] = _dt.now()
+    elif prop.get("vendida") and operacion != "Vendida":
+        # Si cambian de Vendida a otra operación, desmarcar
+        updates["vendida"] = False
+
     await update_property(prop_id, updates)
     return RedirectResponse("/dashboard", status_code=302)
+
+
+# ─── Gestión de fotos de propiedad ───
+
+@app.post("/dashboard/editar/{prop_id}/fotos")
+async def edit_property_photos(request: Request, prop_id: int):
+    """Maneja agregar, eliminar, reordenar fotos y cambiar portada."""
+    user = await require_auth(request)
+    if not user:
+        return JSONResponse({"error": "No autenticado"}, status_code=401)
+    prop = await get_property_by_id(prop_id)
+    if not prop:
+        return JSONResponse({"error": "Propiedad no encontrada"}, status_code=404)
+    if user["rol"] != "admin" and prop.get("user_id") != user["id"]:
+        return JSONResponse({"error": "Sin permisos"}, status_code=403)
+
+    form = await request.form()
+    action = form.get("action", "")
+
+    if action == "delete":
+        # Eliminar una foto
+        foto_url = form.get("foto_url", "")
+        extras = list(prop.get("fotos_extra_urls") or [])
+        updates = {}
+        if foto_url == prop.get("foto_portada_url"):
+            # Si eliminan la portada, poner la primera extra como portada
+            updates["foto_portada_url"] = extras[0] if extras else ""
+            if extras:
+                extras.pop(0)
+            updates["fotos_extra_urls"] = json.dumps(extras)
+        elif foto_url in extras:
+            extras.remove(foto_url)
+            updates["fotos_extra_urls"] = json.dumps(extras)
+        if updates:
+            await update_property(prop_id, updates)
+        # Eliminar archivo físico
+        try:
+            file_path = BASE_DIR / foto_url.lstrip("/")
+            if file_path.exists():
+                file_path.unlink()
+        except Exception:
+            pass
+        return RedirectResponse(f"/dashboard/editar/{prop_id}", status_code=302)
+
+    elif action == "set_cover":
+        # Cambiar foto de portada
+        foto_url = form.get("foto_url", "")
+        extras = list(prop.get("fotos_extra_urls") or [])
+        old_cover = prop.get("foto_portada_url", "")
+        if foto_url in extras:
+            extras.remove(foto_url)
+            if old_cover:
+                extras.insert(0, old_cover)
+            await update_property(prop_id, {
+                "foto_portada_url": foto_url,
+                "fotos_extra_urls": json.dumps(extras),
+            })
+        return RedirectResponse(f"/dashboard/editar/{prop_id}", status_code=302)
+
+    elif action == "upload":
+        # Subir nuevas fotos
+        files = form.getlist("nuevas_fotos")
+        if not files:
+            return RedirectResponse(f"/dashboard/editar/{prop_id}", status_code=302)
+
+        session_id = prop.get("session_id", uuid.uuid4().hex)
+        photo_dir = UPLOAD_DIR / session_id
+        photo_dir.mkdir(parents=True, exist_ok=True)
+
+        extras = list(prop.get("fotos_extra_urls") or [])
+        current_cover = prop.get("foto_portada_url", "")
+
+        for f in files:
+            if not hasattr(f, 'filename') or not f.filename:
+                continue
+            ext = Path(f.filename).suffix.lower()
+            if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
+                continue
+            # Validar MIME
+            if f.content_type and f.content_type not in ["image/jpeg", "image/png", "image/webp"]:
+                continue
+            fname = f"{uuid.uuid4().hex[:8]}{ext}"
+            dest = photo_dir / fname
+            content = await f.read()
+            if len(content) > 10 * 1024 * 1024:  # 10MB max por foto
+                continue
+            with open(dest, "wb") as buf:
+                buf.write(content)
+            url = f"/static/uploads/{session_id}/{fname}"
+            if not current_cover:
+                current_cover = url
+            else:
+                extras.append(url)
+
+        updates = {"fotos_extra_urls": json.dumps(extras)}
+        if current_cover != prop.get("foto_portada_url"):
+            updates["foto_portada_url"] = current_cover
+        await update_property(prop_id, updates)
+        return RedirectResponse(f"/dashboard/editar/{prop_id}", status_code=302)
+
+    elif action == "reorder":
+        # Reordenar fotos (recibe JSON con el nuevo orden)
+        order_json = form.get("order", "[]")
+        try:
+            new_order = json.loads(order_json)
+        except json.JSONDecodeError:
+            new_order = []
+        if new_order:
+            await update_property(prop_id, {
+                "foto_portada_url": new_order[0],
+                "fotos_extra_urls": json.dumps(new_order[1:]),
+            })
+        return RedirectResponse(f"/dashboard/editar/{prop_id}", status_code=302)
+
+    return RedirectResponse(f"/dashboard/editar/{prop_id}", status_code=302)
 
 
 @app.post("/dashboard/editar/{prop_id}/asignar")
@@ -4573,7 +4698,19 @@ async def admin_config_save(request: Request):
         "seo_titulo", "seo_descripcion",
         "cta_titulo", "cta_subtitulo", "cta_boton",
         "footer_texto", "footer_zonas",
+        # Vender/Rentar
+        "vender_titulo", "vender_subtitulo",
+        "vender_stat1_num", "vender_stat1_label",
+        "vender_stat2_num", "vender_stat2_label",
+        "vender_stat3_num", "vender_stat3_label",
     ]
+    # Agregar campos dinámicos de beneficios
+    for i in range(1, 7):
+        campos.extend([
+            f"vender_beneficio{i}_icono",
+            f"vender_beneficio{i}_titulo",
+            f"vender_beneficio{i}_desc",
+        ])
     for campo in campos:
         valor = form.get(campo, "").strip()
         if valor:
@@ -4609,6 +4746,18 @@ async def load_public_config() -> dict:
         "cta_boton": "Contactar por WhatsApp",
         "footer_texto": "Asesores inmobiliarios certificados en Guanajuato. Compra, venta y renta con respaldo legal completo.",
         "footer_zonas": "Guanajuato, León e Irapuato",
+        # Sección Vender/Rentar
+        "vender_titulo": "Vende o Renta tu {gold}Propiedad{/gold}",
+        "vender_subtitulo": "Nos encargamos de todo: desde la publicación hasta el cierre. Déjanos tu información y te contactamos en menos de 24 horas.",
+        "vender_stat1_num": "50+", "vender_stat1_label": "Propiedades publicadas",
+        "vender_stat2_num": "95%", "vender_stat2_label": "Clientes satisfechos",
+        "vender_stat3_num": "30", "vender_stat3_label": "Días promedio de venta",
+        "vender_beneficio1_icono": "📸", "vender_beneficio1_titulo": "Contenido profesional", "vender_beneficio1_desc": "Fotos, descripciones y publicaciones diseñadas para atraer compradores",
+        "vender_beneficio2_icono": "📊", "vender_beneficio2_titulo": "Análisis de mercado", "vender_beneficio2_desc": "Definimos el precio justo basado en datos reales del mercado",
+        "vender_beneficio3_icono": "🔑", "vender_beneficio3_titulo": "Gestión integral", "vender_beneficio3_desc": "Desde la publicación hasta la firma. Visitas, negociación y cierre",
+        "vender_beneficio4_icono": "📱", "vender_beneficio4_titulo": "Máxima exposición", "vender_beneficio4_desc": "Tu propiedad en nuestro sitio, Instagram, WhatsApp y portales inmobiliarios",
+        "vender_beneficio5_icono": "💰", "vender_beneficio5_titulo": "Sin costo inicial", "vender_beneficio5_desc": "Solo cobramos al cerrar la operación. Sin riesgo para ti",
+        "vender_beneficio6_icono": "⚡", "vender_beneficio6_titulo": "Respuesta rápida", "vender_beneficio6_desc": "Te contactamos en menos de 24 horas con un plan personalizado",
     }
     for k, v in defaults.items():
         if k not in config or not config[k]:
@@ -5445,6 +5594,10 @@ async def generate(
             "user_id": user["id"] if user else None,
         }
         prop_id = await save_property(db_data)
+        # Si operación es "Vendida", marcar como vendida
+        if context.get("operacion") == "Vendida":
+            from datetime import datetime as _dt
+            await update_property(prop_id, {"vendida": True, "fecha_venta": _dt.now()})
         context["property_id"] = prop_id
     except Exception as e:
         print(f"[DB] Error guardando propiedad: {e}")

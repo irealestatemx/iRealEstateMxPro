@@ -54,15 +54,15 @@
 <!-- Hero -->
 <section class="vender-hero" style="background:url('/static/img/hero-bg.jpg') center/cover no-repeat">
   <h1 style="font-family:'Playfair Display',serif;font-size:clamp(28px,5vw,48px);color:var(--text-bright);margin-bottom:12px">
-    Vende o Renta tu <span style="color:var(--gold)">Propiedad</span>
+    {{ c.vender_titulo|replace('{gold}', '<span style="color:var(--gold)">')|replace('{/gold}', '</span>')|safe }}
   </h1>
   <p style="color:var(--text-dim);font-size:17px;max-width:600px;margin:0 auto 24px">
-    Nos encargamos de todo: desde la publicación hasta el cierre. Déjanos tu información y te contactamos en menos de 24 horas.
+    {{ c.vender_subtitulo }}
   </p>
   <div class="vender-stats">
-    <div class="vender-stat"><div class="num">50+</div><div class="lbl">Propiedades publicadas</div></div>
-    <div class="vender-stat"><div class="num">95%</div><div class="lbl">Clientes satisfechos</div></div>
-    <div class="vender-stat"><div class="num">30</div><div class="lbl">Días promedio de venta</div></div>
+    <div class="vender-stat"><div class="num">{{ c.vender_stat1_num }}</div><div class="lbl">{{ c.vender_stat1_label }}</div></div>
+    <div class="vender-stat"><div class="num">{{ c.vender_stat2_num }}</div><div class="lbl">{{ c.vender_stat2_label }}</div></div>
+    <div class="vender-stat"><div class="num">{{ c.vender_stat3_num }}</div><div class="lbl">{{ c.vender_stat3_label }}</div></div>
   </div>
 </section>
 
@@ -148,30 +148,12 @@
       <div style="margin-top:48px">
         <h3 class="section-title" style="font-size:22px">¿Por qué elegirnos?</h3>
         <div class="seller-benefits" style="margin-top:24px">
+          {% for i in range(1, 7) %}
           <div class="seller-benefit">
-            <span class="seller-benefit-icon">📸</span>
-            <div><strong>Contenido profesional</strong><br><span>Fotos, descripciones y publicaciones diseñadas para atraer compradores</span></div>
+            <span class="seller-benefit-icon">{{ c['vender_beneficio' ~ i ~ '_icono'] }}</span>
+            <div><strong>{{ c['vender_beneficio' ~ i ~ '_titulo'] }}</strong><br><span>{{ c['vender_beneficio' ~ i ~ '_desc'] }}</span></div>
           </div>
-          <div class="seller-benefit">
-            <span class="seller-benefit-icon">📊</span>
-            <div><strong>Análisis de mercado</strong><br><span>Definimos el precio justo basado en datos reales del mercado</span></div>
-          </div>
-          <div class="seller-benefit">
-            <span class="seller-benefit-icon">🔑</span>
-            <div><strong>Gestión integral</strong><br><span>Desde la publicación hasta la firma. Visitas, negociación y cierre</span></div>
-          </div>
-          <div class="seller-benefit">
-            <span class="seller-benefit-icon">📱</span>
-            <div><strong>Máxima exposición</strong><br><span>Tu propiedad en nuestro sitio, Instagram, WhatsApp y portales inmobiliarios</span></div>
-          </div>
-          <div class="seller-benefit">
-            <span class="seller-benefit-icon">💰</span>
-            <div><strong>Sin costo inicial</strong><br><span>Solo cobramos al cerrar la operación. Sin riesgo para ti</span></div>
-          </div>
-          <div class="seller-benefit">
-            <span class="seller-benefit-icon">⚡</span>
-            <div><strong>Respuesta rápida</strong><br><span>Te contactamos en menos de 24 horas con un plan personalizado</span></div>
-          </div>
+          {% endfor %}
         </div>
       </div>
 

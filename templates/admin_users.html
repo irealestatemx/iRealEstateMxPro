@@ -6,32 +6,11 @@
   <title>iRealEstateMxPro — Usuarios</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/sidebar.css"/>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Inter', sans-serif; background: #0d0d0d; color: #e0e0e0; min-height: 100vh; }
-    .topbar {
-      background: #111; border-bottom: 1px solid rgba(201,162,39,.15);
-      padding: 16px 32px; display: flex; align-items: center; justify-content: space-between;
-    }
-    .topbar-logo { height: 36px; }
-    .topbar-nav { display: flex; gap: 16px; align-items: center; }
-    .topbar-nav a { color: rgba(255,255,255,.6); text-decoration: none; font-size: 14px; font-weight: 500; transition: color .2s; }
-    .topbar-nav a:hover { color: #c9a227; }
-    .topbar-nav a.active { color: #c9a227; }
-    .topbar-user { color: rgba(255,255,255,.4); font-size: 13px; }
-    .hamburger { display:none; background:none; border:none; cursor:pointer; padding:4px; }
-    .hamburger span { display:block; width:22px; height:2px; background:#c9a227; margin:5px 0; border-radius:2px; transition:all .25s; }
-    .hamburger.open span:nth-child(1) { transform:rotate(45deg) translate(5px,5px); }
-    .hamburger.open span:nth-child(2) { opacity:0; }
-    .hamburger.open span:nth-child(3) { transform:rotate(-45deg) translate(5px,-5px); }
-    @media(max-width:768px){
-      .hamburger { display:block; }
-      .topbar { flex-wrap:wrap; padding:12px 16px; }
-      .topbar-nav { display:none; width:100%; flex-direction:column; gap:0; padding-top:12px; border-top:1px solid rgba(255,255,255,.1); margin-top:12px; }
-      .topbar-nav.open { display:flex; }
-      .topbar-nav a, .topbar-nav span { padding:10px 0; font-size:15px; }
-      .topbar-nav a.active { border-left:3px solid #c9a227; padding-left:10px; }
-    }
+    /* topbar replaced by sidebar */
     .container { max-width: 960px; margin: 32px auto; padding: 0 20px; }
     h1 { font-size: 24px; color: #c9a227; font-family: 'Playfair Display', serif; margin-bottom: 24px; }
     .card {
@@ -140,20 +119,10 @@
   </style>
 </head>
 <body>
-  <div class="topbar">
-    <img src="/static/img/logo-header.png" alt="iRealEstateMx" class="topbar-logo" />
-    <button class="hamburger" onclick="this.classList.toggle('open');document.querySelector('.topbar-nav').classList.toggle('open');" aria-label="Menu">
-      <span></span><span></span><span></span>
-    </button>
-    <div class="topbar-nav">
-      <a href="/">Nueva Propiedad</a>
-      <a href="/dashboard">Propiedades</a>
-      <a href="/admin/prospectos">Prospectos</a>
-      <a href="/admin/usuarios" class="active">Usuarios</a>
-      <span class="topbar-user">{{ user.nombre }}</span>
-      <a href="/logout">Salir</a>
-    </div>
-  </div>
+  {% set page = 'usuarios' %}
+  {% include '_sidebar.html' %}
+  <div class="layout">
+  <div class="layout-main">
 
   <div class="container">
     <h1>Administrar Usuarios</h1>
@@ -162,7 +131,7 @@
     {% if created %}
     <div class="card" id="credencialesCard" style="border: 2px solid #c9a227; background: #111;">
       <h2 style="color:#2ecc71;">Usuario creado exitosamente</h2>
-      <p style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:12px;">Copia estas credenciales y compartelas. <strong style="color:#c9a227;">La contrasena no se puede recuperar despues.</strong></p>
+      <p style="font-size:13px;color:rgba(255,255,255,.5);margin-bottom:12px;">Copia estas credenciales y compartelas. <strong style="color:#c9a227;">La contraseña no se puede recuperar después.</strong></p>
       <div style="background:#0d0d0d;border-radius:8px;padding:16px;font-family:monospace;font-size:14px;line-height:2;border:1px solid rgba(201,162,39,.2);color:#e0e0e0;">
         <div><strong>Nombre:</strong> {{ c_nombre }}</div>
         <div><strong>Email:</strong> {{ c_email }}</div>
@@ -359,5 +328,7 @@
       });
     }
   </script>
+</div><!-- layout-main -->
+</div><!-- layout -->
 </body>
 </html>

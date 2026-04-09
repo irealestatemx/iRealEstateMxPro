@@ -6,25 +6,11 @@
   <title>iRealEstateMxPro — Desarrollos</title>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/sidebar.css"/>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:'Inter',sans-serif;background:#0d0d0d;color:#e0e0e0;min-height:100vh}
-    .topbar{background:#111;border-bottom:1px solid rgba(201,162,39,.15);padding:16px 32px;display:flex;align-items:center;justify-content:space-between}
-    .topbar-logo{height:36px}
-    .topbar-nav{display:flex;gap:16px;align-items:center}
-    .topbar-nav a{color:rgba(255,255,255,.6);text-decoration:none;font-size:14px;font-weight:500;transition:color .2s}
-    .topbar-nav a:hover{color:#c9a227}
-    .topbar-nav a.active{color:#c9a227;border-bottom:2px solid #c9a227;padding-bottom:2px}
-    .topbar-user{color:rgba(255,255,255,.4);font-size:13px}
-    .hamburger{display:none;background:none;border:none;cursor:pointer;padding:4px}
-    .hamburger span{display:block;width:22px;height:2px;background:#c9a227;margin:5px 0;border-radius:2px}
-    @media(max-width:768px){
-      .hamburger{display:block}
-      .topbar{flex-wrap:wrap;padding:12px 16px}
-      .topbar-nav{display:none;width:100%;flex-direction:column;gap:0;padding-top:12px;border-top:1px solid rgba(255,255,255,.1);margin-top:12px}
-      .topbar-nav.open{display:flex}
-      .topbar-nav a,.topbar-nav span{padding:10px 0;font-size:15px}
-    }
+    /* topbar replaced by sidebar */
     .container{max-width:1000px;margin:24px auto;padding:0 20px}
     h1{font-size:24px;color:#c9a227;font-family:'Playfair Display',serif;margin-bottom:24px}
     .dev-card{
@@ -84,22 +70,10 @@
 </head>
 <body>
 
-<div class="topbar">
-  <img src="/static/img/logo-header.png" alt="iRealEstateMx" class="topbar-logo"/>
-  <button class="hamburger" onclick="this.classList.toggle('open');document.querySelector('.topbar-nav').classList.toggle('open')">
-    <span></span><span></span><span></span>
-  </button>
-  <div class="topbar-nav">
-    <a href="/">Nueva Propiedad</a>
-    <a href="/dashboard">Propiedades</a>
-    <a href="/admin/prospectos">Prospectos</a>
-    <a href="/admin/desarrollos" class="active">Desarrollos</a>
-    {% if user.rol == 'admin' %}<a href="/admin/config">Configuración</a>{% endif %}
-    {% if user.rol == 'admin' %}<a href="/admin/usuarios">Usuarios</a>{% endif %}
-    <span class="topbar-user">{{ user.nombre }}</span>
-    <a href="/logout">Salir</a>
-  </div>
-</div>
+{% set page = 'desarrollos' %}
+{% include '_sidebar.html' %}
+<div class="layout">
+<div class="layout-main">
 
 <div class="container">
   <h1>Gestión de Desarrollos</h1>
@@ -208,5 +182,7 @@
   {% endfor %}
 </div>
 
+</div><!-- layout-main -->
+</div><!-- layout -->
 </body>
 </html>

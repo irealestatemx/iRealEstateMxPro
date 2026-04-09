@@ -6,6 +6,7 @@
   <title>iRealEstateMxPro — Nueva Propiedad</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/sidebar.css"/>
   <style>
     :root {
       --black: #0a0a0a;
@@ -39,35 +40,7 @@
       flex-direction: column;
     }
 
-    /* ── HEADER ── */
-    .topbar {
-      background: var(--black-soft);
-      border-bottom: 1px solid rgba(201,162,39,0.15);
-      padding: 14px 32px;
-      display: flex; align-items: center; justify-content: space-between;
-    }
-    .topbar-logo { height: 34px; }
-    .topbar-nav { display: flex; gap: 18px; align-items: center; }
-    .topbar-nav a {
-      color: var(--gray-300); text-decoration: none; font-size: 13px; font-weight: 500;
-      transition: color var(--transition);
-    }
-    .topbar-nav a:hover { color: var(--gold); }
-    .topbar-nav a.active { color: var(--gold); }
-    .topbar-user { color: var(--gray-500); font-size: 12px; }
-    .hamburger { display:none; background:none; border:none; cursor:pointer; padding:4px; }
-    .hamburger span { display:block; width:22px; height:2px; background:var(--gold); margin:5px 0; border-radius:2px; transition:all .25s; }
-    .hamburger.open span:nth-child(1) { transform:rotate(45deg) translate(5px,5px); }
-    .hamburger.open span:nth-child(2) { opacity:0; }
-    .hamburger.open span:nth-child(3) { transform:rotate(-45deg) translate(5px,-5px); }
-    @media(max-width:768px){
-      .hamburger { display:block; }
-      .topbar { flex-wrap:wrap; padding:12px 16px; }
-      .topbar-nav { display:none; width:100%; flex-direction:column; gap:0; padding-top:12px; border-top:1px solid rgba(201,162,39,.15); margin-top:12px; }
-      .topbar-nav.open { display:flex; }
-      .topbar-nav a, .topbar-nav span { padding:10px 0; font-size:14px; }
-      .topbar-nav a.active { border-left:3px solid var(--gold); padding-left:10px; }
-    }
+    /* topbar replaced by sidebar */
 
     /* ── PROGRESS BAR ── */
     .wizard-progress {
@@ -502,22 +475,10 @@
 <body>
 
   <!-- HEADER -->
-  <div class="topbar">
-    <img src="/static/img/logo-header.png" alt="iRealEstateMx" class="topbar-logo" />
-    <button class="hamburger" onclick="this.classList.toggle('open');document.querySelector('.topbar-nav').classList.toggle('open');" aria-label="Menu">
-      <span></span><span></span><span></span>
-    </button>
-    <div class="topbar-nav">
-      <a href="/" class="active">Nueva Propiedad</a>
-      <a href="/dashboard">Propiedades</a>
-      {% if user and user.rol == 'admin' %}
-      <a href="/admin/prospectos">Prospectos</a>
-      <a href="/admin/usuarios">Usuarios</a>
-      {% endif %}
-      <span class="topbar-user">{{ user.nombre }}</span>
-      <a href="/logout">Salir</a>
-    </div>
-  </div>
+  {% set page = 'nueva' %}
+  {% include '_sidebar.html' %}
+  <div class="layout">
+  <div class="layout-main">
 
   <!-- PROGRESS BAR -->
   <div class="wizard-progress">
@@ -592,6 +553,8 @@
                 <option value="Venta">Venta</option>
                 <option value="Renta">Renta</option>
                 <option value="Preventa">Preventa</option>
+                <option value="Traspaso">Traspaso</option>
+                <option value="Vendida">Vendida</option>
               </select>
             </div>
           </div>
@@ -1458,5 +1421,7 @@
     // Init progress bar
     goToStep(1);
   </script>
+</div><!-- layout-main -->
+</div><!-- layout -->
 </body>
 </html>

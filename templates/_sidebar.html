@@ -1,0 +1,73 @@
+<!-- Sidebar Navigation - Admin/Dashboard -->
+<aside class="sidebar" id="sidebar">
+  <div class="sb-header">
+    <a href="/"><img src="/static/img/logo-header.png" alt="iRealEstateMx" class="sb-logo"/></a>
+    <button class="sb-close" onclick="document.getElementById('sidebar').classList.remove('open')">&times;</button>
+  </div>
+
+  <nav class="sb-nav">
+    <!-- Propiedades -->
+    <div class="sb-section">PROPIEDADES</div>
+    <a href="/" class="sb-link {{ 'active' if page == 'nueva' }}">
+      <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+      Nueva propiedad
+    </a>
+    <a href="/dashboard" class="sb-link {{ 'active' if page == 'propiedades' }}">
+      <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+      Mis propiedades
+    </a>
+
+    <!-- CRM -->
+    <div class="sb-section">CRM</div>
+    <a href="/admin/prospectos" class="sb-link {{ 'active' if page == 'prospectos' }}">
+      <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+      Prospectos
+    </a>
+
+    {% if user and user.rol == 'admin' %}
+    <!-- Admin -->
+    <div class="sb-section">ADMINISTRAR</div>
+    <a href="/admin/usuarios" class="sb-link {{ 'active' if page == 'usuarios' }}">
+      <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+      Usuarios
+    </a>
+    <a href="/admin/desarrollos" class="sb-link {{ 'active' if page == 'desarrollos' }}">
+      <svg viewBox="0 0 24 24"><path d="M15 11V5l-3-3-3 3v2H3v14h18V11h-6zm-8 8H5v-2h2v2zm0-4H5v-2h2v2zm0-4H5V9h2v2zm6 8h-2v-2h2v2zm0-4h-2v-2h2v2zm0-4h-2V9h2v2zm0-4h-2V5h2v2zm6 12h-2v-2h2v2zm0-4h-2v-2h2v2z"/></svg>
+      Desarrollos
+    </a>
+    <a href="/admin/config" class="sb-link {{ 'active' if page == 'config' }}">
+      <svg viewBox="0 0 24 24"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/></svg>
+      Configuraci&oacute;n
+    </a>
+    {% endif %}
+  </nav>
+
+  <!-- User / Web / Logout -->
+  <div class="sb-footer">
+    <a href="/web" class="sb-link sb-web" target="_blank">
+      <svg viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zm6.93 6h-2.95c-.32-1.25-.78-2.45-1.38-3.56 1.84.63 3.37 1.91 4.33 3.56zM12 4.04c.83 1.2 1.48 2.53 1.91 3.96h-3.82c.43-1.43 1.08-2.76 1.91-3.96zM4.26 14C4.1 13.36 4 12.69 4 12s.1-1.36.26-2h3.38c-.08.66-.14 1.32-.14 2 0 .68.06 1.34.14 2H4.26zm.82 2h2.95c.32 1.25.78 2.45 1.38 3.56-1.84-.63-3.37-1.9-4.33-3.56zm2.95-8H5.08c.96-1.66 2.49-2.93 4.33-3.56C8.81 5.55 8.35 6.75 8.03 8zM12 19.96c-.83-1.2-1.48-2.53-1.91-3.96h3.82c-.43 1.43-1.08 2.76-1.91 3.96zM14.34 14H9.66c-.09-.66-.16-1.32-.16-2 0-.68.07-1.35.16-2h4.68c.09.65.16 1.32.16 2 0 .68-.07 1.34-.16 2zm.25 5.56c.6-1.11 1.06-2.31 1.38-3.56h2.95c-.96 1.65-2.49 2.93-4.33 3.56zM16.36 14c.08-.66.14-1.32.14-2 0-.68-.06-1.34-.14-2h3.38c.16.64.26 1.31.26 2s-.1 1.36-.26 2h-3.38z"/></svg>
+      Ver sitio web
+    </a>
+    <div class="sb-user">
+      <div class="sb-avatar">{{ user.nombre[0] if user and user.nombre else 'U' }}</div>
+      <div class="sb-user-info">
+        <div class="sb-user-name">{{ user.nombre if user else '' }}</div>
+        <div class="sb-user-role">{{ user.rol|capitalize if user else '' }}</div>
+      </div>
+    </div>
+    <a href="/logout" class="sb-link sb-logout">
+      <svg viewBox="0 0 24 24"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+      Cerrar sesi&oacute;n
+    </a>
+  </div>
+</aside>
+
+<!-- Mobile topbar -->
+<div class="sb-topbar">
+  <button class="sb-hamburger" onclick="document.getElementById('sidebar').classList.toggle('open')">
+    <span></span><span></span><span></span>
+  </button>
+  <img src="/static/img/logo-header.png" alt="iRealEstateMx" class="sb-topbar-logo"/>
+  <span class="sb-topbar-user">{{ user.nombre if user else '' }}</span>
+</div>
+<div class="sb-overlay" onclick="document.getElementById('sidebar').classList.remove('open')"></div>
