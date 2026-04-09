@@ -87,7 +87,7 @@
 <section class="section">
   <div class="section-inner" style="max-width:800px">
     <h2 class="section-title">Sobre {{ desarrollo.nombre }}</h2>
-    <div class="detail-desc" style="margin-top:16px">{{ desarrollo.descripcion|replace('\n','<br>')|safe }}</div>
+    <div class="detail-desc" style="margin-top:16px">{{ desarrollo.descripcion|safe_nl2br|safe }}</div>
 
     {% if desarrollo.diferenciales %}
     <h3 style="color:var(--text-bright);margin:28px 0 16px;font-size:18px">Diferenciales</h3>

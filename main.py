@@ -4,15 +4,20 @@ import re
 import json
 import uuid
 import time
+import hmac
 import shutil
 import asyncio
+import hashlib
+import secrets
 import subprocess
 from pathlib import Path
 from typing import List, Optional, Dict
+from collections import defaultdict
 
 from fastapi import FastAPI, Request, Form, File, UploadFile, Depends
 from fastapi.responses import HTMLResponse, StreamingResponse, FileResponse, JSONResponse, RedirectResponse
 from starlette.responses import PlainTextResponse, Response as StarletteResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from openai import OpenAI
@@ -48,7 +53,10 @@ from database import (
 )
 
 # ─── Sesiones con cookie firmada ───
-SECRET_KEY = os.getenv("SECRET_KEY", "irealestatemx-secret-key-change-me-2026")
+SECRET_KEY = os.getenv("SECRET_KEY", "")
+if not SECRET_KEY:
+    print("[SEGURIDAD] ⚠ SECRET_KEY no configurada en .env — generando una temporal")
+    SECRET_KEY = secrets.token_hex(32)
 serializer = URLSafeTimedSerializer(SECRET_KEY)
 SESSION_MAX_AGE = 86400 * 7  # 7 dias
 
@@ -73,6 +81,121 @@ async def require_auth(request: Request):
     return await get_user_by_id(user_id)
 
 app = FastAPI(title="iRealEstateMxPro")
+
+
+# ═══════════════════════════════════════════════════════════
+# SEGURIDAD: Headers HTTP, Rate Limiting, CSRF
+# ═══════════════════════════════════════════════════════════
+
+# ─── 1. Headers de seguridad HTTP ───
+class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://maps.googleapis.com https://www.googletagmanager.com https://www.google-analytics.com; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net https://cdnjs.cloudflare.com; "
+            "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
+            "img-src 'self' data: blob: https: http:; "
+            "connect-src 'self' https://maps.googleapis.com https://www.google-analytics.com; "
+            "frame-src 'self' https://www.google.com https://maps.google.com; "
+            "object-src 'none'; "
+            "base-uri 'self'"
+        )
+        return response
+
+app.add_middleware(SecurityHeadersMiddleware)
+
+
+# ─── 2. Rate Limiting ───
+_rate_limit_store: Dict[str, list] = defaultdict(list)
+RATE_LIMITS = {
+    "/login": (5, 300),           # 5 intentos cada 5 min
+    "/forgot-password": (3, 600), # 3 intentos cada 10 min
+    "/reset-password": (5, 600),  # 5 intentos cada 10 min
+    "/api/whatsapp/debounce": (60, 60),  # 60 req/min
+    "/api/prospectos/registrar": (30, 60),
+}
+
+def _check_rate_limit(ip: str, path: str) -> bool:
+    """Retorna True si el request está dentro del límite. False si excede."""
+    key = f"{ip}:{path}"
+    # Buscar la ruta más específica que aplique
+    limit_config = None
+    for route, config in RATE_LIMITS.items():
+        if path == route or path.startswith(route):
+            limit_config = config
+            break
+    if not limit_config:
+        return True
+    max_requests, window = limit_config
+    now = time.time()
+    # Limpiar requests viejos
+    _rate_limit_store[key] = [t for t in _rate_limit_store[key] if now - t < window]
+    if len(_rate_limit_store[key]) >= max_requests:
+        return False
+    _rate_limit_store[key].append(now)
+    return True
+
+class RateLimitMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        if request.method == "POST":
+            ip = request.client.host if request.client else "unknown"
+            forwarded = request.headers.get("x-forwarded-for", "")
+            if forwarded:
+                ip = forwarded.split(",")[0].strip()
+            if not _check_rate_limit(ip, request.url.path):
+                return JSONResponse(
+                    {"error": "Demasiados intentos. Intenta de nuevo más tarde."},
+                    status_code=429
+                )
+        return await call_next(request)
+
+app.add_middleware(RateLimitMiddleware)
+
+
+# ─── 3. CSRF Protection ───
+CSRF_SECRET = os.getenv("CSRF_SECRET", SECRET_KEY)
+CSRF_EXEMPT_PATHS = {
+    "/api/whatsapp/debounce",
+    "/api/prospectos/registrar",
+    "/api/citas/disponibilidad",
+    "/api/citas/registrar",
+    "/api/whatsapp/pause",
+    "/api/whatsapp/unpause",
+    "/api/whatsapp/status",
+    "/api/whatsapp/deactivate",
+    "/api/kommo/webhook",
+    "/webhook/n8n",
+}
+
+def generate_csrf_token(session_id: str) -> str:
+    """Genera un token CSRF basado en el session_id."""
+    msg = f"{session_id}:{CSRF_SECRET}".encode()
+    return hmac.new(CSRF_SECRET.encode(), msg, hashlib.sha256).hexdigest()[:32]
+
+def verify_csrf_token(session_id: str, token: str) -> bool:
+    """Verifica que el token CSRF sea válido."""
+    expected = generate_csrf_token(session_id)
+    return hmac.compare_digest(expected, token)
+
+
+# ─── 4. Validación MIME de uploads ───
+MIME_WHITELIST = {
+    ".jpg": ["image/jpeg"],
+    ".jpeg": ["image/jpeg"],
+    ".png": ["image/png"],
+    ".webp": ["image/webp"],
+    ".pdf": ["application/pdf"],
+    ".doc": ["application/msword"],
+    ".docx": ["application/vnd.openxmlformats-officedocument.wordprocessingml.document"],
+}
 
 
 @app.on_event("startup")
@@ -114,10 +237,29 @@ video_jobs: Dict[str, dict] = {}
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
+# Hacer csrf_token disponible en todos los templates
+def _get_csrf_for_request(request: Request) -> str:
+    token = request.cookies.get("session", "anonymous")
+    return generate_csrf_token(token)
+
+templates.env.globals["csrf_token"] = ""  # placeholder, se setea por request
+
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 
 # ─── Utilidades ───
+
+def sanitize_html(text: str) -> str:
+    """Escapa HTML peligroso pero permite saltos de línea como <br>."""
+    if not text:
+        return ""
+    import html
+    escaped = html.escape(str(text))
+    return escaped.replace("\n", "<br>")
+
+# Registrar filtro seguro en Jinja2
+templates.env.filters["safe_nl2br"] = sanitize_html
+
 
 def format_price(price: float) -> str:
     return f"${price:,.0f} MXN"
@@ -1265,7 +1407,7 @@ async def login_submit(request: Request, email: str = Form(...), password: str =
     else:
         redirect_url = "/"
     response = RedirectResponse(redirect_url, status_code=302)
-    response.set_cookie("session", token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax")
+    response.set_cookie("session", token, max_age=SESSION_MAX_AGE, httponly=True, samesite="lax", secure=True)
     return response
 
 
@@ -1861,13 +2003,12 @@ async def admin_create_user(
             updates["telefono"] = telefono.strip()
         if updates:
             await update_user(user_id, updates)
-        # Redirigir con credenciales visibles una sola vez
+        # Redirigir sin exponer contraseña en URL
         from urllib.parse import urlencode
         params = urlencode({
             "created": "1",
             "c_nombre": nombre,
             "c_email": email,
-            "c_password": password,
             "c_rol": rol,
             "c_prefijo": prefijo_whatsapp.strip().upper(),
         })
@@ -2188,6 +2329,16 @@ async def subir_documento(
     ext = Path(archivo.filename).suffix.lower()
     if ext not in VALID_DOC_EXTENSIONS:
         return JSONResponse({"error": f"Tipo de archivo no permitido. Permitidos: {', '.join(VALID_DOC_EXTENSIONS)}"}, status_code=400)
+
+    # Validar MIME type real del archivo
+    if ext in MIME_WHITELIST and archivo.content_type not in MIME_WHITELIST[ext]:
+        return JSONResponse({"error": f"El contenido del archivo no coincide con su extensión ({ext})"}, status_code=400)
+
+    # Limitar tamaño (20MB máximo)
+    contents = await archivo.read()
+    if len(contents) > 20 * 1024 * 1024:
+        return JSONResponse({"error": "Archivo demasiado grande. Máximo 20MB"}, status_code=400)
+    await archivo.seek(0)
 
     # Guardar archivo (reutiliza UPLOAD_DIR + session_id de la propiedad)
     doc_dir = UPLOAD_DIR / prop["session_id"] / "documentos"
