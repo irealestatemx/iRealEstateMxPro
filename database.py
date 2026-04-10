@@ -352,8 +352,8 @@ async def get_properties_by_user(user_id: int, limit: int = 50, offset: int = 0)
 
 
 async def get_propiedades_seguimiento(agente_id: int = None):
-    """Lista propiedades con vendedor asignado + conteos de documentos para dashboard asesor."""
-    where = "WHERE p.vendedor_id IS NOT NULL AND p.activa = TRUE"
+    """Lista propiedades activas + conteos de documentos para dashboard asesor."""
+    where = "WHERE p.activa = TRUE AND p.vendida IS NOT TRUE"
     values = {}
     if agente_id:
         where += " AND p.user_id = :agente_id"
@@ -363,7 +363,10 @@ async def get_propiedades_seguimiento(agente_id: int = None):
            p.precio_formateado, p.foto_portada_url, p.vendedor_id, p.comprador_id, p.user_id,
            p.tipo_compra, p.cierre_data,
            u_v.nombre as vendedor_nombre, u_v.email as vendedor_email,
+           u_v.telefono as vendedor_telefono, u_v.rol as vendedor_rol,
            u_c.nombre as comprador_nombre, u_c.email as comprador_email,
+           u_c.telefono as comprador_telefono, u_c.rol as comprador_rol,
+           u_a.nombre as agente_nombre_user, u_a.telefono as agente_telefono,
            COUNT(d.id) as docs_subidos,
            COUNT(CASE WHEN d.estado = 'aprobado' THEN 1 END) as docs_aprobados,
            COUNT(CASE WHEN d.estado = 'rechazado' THEN 1 END) as docs_rechazados,
@@ -372,9 +375,12 @@ async def get_propiedades_seguimiento(agente_id: int = None):
     FROM propiedades p
     LEFT JOIN usuarios u_v ON p.vendedor_id = u_v.id
     LEFT JOIN usuarios u_c ON p.comprador_id = u_c.id
+    LEFT JOIN usuarios u_a ON p.user_id = u_a.id
     LEFT JOIN documentos d ON d.propiedad_id = p.id AND d.categoria = 'vendedor'
     {where}
-    GROUP BY p.id, u_v.nombre, u_v.email, u_c.nombre, u_c.email
+    GROUP BY p.id, u_v.nombre, u_v.email, u_v.telefono, u_v.rol,
+             u_c.nombre, u_c.email, u_c.telefono, u_c.rol,
+             u_a.nombre, u_a.telefono
     ORDER BY p.created_at DESC
     """
     rows = await database.fetch_all(query=query, values=values)

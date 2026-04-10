@@ -145,23 +145,33 @@
           <div class="prop-card-loc">{{ p.direccion }}, {{ p.ciudad }}</div>
           <div class="prop-card-specs">
             {% if p.recamaras %}<span>{{ p.recamaras }} Rec</span>{% endif %}
-            {% if p.banos %}<span>{{ p.banos }} Banos</span>{% endif %}
+            {% if p.banos %}<span>{{ p.banos }} Ba&ntilde;os</span>{% endif %}
             {% if p.metros_construidos %}<span>{{ p.metros_construidos }} m2</span>{% endif %}
             {% if p.estacionamientos %}<span>{{ p.estacionamientos }} Est</span>{% endif %}
           </div>
           <div class="prop-card-agent">
             Agente: {{ p.agente_nombre }}
           </div>
-          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;align-items:center;">
             {% if p.vendedor_id %}
             <span style="font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(104,211,145,.12);color:#68d391;">Vendedor asignado</span>
             {% else %}
             <span style="font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(252,129,129,.1);color:#fc8181;">Sin vendedor</span>
+            {% if user.rol in ('admin', 'agente') %}
+            <form method="post" action="/dashboard/asignarme/{{ p.id }}/vendedor" style="display:inline" onsubmit="return confirm('&iquest;Asignarte como vendedor de esta propiedad? Ser&aacute;s responsable de los documentos y seguimiento.')">
+              <button type="submit" class="btn-sm" style="background:rgba(201,162,39,.15);color:#c9a227;font-size:10px;padding:2px 8px;">Asignarme</button>
+            </form>
+            {% endif %}
             {% endif %}
             {% if p.comprador_id %}
             <span style="font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(104,211,145,.12);color:#68d391;">Comprador asignado</span>
             {% else %}
             <span style="font-size:11px;padding:2px 8px;border-radius:8px;background:rgba(255,255,255,.05);color:rgba(255,255,255,.3);">Sin comprador</span>
+            {% if user.rol in ('admin', 'agente') %}
+            <form method="post" action="/dashboard/asignarme/{{ p.id }}/comprador" style="display:inline" onsubmit="return confirm('&iquest;Asignarte como comprador de esta propiedad? Ser&aacute;s responsable de los documentos del comprador.')">
+              <button type="submit" class="btn-sm" style="background:rgba(99,179,237,.12);color:#63b3ed;font-size:10px;padding:2px 8px;">Asignarme</button>
+            </form>
+            {% endif %}
             {% endif %}
           </div>
           <div class="prop-card-actions">

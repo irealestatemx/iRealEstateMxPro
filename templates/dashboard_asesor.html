@@ -46,8 +46,7 @@
     .prop-list { display: flex; flex-direction: column; gap: 12px; }
     .prop-row {
       background: #1a1a1a; border: 1px solid rgba(255,255,255,.08); border-radius: 12px;
-      padding: 18px 20px; display: flex; align-items: center; gap: 16px;
-      transition: border-color .2s;
+      padding: 18px 20px; transition: border-color .2s;
     }
     .prop-row:hover { border-color: rgba(201,162,39,.25); }
     .prop-row.st-atorado { border-left: 4px solid #fc8181; }
@@ -60,6 +59,7 @@
     .prop-row.st-completo { border-left: 4px solid #68d391; }
     .prop-row.st-sin_iniciar { border-left: 4px solid rgba(255,255,255,.15); }
 
+    .prop-row-top { display: flex; align-items: center; gap: 14px; }
     .prop-thumb {
       width: 70px; height: 54px; border-radius: 8px; object-fit: cover;
       background: #222; flex-shrink: 0;
@@ -69,12 +69,14 @@
     .prop-sub { font-size: 12px; color: rgba(255,255,255,.4); }
     .prop-cliente { font-size: 12px; color: rgba(255,255,255,.55); margin-top: 2px; }
 
-    .prop-progress { width: 180px; flex-shrink: 0; }
+    .prop-progress { width: 160px; flex-shrink: 0; }
     .progress-bar-bg { background: rgba(255,255,255,.08); border-radius: 5px; height: 8px; overflow: hidden; margin-bottom: 4px; }
     .progress-bar-fill { height: 100%; border-radius: 5px; transition: width .4s; }
     .progress-text { font-size: 11px; color: rgba(255,255,255,.4); }
 
-    .prop-status { width: 140px; flex-shrink: 0; text-align: center; }
+    .prop-status { width: 130px; flex-shrink: 0; text-align: center; }
+    .prop-meta { width: 90px; flex-shrink: 0; text-align: right; }
+    .prop-row-actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.05); }
     .estado-badge {
       display: inline-block; font-size: 10px; font-weight: 700; padding: 4px 10px;
       border-radius: 12px; text-transform: uppercase; letter-spacing: .3px;
@@ -119,7 +121,6 @@
     .alert-atorado { color: #fc8181; }
     .alert-casi { color: #63b3ed; }
 
-    .prop-meta { width: 100px; flex-shrink: 0; text-align: right; }
     .prop-meta .docs-count { font-size: 12px; color: rgba(255,255,255,.5); }
     .prop-meta .docs-rejected { font-size: 11px; color: #fc8181; font-weight: 600; }
     .prop-meta .last-activity { font-size: 10px; color: rgba(255,255,255,.25); margin-top: 4px; }
@@ -230,11 +231,12 @@
     .empty-state .icon { font-size: 3rem; margin-bottom: 12px; }
 
     @media(max-width:768px){
-      .prop-row { flex-wrap: wrap; gap: 10px; }
+      .prop-row-top { flex-wrap: wrap; gap: 10px; }
       .prop-thumb { width: 50px; height: 40px; }
       .prop-progress { width: 100%; order: 10; }
       .prop-status { width: auto; text-align: left; }
       .prop-meta { width: auto; text-align: left; }
+      .prop-row-actions { gap: 6px; }
     }
 
     /* Modal cierre */
@@ -412,104 +414,103 @@
     <div class="prop-list" id="propList">
       {% for p in propiedades %}
       <div class="prop-row st-{{ p.estado }}" data-estado="{{ p.estado }}">
-        {% if p.foto_portada_url %}
-        <img src="{{ p.foto_portada_url }}" alt="" class="prop-thumb" />
-        {% else %}
-        <div class="prop-thumb"></div>
-        {% endif %}
-
-        <div class="prop-info">
-          <div class="prop-title">{{ p.tipo_propiedad }} — {{ p.operacion }}</div>
-          <div class="prop-sub">{{ p.direccion }}, {{ p.ciudad }}</div>
-          <div class="prop-cliente">Vendedor: {{ p.vendedor_nombre or '—' }}</div>
-          {% if p.comprador_nombre %}
-          <div class="prop-cliente" style="color:#63b3ed;">Comprador: {{ p.comprador_nombre }}{% if p.tipo_compra %} ({{ p.tipo_compra }}){% endif %}</div>
+        <div class="prop-row-top">
+          {% if p.foto_portada_url %}
+          <img src="{{ p.foto_portada_url }}" alt="" class="prop-thumb" />
+          {% else %}
+          <div class="prop-thumb"></div>
           {% endif %}
-        </div>
 
-        <div class="prop-progress">
-          <div class="progress-bar-bg">
-            <div class="progress-bar-fill" style="width:{{ p.porcentaje }}%;background:{% if p.estado == 'completo' %}#68d391{% elif p.estado in ('listo_para_cerrar','en_cierre') %}#48bb78{% elif p.estado == 'esperando_notaria' %}#9f7aea{% elif p.estado == 'en_proceso_inscripcion' %}#f6ad55{% elif p.estado == 'atorado' %}#fc8181{% elif p.estado == 'casi_listo' %}#63b3ed{% else %}#c9a227{% endif %};"></div>
+          <div class="prop-info">
+            <div class="prop-title">{{ p.tipo_propiedad }} — {{ p.operacion }}</div>
+            <div class="prop-sub">{{ p.direccion }}, {{ p.ciudad }}</div>
+            <div class="prop-cliente">Vendedor: {{ p.vendedor_nombre or 'Sin asignar' }}{% if p.vendedor_rol and p.vendedor_rol in ('admin','agente') %} <span style="font-size:10px;color:#c9a227;">({{ p.vendedor_rol }})</span>{% endif %}{% if not p.vendedor_id %} <span style="font-size:10px;color:rgba(255,255,255,.3);">— agente responsable</span>{% endif %}</div>
+            {% if p.comprador_nombre %}
+            <div class="prop-cliente" style="color:#63b3ed;">Comprador: {{ p.comprador_nombre }}{% if p.comprador_rol and p.comprador_rol in ('admin','agente') %} <span style="font-size:10px;color:#c9a227;">({{ p.comprador_rol }})</span>{% endif %}{% if p.tipo_compra %} ({{ p.tipo_compra }}){% endif %}</div>
+            {% endif %}
           </div>
-          <div class="progress-text">{{ p.porcentaje }}% — {{ p.docs_subidos }}/{{ p.docs_total }} docs</div>
-        </div>
 
-        <div class="prop-status">
-          <span class="estado-badge eb-{{ p.estado }}">
-            {% if p.estado == 'atorado' %}Atorado
-            {% elif p.estado == 'esperando_notaria' %}Esperando notar&iacute;a
-            {% elif p.estado == 'en_cierre' %}En cierre
-            {% elif p.estado == 'en_proceso_inscripcion' %}Cr&eacute;dito en tr&aacute;mite
-            {% elif p.estado == 'listo_para_cerrar' %}Listo para cerrar
-            {% elif p.estado == 'casi_listo' %}Casi listo
-            {% elif p.estado == 'en_proceso' %}En proceso
-            {% elif p.estado == 'completo' %}Completo
-            {% else %}Sin iniciar{% endif %}
-          </span>
-          {% if p.estado == 'atorado' and p.dias_inactivo is not none and p.dias_inactivo > 3 %}
-          <div class="prop-alert alert-atorado" style="font-weight:700;">&#x1F6A8; URGENTE: Cliente se est&aacute; enfriando ({{ p.dias_inactivo }}d)</div>
-          {% elif p.estado == 'atorado' %}
-          <div class="prop-alert alert-atorado">Cliente requiere atenci&oacute;n</div>
-          {% elif p.estado == 'esperando_notaria' %}
-          <div class="prop-alert" style="color:#9f7aea;font-weight:700;">&#x1F3DB;&#xFE0F; Esperando fecha en notar&iacute;a</div>
-          {% elif p.estado == 'en_cierre' %}
-          <div class="prop-alert" style="color:#48bb78;font-weight:700;">&#x1F4DD; Promesa firmada — en cierre</div>
-          {% elif p.estado == 'en_proceso_inscripcion' %}
-          <div class="prop-alert" style="color:#f6ad55;">&#x1F3E6; Cr&eacute;dito en proceso de autorizaci&oacute;n</div>
-          {% elif p.estado == 'listo_para_cerrar' %}
-          <div class="prop-alert" style="color:#48bb78;font-weight:700;">&#x1F31F; Momento ideal para cerrar</div>
-          {% elif p.estado == 'casi_listo' and p.dias_inactivo is not none and p.dias_inactivo > 5 %}
-          <div class="prop-alert alert-casi">&#x23F3; Sin movimiento hace {{ p.dias_inactivo }} d&iacute;as</div>
-          {% elif p.estado == 'casi_listo' %}
-          <div class="prop-alert alert-casi">Listo para cerrar pronto</div>
-          {% elif p.estado == 'en_proceso' and p.dias_inactivo is not none and p.dias_inactivo > 7 %}
-          <div class="prop-alert" style="color:#c9a227;">&#x26A0;&#xFE0F; Sin actividad hace {{ p.dias_inactivo }} d&iacute;as</div>
-          {% endif %}
-        </div>
-
-        <div class="prop-meta">
-          <div class="docs-count">{{ p.docs_subidos }}/{{ p.docs_total }}</div>
-          {% if p.docs_rechazados > 0 %}
-          <div class="docs-rejected">{{ p.docs_rechazados }} rechazados</div>
-          {% endif %}
-          <div class="last-activity">{{ p.ultimo_movimiento }}</div>
-          {% if p.comprador_id %}
-            {% if p.dias_desde_contacto is not none %}
-            <div style="font-size:10px;margin-top:4px;color:{% if p.dias_desde_contacto > 2 %}#fc8181{% else %}rgba(255,255,255,.35){% endif %};">
-              {% if p.dias_desde_contacto == 0 %}Contactado hoy
-              {% elif p.dias_desde_contacto == 1 %}Contactado ayer
-              {% else %}Hace {{ p.dias_desde_contacto }} d&iacute;as{% endif %}
+          <div class="prop-progress">
+            <div class="progress-bar-bg">
+              <div class="progress-bar-fill" style="width:{{ p.porcentaje }}%;background:{% if p.estado == 'completo' %}#68d391{% elif p.estado in ('listo_para_cerrar','en_cierre') %}#48bb78{% elif p.estado == 'esperando_notaria' %}#9f7aea{% elif p.estado == 'en_proceso_inscripcion' %}#f6ad55{% elif p.estado == 'atorado' %}#fc8181{% elif p.estado == 'casi_listo' %}#63b3ed{% else %}#c9a227{% endif %};"></div>
             </div>
-            {% if p.dias_desde_contacto > 2 %}
-            <div style="font-size:10px;color:#fc8181;font-weight:600;margin-top:2px;">&#x26A0;&#xFE0F; Sin seguimiento reciente</div>
+            <div class="progress-text">{{ p.porcentaje }}% — {{ p.docs_subidos }}/{{ p.docs_total }} docs</div>
+          </div>
+
+          <div class="prop-status">
+            <span class="estado-badge eb-{{ p.estado }}">
+              {% if p.estado == 'atorado' %}Atorado
+              {% elif p.estado == 'esperando_notaria' %}Esperando notar&iacute;a
+              {% elif p.estado == 'en_cierre' %}En cierre
+              {% elif p.estado == 'en_proceso_inscripcion' %}Cr&eacute;dito en tr&aacute;mite
+              {% elif p.estado == 'listo_para_cerrar' %}Listo para cerrar
+              {% elif p.estado == 'casi_listo' %}Casi listo
+              {% elif p.estado == 'en_proceso' %}En proceso
+              {% elif p.estado == 'completo' %}Completo
+              {% else %}Sin iniciar{% endif %}
+            </span>
+            {% if p.estado == 'atorado' and p.dias_inactivo is not none and p.dias_inactivo > 3 %}
+            <div class="prop-alert alert-atorado" style="font-weight:700;">&#x1F6A8; URGENTE ({{ p.dias_inactivo }}d)</div>
+            {% elif p.estado == 'atorado' %}
+            <div class="prop-alert alert-atorado">Requiere atenci&oacute;n</div>
+            {% elif p.estado == 'esperando_notaria' %}
+            <div class="prop-alert" style="color:#9f7aea;">&#x1F3DB;&#xFE0F; Esperando notar&iacute;a</div>
+            {% elif p.estado == 'en_cierre' %}
+            <div class="prop-alert" style="color:#48bb78;">&#x1F4DD; En cierre</div>
+            {% elif p.estado == 'en_proceso_inscripcion' %}
+            <div class="prop-alert" style="color:#f6ad55;">&#x1F3E6; Cr&eacute;dito en tr&aacute;mite</div>
+            {% elif p.estado == 'listo_para_cerrar' %}
+            <div class="prop-alert" style="color:#48bb78;">&#x1F31F; Listo para cerrar</div>
+            {% elif p.estado == 'casi_listo' and p.dias_inactivo is not none and p.dias_inactivo > 5 %}
+            <div class="prop-alert alert-casi">&#x23F3; {{ p.dias_inactivo }}d sin movimiento</div>
+            {% elif p.estado == 'en_proceso' and p.dias_inactivo is not none and p.dias_inactivo > 7 %}
+            <div class="prop-alert" style="color:#c9a227;">&#x26A0;&#xFE0F; {{ p.dias_inactivo }}d sin actividad</div>
             {% endif %}
-            {% else %}
-            <div style="font-size:10px;color:#fc8181;margin-top:4px;">&#x26A0;&#xFE0F; Sin contactar a&uacute;n</div>
+          </div>
+
+          <div class="prop-meta">
+            <div class="docs-count">{{ p.docs_subidos }}/{{ p.docs_total }}</div>
+            {% if p.docs_rechazados > 0 %}
+            <div class="docs-rejected">{{ p.docs_rechazados }} rechazados</div>
             {% endif %}
-          {% endif %}
+            <div class="last-activity">{{ p.ultimo_movimiento }}</div>
+            {% if p.comprador_id %}
+              {% if p.dias_desde_contacto is not none %}
+              <div style="font-size:10px;margin-top:4px;color:{% if p.dias_desde_contacto > 2 %}#fc8181{% else %}rgba(255,255,255,.35){% endif %};">
+                {% if p.dias_desde_contacto == 0 %}Hoy
+                {% elif p.dias_desde_contacto == 1 %}Ayer
+                {% else %}Hace {{ p.dias_desde_contacto }}d{% endif %}
+              </div>
+              {% else %}
+              <div style="font-size:10px;color:#fc8181;margin-top:4px;">&#x26A0; Sin contactar</div>
+              {% endif %}
+            {% endif %}
+          </div>
         </div>
 
-        <a href="/mis-documentos/{{ p.id }}" class="btn-ver">Ver docs</a>
-        {% if p.vendedor_nombre and p.vendedor_nombre != 'Sin asignar' and p.estado != 'completo' %}
-        <button class="btn-msg" style="border-color:rgba(201,162,39,.3);color:#c9a227;" onclick="mensajeVendedor({{ loop.index0 }})">&#x1F4F2; Mensaje vendedor</button>
-        {% endif %}
-        {% if p.comprador_id %}
-        <button class="btn-msg" onclick="generarMensaje({{ p.comprador_id }})">&#x1F4F2; Mensaje comprador</button>
-        {% endif %}
-        {% if p.estado in ('listo_para_cerrar', 'en_cierre', 'en_proceso_inscripcion', 'esperando_notaria') %}
-        <button class="btn-cierre" style="font-size:11px;padding:7px 12px;" onclick="abrirCierre({{ p.id }})">&#x1F4CB; {% if p.estado == 'esperando_notaria' %}Ver cierre{% else %}Cerrar operaci&oacute;n{% endif %}</button>
-        {% endif %}
-        {% if p.estado == 'atorado' and p.comprador_id %}
-        <button class="btn-msg" style="border-color:rgba(252,129,129,.4);color:#fc8181;" onclick="generarMensaje({{ p.comprador_id }},'recuperar')">&#x1F525; Recuperar cliente</button>
-        {% endif %}
+        <div class="prop-row-actions">
+          <a href="/mis-documentos/{{ p.id }}" class="btn-ver">Ver docs</a>
+          {% if p.vendedor_id and p.estado != 'completo' %}
+          <button class="btn-msg" style="border-color:rgba(201,162,39,.3);color:#c9a227;" onclick="mensajeVendedor({{ loop.index0 }})">&#x1F4F2; Mensaje vendedor</button>
+          {% endif %}
+          {% if p.comprador_id %}
+          <button class="btn-msg" onclick="generarMensaje({{ p.comprador_id }})">&#x1F4F2; Mensaje comprador</button>
+          {% endif %}
+          {% if p.estado in ('listo_para_cerrar', 'en_cierre', 'en_proceso_inscripcion', 'esperando_notaria') %}
+          <button class="btn-cierre" style="font-size:11px;padding:7px 12px;" onclick="abrirCierre({{ p.id }})">&#x1F4CB; {% if p.estado == 'esperando_notaria' %}Ver cierre{% else %}Cerrar operaci&oacute;n{% endif %}</button>
+          {% endif %}
+          {% if p.estado == 'atorado' and p.comprador_id %}
+          <button class="btn-msg" style="border-color:rgba(252,129,129,.4);color:#fc8181;" onclick="generarMensaje({{ p.comprador_id }},'recuperar')">&#x1F525; Recuperar cliente</button>
+          {% endif %}
+        </div>
       </div>
       {% endfor %}
     </div>
     {% else %}
     <div class="empty-state">
       <div class="icon">📋</div>
-      <p>No hay propiedades con vendedor asignado a&uacute;n.</p>
-      <p style="font-size:13px;margin-top:6px;">Asigna un vendedor a una propiedad para comenzar el seguimiento.</p>
+      <p>No hay propiedades activas a&uacute;n.</p>
+      <p style="font-size:13px;margin-top:6px;">Sube una propiedad para comenzar el seguimiento.</p>
     </div>
     {% endif %}
   </div>
@@ -717,7 +718,7 @@
   // Datos de vendedores para mensajes
   var vendedoresData = [
     {% for p in propiedades %}
-    { nombre: {{ p.vendedor_nombre | tojson }}, mensaje: {{ p.mensaje_sugerido | tojson }}, estado: {{ p.estado | tojson }} },
+    { nombre: {{ p.vendedor_nombre | tojson }}, mensaje: {{ p.mensaje_sugerido | tojson }}, estado: {{ p.estado | tojson }}, telefono: {{ (p.vendedor_telefono or p.agente_telefono or '') | tojson }} },
     {% endfor %}
   ];
 
@@ -809,7 +810,8 @@
     title.textContent = 'Mensaje para ' + v.nombre;
     meta.innerHTML = '<span>Vendedor</span><span>Estado: ' + v.estado + '</span>';
     text.textContent = v.mensaje;
-    wa.href = 'https://wa.me/?text=' + encodeURIComponent(v.mensaje);
+    var phone = (v.telefono || '').replace(/[^0-9]/g, '');
+    wa.href = phone ? 'https://wa.me/' + phone + '?text=' + encodeURIComponent(v.mensaje) : 'https://wa.me/?text=' + encodeURIComponent(v.mensaje);
     wa.style.display = 'inline-flex';
     overlay.classList.add('open');
   }

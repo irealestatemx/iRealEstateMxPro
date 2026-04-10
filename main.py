@@ -2154,12 +2154,14 @@ async def edit_property_page(request: Request, prop_id: int):
 
     vendedores = await get_users_by_rol("vendedor")
     compradores = await get_users_by_rol("comprador")
+    # Admin/agente también pueden asignarse como vendedor o comprador
+    agentes_admins = await get_users_by_rol("agente") + await get_users_by_rol("admin")
 
     return templates.TemplateResponse(request=request, name="edit_property.html", context={
         "user": user,
         "prop": prop,
-        "vendedores": vendedores,
-        "compradores": compradores,
+        "vendedores": vendedores + agentes_admins,
+        "compradores": compradores + agentes_admins,
         "desarrollos_dict": DESARROLLOS_DATA,
     })
 
@@ -2369,6 +2371,27 @@ async def asignar_vendedor_comprador(
         await update_property(prop_id, updates)
 
     return RedirectResponse(f"/dashboard/editar/{prop_id}", status_code=302)
+
+
+@app.post("/dashboard/asignarme/{prop_id}/{rol}")
+async def asignarme_propiedad(request: Request, prop_id: int, rol: str):
+    """Quick self-assign: agente/admin se asigna como vendedor o comprador."""
+    user = await require_auth(request)
+    if not user or user["rol"] not in ("admin", "agente"):
+        return RedirectResponse("/login", status_code=302)
+    if rol not in ("vendedor", "comprador"):
+        return RedirectResponse("/dashboard", status_code=302)
+
+    prop = await get_property_by_id(prop_id)
+    if not prop:
+        return RedirectResponse("/dashboard", status_code=302)
+    # Solo el dueño o admin
+    if user["rol"] != "admin" and prop.get("user_id") != user["id"]:
+        return RedirectResponse("/dashboard", status_code=302)
+
+    field = "vendedor_id" if rol == "vendedor" else "comprador_id"
+    await update_property(prop_id, {field: user["id"]})
+    return RedirectResponse("/dashboard", status_code=302)
 
 
 @app.post("/dashboard/toggle/{prop_id}")
@@ -3558,16 +3581,17 @@ async def dashboard_asesor(request: Request):
 
 
 DOCS_VENDEDOR_LIST = DOCS_VENDEDOR = [
+    {"tipo": "INE (Identificación oficial)", "obligatorio": True},
+    {"tipo": "CURP", "obligatorio": True},
+    {"tipo": "Constancia de situación fiscal", "obligatorio": True},
+    {"tipo": "Acta de nacimiento", "obligatorio": True},
     {"tipo": "Escrituras", "obligatorio": True},
     {"tipo": "Estado de cuenta", "obligatorio": True},
-    {"tipo": "Identificación oficial", "obligatorio": True},
-    {"tipo": "CURP", "obligatorio": True},
     {"tipo": "Comprobante de servicios", "obligatorio": True},
     {"tipo": "Predial", "obligatorio": True},
+    {"tipo": "Acta de matrimonio/divorcio", "obligatorio": False},
     {"tipo": "Poder notarial", "obligatorio": False},
     {"tipo": "Planos", "obligatorio": False},
-    {"tipo": "Acta de matrimonio/divorcio", "obligatorio": True},
-    {"tipo": "Acta de nacimiento", "obligatorio": True},
 ]
 
 DOCS_AGENTE = [
@@ -6601,8 +6625,17 @@ async def download_video(job_id: str):
 
 TIPOS_COMPRA = ["Contado", "Transferencia", "Crédito bancario", "Crédito Infonavit", "Crédito ISSEG"]
 
+# Documentos base obligatorios para TODOS los compradores (cualquier tipo de compra)
+_DOCS_COMPRADOR_BASE = [
+    {"tipo": "INE (Identificación oficial)", "obligatorio": True},
+    {"tipo": "CURP", "obligatorio": True},
+    {"tipo": "Constancia de situación fiscal", "obligatorio": True},
+    {"tipo": "Acta de nacimiento", "obligatorio": True},
+    {"tipo": "Acta de matrimonio", "obligatorio": False},
+]
+
 DOCS_COMPRADOR = {
-    "Crédito Infonavit": [
+    "Crédito Infonavit": _DOCS_COMPRADOR_BASE + [
         {"tipo": "Solicitud de avalúo", "obligatorio": True},
         {"tipo": "Solicitud de crédito", "obligatorio": True},
         {"tipo": "Constancia Saber +", "obligatorio": True},
@@ -6618,7 +6651,7 @@ DOCS_COMPRADOR = {
         {"tipo": "Predial", "obligatorio": True},
         {"tipo": "Agua y luz", "obligatorio": True},
     ],
-    "Crédito ISSEG": [
+    "Crédito ISSEG": _DOCS_COMPRADOR_BASE + [
         {"tipo": "Solicitud de préstamo", "obligatorio": True},
         {"tipo": "Talón de pago actual", "obligatorio": True},
         {"tipo": "Aviso de privacidad firmado", "obligatorio": True},
@@ -6629,7 +6662,7 @@ DOCS_COMPRADOR = {
         {"tipo": "Consentimiento de monto y plazo", "obligatorio": True},
         {"tipo": "Contrato de promesa", "obligatorio": True},
     ],
-    "Crédito bancario": [
+    "Crédito bancario": _DOCS_COMPRADOR_BASE + [
         {"tipo": "Escritura de propiedad completa y legible con registro público", "obligatorio": True},
         {"tipo": "Régimen de propiedad en condominio", "obligatorio": False},
         {"tipo": "Planos arquitectónicos", "obligatorio": False},
@@ -6640,21 +6673,18 @@ DOCS_COMPRADOR = {
         {"tipo": "Confirmación de notaría o carta petición del cliente", "obligatorio": True},
         {"tipo": "Cuenta del cliente donde se ligará el crédito", "obligatorio": True},
         {"tipo": "Estado de cuenta del vendedor", "obligatorio": True},
-        {"tipo": "INE", "obligatorio": True},
-        {"tipo": "Acta de nacimiento", "obligatorio": True},
-        {"tipo": "Acta de matrimonio", "obligatorio": False},
         {"tipo": "Comprobante de domicilio", "obligatorio": True},
-        {"tipo": "CURP", "obligatorio": True},
-        {"tipo": "Constancia de situación fiscal (CSF)", "obligatorio": True},
     ],
-    "_basico": [
-        {"tipo": "Escrituras", "obligatorio": True},
-        {"tipo": "Identificación oficial", "obligatorio": True},
+    "Contado": _DOCS_COMPRADOR_BASE + [
         {"tipo": "Comprobante de domicilio", "obligatorio": True},
-        {"tipo": "RFC", "obligatorio": True},
-        {"tipo": "CURP", "obligatorio": True},
-        {"tipo": "Acta de matrimonio", "obligatorio": False},
-        {"tipo": "Acta de nacimiento", "obligatorio": True},
+        {"tipo": "Estado de cuenta", "obligatorio": True},
+    ],
+    "Transferencia": _DOCS_COMPRADOR_BASE + [
+        {"tipo": "Comprobante de domicilio", "obligatorio": True},
+        {"tipo": "Estado de cuenta", "obligatorio": True},
+    ],
+    "_basico": _DOCS_COMPRADOR_BASE + [
+        {"tipo": "Comprobante de domicilio", "obligatorio": True},
         {"tipo": "Estado de cuenta", "obligatorio": True},
     ],
 }
@@ -6833,6 +6863,103 @@ async def seleccionar_propiedad_submit(request: Request):
             return RedirectResponse("/seleccionar-propiedad", status_code=302)
         await update_property(propiedad_id, {"comprador_id": user["id"]})
         return RedirectResponse("/portal-comprador", status_code=302)
+
+
+# ─── Subida simplificada de propiedad (vendedor) ─────────
+
+@app.get("/nueva-propiedad-vendedor", response_class=HTMLResponse)
+async def nueva_propiedad_vendedor_page(request: Request):
+    user = await require_auth(request)
+    if not user or user["rol"] != "vendedor":
+        return RedirectResponse("/login", status_code=302)
+    # Necesita haber seleccionado al menos un agente antes
+    props = await get_properties_by_vendedor(user["id"])
+    # Obtener agentes disponibles
+    agentes = await get_users_by_rol("agente") + await get_users_by_rol("admin")
+    return templates.TemplateResponse(request=request, name="nueva_propiedad_vendedor.html", context={
+        "user": user,
+        "agentes": agentes,
+    })
+
+@app.post("/nueva-propiedad-vendedor")
+async def nueva_propiedad_vendedor_submit(request: Request):
+    user = await require_auth(request)
+    if not user or user["rol"] != "vendedor":
+        return RedirectResponse("/login", status_code=302)
+
+    form = await request.form()
+    tipo_propiedad = form.get("tipo_propiedad", "Casa")
+    operacion = form.get("operacion", "Venta")
+    direccion = form.get("direccion", "")
+    ciudad = form.get("ciudad", "")
+    precio = form.get("precio", "")
+    recamaras = form.get("recamaras", "")
+    banos = form.get("banos", "")
+    metros_construidos = form.get("metros_construidos", "")
+    agente_id = form.get("agente_id")
+
+    if not direccion or not ciudad or not agente_id:
+        return RedirectResponse("/nueva-propiedad-vendedor", status_code=302)
+
+    try:
+        agente_id = int(agente_id)
+    except (ValueError, TypeError):
+        return RedirectResponse("/nueva-propiedad-vendedor", status_code=302)
+
+    # Formatear precio
+    precio_num = None
+    precio_formateado = ""
+    if precio:
+        try:
+            precio_num = float(precio.replace(",", "").replace("$", ""))
+            precio_formateado = f"${precio_num:,.0f} MXN"
+        except ValueError:
+            precio_formateado = precio
+
+    # Guardar fotos si las hay
+    fotos_files = form.getlist("fotos")
+    session_id = str(uuid.uuid4())
+    foto_portada_url = None
+    fotos_extra_urls = []
+
+    valid_fotos = [f for f in fotos_files if hasattr(f, 'filename') and f.filename and f.size > 0]
+    if valid_fotos:
+        session_upload_dir = UPLOAD_DIR / session_id
+        session_upload_dir.mkdir(parents=True, exist_ok=True)
+        for i, foto in enumerate(valid_fotos):
+            ext = Path(foto.filename).suffix.lower()
+            if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
+                continue
+            filename = f"{i:03d}{ext}"
+            dest = session_upload_dir / filename
+            with open(dest, "wb") as buffer:
+                shutil.copyfileobj(foto.file, buffer)
+            url = f"/static/uploads/{session_id}/{filename}"
+            if i == 0:
+                foto_portada_url = url
+            else:
+                fotos_extra_urls.append(url)
+
+    db_data = {
+        "tipo_propiedad": tipo_propiedad,
+        "operacion": operacion,
+        "direccion": direccion,
+        "ciudad": ciudad,
+        "precio": precio_num,
+        "precio_formateado": precio_formateado,
+        "recamaras": recamaras or None,
+        "banos": banos or None,
+        "metros_construidos": metros_construidos or None,
+        "foto_portada_url": foto_portada_url,
+        "fotos_extra_urls": fotos_extra_urls,
+        "session_id": session_id,
+        "user_id": agente_id,
+        "vendedor_id": user["id"],
+        "activa": True,
+    }
+
+    await save_property(db_data)
+    return RedirectResponse("/mis-documentos", status_code=302)
 
 
 if __name__ == "__main__":

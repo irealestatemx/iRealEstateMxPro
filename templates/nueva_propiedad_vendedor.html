@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>iRealEstateMxPro — Nueva Propiedad</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="/static/css/sidebar.css"/>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #0d0d0d; color: #e0e0e0; min-height: 100vh; }
+    .container { max-width: 640px; margin: 24px auto; padding: 0 20px; }
+    h1 { font-size: 22px; color: #c9a227; font-family: 'Playfair Display', serif; margin-bottom: 6px; }
+    .subtitle { font-size: 13px; color: rgba(255,255,255,.4); margin-bottom: 24px; }
+    .form-card {
+      background: #1a1a1a; border: 1px solid rgba(201,162,39,.15); border-radius: 14px;
+      padding: 28px;
+    }
+    .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-grid .full { grid-column: 1 / -1; }
+    label { font-size: 12px; font-weight: 600; color: rgba(255,255,255,.5); display: block; margin-bottom: 5px; }
+    input, select {
+      width: 100%; padding: 10px 14px; background: #111; border: 1px solid rgba(255,255,255,.1);
+      border-radius: 8px; color: #e0e0e0; font-size: 14px; font-family: 'Inter', sans-serif;
+    }
+    input:focus, select:focus { outline: none; border-color: #c9a227; }
+    select { appearance: auto; }
+    .fotos-area {
+      border: 2px dashed rgba(201,162,39,.2); border-radius: 10px; padding: 24px;
+      text-align: center; cursor: pointer; transition: border-color .2s;
+    }
+    .fotos-area:hover { border-color: #c9a227; }
+    .fotos-area p { font-size: 13px; color: rgba(255,255,255,.35); }
+    .fotos-area input { display: none; }
+    .fotos-preview { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+    .fotos-preview img { width: 80px; height: 60px; object-fit: cover; border-radius: 6px; border: 1px solid rgba(255,255,255,.1); }
+    .btn-submit {
+      display: block; width: 100%; padding: 14px; margin-top: 20px;
+      background: linear-gradient(135deg, #c9a227, #d4af37); color: #000;
+      border: none; border-radius: 10px; font-size: 15px; font-weight: 700;
+      cursor: pointer; font-family: 'Inter', sans-serif; transition: opacity .2s;
+    }
+    .btn-submit:hover { opacity: .9; }
+    .note { font-size: 11px; color: rgba(255,255,255,.3); margin-top: 12px; text-align: center; }
+  </style>
+</head>
+<body>
+  {% set page = 'nueva_vendedor' %}
+  {% include '_sidebar.html' %}
+  <div class="layout">
+  <div class="layout-main">
+
+  <div class="container">
+    <h1>Registrar propiedad</h1>
+    <p class="subtitle">Completa los datos b&aacute;sicos de tu propiedad. Tu agente podr&aacute; editarla despu&eacute;s.</p>
+
+    <form method="post" action="/nueva-propiedad-vendedor" enctype="multipart/form-data" class="form-card">
+      <div class="form-grid">
+        <div>
+          <label>Tipo de propiedad</label>
+          <select name="tipo_propiedad">
+            <option>Casa</option>
+            <option>Departamento</option>
+            <option>Terreno</option>
+            <option>Local comercial</option>
+            <option>Oficina</option>
+            <option>Bodega</option>
+          </select>
+        </div>
+        <div>
+          <label>Operaci&oacute;n</label>
+          <select name="operacion">
+            <option>Venta</option>
+            <option>Renta</option>
+            <option>Traspaso</option>
+          </select>
+        </div>
+        <div class="full">
+          <label>Direcci&oacute;n *</label>
+          <input type="text" name="direccion" required placeholder="Calle, n&uacute;mero, colonia" />
+        </div>
+        <div>
+          <label>Ciudad *</label>
+          <input type="text" name="ciudad" required placeholder="Ej: Le&oacute;n, Guanajuato" />
+        </div>
+        <div>
+          <label>Precio (MXN)</label>
+          <input type="text" name="precio" placeholder="Ej: 1,500,000" />
+        </div>
+        <div>
+          <label>Rec&aacute;maras</label>
+          <input type="number" name="recamaras" min="0" placeholder="0" />
+        </div>
+        <div>
+          <label>Ba&ntilde;os</label>
+          <input type="number" name="banos" min="0" step="0.5" placeholder="0" />
+        </div>
+        <div>
+          <label>m&sup2; construidos</label>
+          <input type="number" name="metros_construidos" min="0" placeholder="0" />
+        </div>
+        <div>
+          <label>Tu agente *</label>
+          <select name="agente_id" required>
+            <option value="">— Selecciona tu agente —</option>
+            {% for a in agentes %}
+            <option value="{{ a.id }}">{{ a.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="full">
+          <label>Fotos (opcional)</label>
+          <div class="fotos-area" onclick="document.getElementById('inputFotos').click()">
+            <p>Haz clic para seleccionar fotos de tu propiedad</p>
+            <input type="file" name="fotos" id="inputFotos" accept="image/*" multiple />
+          </div>
+          <div class="fotos-preview" id="fotosPreview"></div>
+        </div>
+      </div>
+
+      <button type="submit" class="btn-submit">Registrar propiedad</button>
+      <p class="note">La propiedad se asignar&aacute; a tu agente. &Eacute;l podr&aacute; completar la informaci&oacute;n y generar materiales.</p>
+    </form>
+  </div>
+
+  </div><!-- layout-main -->
+  </div><!-- layout -->
+
+  <script>
+  document.getElementById('inputFotos').addEventListener('change', function(e) {
+    const preview = document.getElementById('fotosPreview');
+    preview.innerHTML = '';
+    Array.from(e.target.files).forEach(f => {
+      const img = document.createElement('img');
+      img.src = URL.createObjectURL(f);
+      preview.appendChild(img);
+    });
+  });
+  </script>
+</body>
+</html>

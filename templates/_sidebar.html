@@ -39,12 +39,33 @@
     </a>
     {% endif %}
 
-    {% if user and user.rol in ('vendedor', 'comprador') %}
-    <!-- Vendedor / Comprador -->
+    {% if user and user.rol == 'vendedor' %}
+    <!-- Vendedor -->
     <div class="sb-section">MI PROCESO</div>
-    <a href="{{ '/mis-documentos' if user.rol == 'vendedor' else '/portal-comprador' }}" class="sb-link {{ 'active' if page == 'propiedades' }}">
+    <a href="/mis-documentos" class="sb-link {{ 'active' if page == 'propiedades' }}">
       <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
       Mis propiedades
+    </a>
+    <a href="/seleccionar-propiedad" class="sb-link {{ 'active' if page == 'seleccionar' }}">
+      <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+      Seleccionar propiedad
+    </a>
+    <a href="/nueva-propiedad-vendedor" class="sb-link {{ 'active' if page == 'nueva_vendedor' }}">
+      <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+      Nueva propiedad
+    </a>
+    {% endif %}
+
+    {% if user and user.rol == 'comprador' %}
+    <!-- Comprador -->
+    <div class="sb-section">MI PROCESO</div>
+    <a href="/portal-comprador" class="sb-link {{ 'active' if page == 'propiedades' }}">
+      <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+      Mis propiedades
+    </a>
+    <a href="/seleccionar-propiedad" class="sb-link {{ 'active' if page == 'seleccionar' }}">
+      <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+      Seleccionar propiedad
     </a>
     {% endif %}
 
