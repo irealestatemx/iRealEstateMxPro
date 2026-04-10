@@ -6,7 +6,8 @@
   </div>
 
   <nav class="sb-nav">
-    <!-- Propiedades -->
+    {% if user and user.rol in ('admin', 'agente') %}
+    <!-- Propiedades (solo admin/agente) -->
     <div class="sb-section">PROPIEDADES</div>
     <a href="/" class="sb-link {{ 'active' if page == 'nueva' }}">
       <svg viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
@@ -23,6 +24,29 @@
       <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
       Prospectos
     </a>
+    <a href="/dashboard-asesor" class="sb-link {{ 'active' if page == 'seguimiento' }}">
+      <svg viewBox="0 0 24 24"><path d="M19 3h-4.18C14.4 1.84 13.3 1 12 1c-1.3 0-2.4.84-2.82 2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-2 14l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+      Seguimiento
+    </a>
+    {% endif %}
+
+    {% if user and user.rol == 'referido' %}
+    <!-- Referido -->
+    <div class="sb-section">CRM</div>
+    <a href="/mis-prospectos" class="sb-link {{ 'active' if page == 'prospectos' }}">
+      <svg viewBox="0 0 24 24"><path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/></svg>
+      Mis prospectos
+    </a>
+    {% endif %}
+
+    {% if user and user.rol in ('vendedor', 'comprador') %}
+    <!-- Vendedor / Comprador -->
+    <div class="sb-section">MI PROCESO</div>
+    <a href="{{ '/mis-documentos' if user.rol == 'vendedor' else '/portal-comprador' }}" class="sb-link {{ 'active' if page == 'propiedades' }}">
+      <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+      Mis propiedades
+    </a>
+    {% endif %}
 
     {% if user and user.rol == 'admin' %}
     <!-- Admin -->

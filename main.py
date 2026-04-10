@@ -1951,6 +1951,13 @@ async def index(request: Request):
             "desarrollos_dict": DESARROLLOS_DATA,
             "c": c,
         })
+    # Vendedor/comprador no pueden subir propiedades — redirigir a su flujo
+    if user["rol"] == "vendedor":
+        return RedirectResponse("/mis-documentos", status_code=302)
+    if user["rol"] == "comprador":
+        return RedirectResponse("/portal-comprador", status_code=302)
+    if user["rol"] == "referido":
+        return RedirectResponse("/mis-prospectos", status_code=302)
     return templates.TemplateResponse(request=request, name="wizard.html", context={
         "user": user,
         "desarrollos_dict": DESARROLLOS_DATA,
@@ -3707,7 +3714,7 @@ async def admin_prospectos_page(
     buscar: Optional[str] = None,
 ):
     user = await require_auth(request)
-    if not user or user["rol"] != "admin":
+    if not user or user["rol"] not in ("admin", "agente"):
         return RedirectResponse("/login", status_code=302)
     referido_id = int(referido) if referido and referido.isdigit() else None
     prospectos = await get_all_prospectos(referido_id=referido_id)
@@ -5416,6 +5423,11 @@ async def generate(
     if not user:
         return RedirectResponse("/login", status_code=302)
 
+    # Solo admin/agente pueden subir propiedades
+    user_check = await require_auth(request)
+    if user_check and user_check["rol"] in ("vendedor", "comprador", "referido"):
+        return RedirectResponse("/", status_code=302)
+
     # Recoger amenidades desde el form (checkboxes)
     form_data = await request.form()
     amenidades = form_data.getlist("amenidades")
@@ -6756,13 +6768,19 @@ async def guardar_tipo_compra(request: Request):
 # ─── Selección de propiedad (onboarding vendedor/comprador) ─────────
 
 @app.get("/seleccionar-propiedad", response_class=HTMLResponse)
-async def seleccionar_propiedad_page(request: Request, agente_id: Optional[int] = None):
+async def seleccionar_propiedad_page(request: Request, agente_id: Optional[str] = None):
     user = await require_auth(request)
     if not user:
         return RedirectResponse("/login", status_code=302)
 
     if user["rol"] not in ("vendedor", "comprador"):
         return RedirectResponse("/dashboard", status_code=302)
+
+    # Convert agente_id to int safely (dropdown sends "" when nothing selected)
+    try:
+        agente_id = int(agente_id) if agente_id else None
+    except (ValueError, TypeError):
+        agente_id = None
 
     agentes = await get_users_by_rol("agente") + await get_users_by_rol("admin")
     propiedades = []
