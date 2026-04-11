@@ -1256,62 +1256,58 @@ async def get_propiedades_con_docs_pendientes():
 # REstateFlow — Sprints, Standups, KPIs
 # ═══════════════════════════════════════════════════════
 
-CREATE_RESTATEFLOW = """
-CREATE TABLE IF NOT EXISTS sprints (
-    id          SERIAL PRIMARY KEY,
-    nombre      VARCHAR(200) NOT NULL,
-    fecha_inicio DATE NOT NULL,
-    fecha_fin   DATE NOT NULL,
-    estado      VARCHAR(20) DEFAULT 'activo',
-    meta_texto  TEXT,
-    created_by  INTEGER REFERENCES usuarios(id),
-    created_at  TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS sprint_items (
-    id              SERIAL PRIMARY KEY,
-    sprint_id       INTEGER REFERENCES sprints(id) ON DELETE CASCADE,
-    propiedad_id    INTEGER REFERENCES propiedades(id) ON DELETE CASCADE,
-    agente_id       INTEGER REFERENCES usuarios(id),
-    columna         VARCHAR(30) DEFAULT 'para_esta_semana',
-    bloqueo_texto   TEXT,
-    notas           TEXT,
-    updated_at      TIMESTAMP DEFAULT NOW(),
-    created_at      TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS respuestas_diarias (
-    id          SERIAL PRIMARY KEY,
-    agente_id   INTEGER REFERENCES usuarios(id),
-    sprint_id   INTEGER REFERENCES sprints(id) ON DELETE SET NULL,
-    fecha       DATE DEFAULT CURRENT_DATE,
-    que_avance  TEXT,
-    bloqueos    TEXT,
-    plan_hoy    TEXT,
-    created_at  TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS bloqueos_historico (
-    id              SERIAL PRIMARY KEY,
-    sprint_item_id  INTEGER REFERENCES sprint_items(id) ON DELETE CASCADE,
-    propiedad_id    INTEGER REFERENCES propiedades(id) ON DELETE CASCADE,
-    agente_id       INTEGER REFERENCES usuarios(id),
-    descripcion     TEXT NOT NULL,
-    categoria       VARCHAR(50),
-    resuelto        BOOLEAN DEFAULT FALSE,
-    accion_tomada   TEXT,
-    resuelto_por    INTEGER REFERENCES usuarios(id),
-    resuelto_at     TIMESTAMP,
-    created_at      TIMESTAMP DEFAULT NOW()
-);
-
-CREATE TABLE IF NOT EXISTS sprint_reviews (
-    id          SERIAL PRIMARY KEY,
-    sprint_id   INTEGER REFERENCES sprints(id) ON DELETE CASCADE,
-    data_json   JSONB DEFAULT '{}',
-    created_at  TIMESTAMP DEFAULT NOW()
-);
-"""
+RESTATEFLOW_TABLES = [
+    """CREATE TABLE IF NOT EXISTS sprints (
+        id          SERIAL PRIMARY KEY,
+        nombre      VARCHAR(200) NOT NULL,
+        fecha_inicio DATE NOT NULL,
+        fecha_fin   DATE NOT NULL,
+        estado      VARCHAR(20) DEFAULT 'activo',
+        meta_texto  TEXT,
+        created_by  INTEGER REFERENCES usuarios(id),
+        created_at  TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS sprint_items (
+        id              SERIAL PRIMARY KEY,
+        sprint_id       INTEGER REFERENCES sprints(id) ON DELETE CASCADE,
+        propiedad_id    INTEGER REFERENCES propiedades(id) ON DELETE CASCADE,
+        agente_id       INTEGER REFERENCES usuarios(id),
+        columna         VARCHAR(30) DEFAULT 'para_esta_semana',
+        bloqueo_texto   TEXT,
+        notas           TEXT,
+        updated_at      TIMESTAMP DEFAULT NOW(),
+        created_at      TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS respuestas_diarias (
+        id          SERIAL PRIMARY KEY,
+        agente_id   INTEGER REFERENCES usuarios(id),
+        sprint_id   INTEGER REFERENCES sprints(id) ON DELETE SET NULL,
+        fecha       DATE DEFAULT CURRENT_DATE,
+        que_avance  TEXT,
+        bloqueos    TEXT,
+        plan_hoy    TEXT,
+        created_at  TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS bloqueos_historico (
+        id              SERIAL PRIMARY KEY,
+        sprint_item_id  INTEGER REFERENCES sprint_items(id) ON DELETE CASCADE,
+        propiedad_id    INTEGER REFERENCES propiedades(id) ON DELETE CASCADE,
+        agente_id       INTEGER REFERENCES usuarios(id),
+        descripcion     TEXT NOT NULL,
+        categoria       VARCHAR(50),
+        resuelto        BOOLEAN DEFAULT FALSE,
+        accion_tomada   TEXT,
+        resuelto_por    INTEGER REFERENCES usuarios(id),
+        resuelto_at     TIMESTAMP,
+        created_at      TIMESTAMP DEFAULT NOW()
+    )""",
+    """CREATE TABLE IF NOT EXISTS sprint_reviews (
+        id          SERIAL PRIMARY KEY,
+        sprint_id   INTEGER REFERENCES sprints(id) ON DELETE CASCADE,
+        data_json   JSONB DEFAULT '{}',
+        created_at  TIMESTAMP DEFAULT NOW()
+    )""",
+]
 
 CREATE_RESTATEFLOW_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_sprint_items_sprint ON sprint_items(sprint_id);",
@@ -1326,7 +1322,8 @@ CREATE_RESTATEFLOW_INDEXES = [
 
 async def init_restateflow():
     """Crea tablas de REstateFlow."""
-    await database.execute(CREATE_RESTATEFLOW)
+    for tbl in RESTATEFLOW_TABLES:
+        await database.execute(tbl)
     for idx in CREATE_RESTATEFLOW_INDEXES:
         try:
             await database.execute(idx)
