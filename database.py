@@ -256,6 +256,8 @@ async def init_db():
         updated_at TIMESTAMP DEFAULT NOW()
     );
     """)
+    # REstateFlow tables
+    await init_restateflow()
 
 
 async def close_db():
@@ -1248,3 +1250,413 @@ async def get_propiedades_con_docs_pendientes():
     """
     rows = await database.fetch_all(query=query)
     return [dict(r._mapping) for r in rows]
+
+
+# ═══════════════════════════════════════════════════════
+# REstateFlow — Sprints, Standups, KPIs
+# ═══════════════════════════════════════════════════════
+
+CREATE_RESTATEFLOW = """
+CREATE TABLE IF NOT EXISTS sprints (
+    id          SERIAL PRIMARY KEY,
+    nombre      VARCHAR(200) NOT NULL,
+    fecha_inicio DATE NOT NULL,
+    fecha_fin   DATE NOT NULL,
+    estado      VARCHAR(20) DEFAULT 'activo',
+    meta_texto  TEXT,
+    created_by  INTEGER REFERENCES usuarios(id),
+    created_at  TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS sprint_items (
+    id              SERIAL PRIMARY KEY,
+    sprint_id       INTEGER REFERENCES sprints(id) ON DELETE CASCADE,
+    propiedad_id    INTEGER REFERENCES propiedades(id) ON DELETE CASCADE,
+    agente_id       INTEGER REFERENCES usuarios(id),
+    columna         VARCHAR(30) DEFAULT 'para_esta_semana',
+    bloqueo_texto   TEXT,
+    notas           TEXT,
+    updated_at      TIMESTAMP DEFAULT NOW(),
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS respuestas_diarias (
+    id          SERIAL PRIMARY KEY,
+    agente_id   INTEGER REFERENCES usuarios(id),
+    sprint_id   INTEGER REFERENCES sprints(id) ON DELETE SET NULL,
+    fecha       DATE DEFAULT CURRENT_DATE,
+    que_avance  TEXT,
+    bloqueos    TEXT,
+    plan_hoy    TEXT,
+    created_at  TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS bloqueos_historico (
+    id              SERIAL PRIMARY KEY,
+    sprint_item_id  INTEGER REFERENCES sprint_items(id) ON DELETE CASCADE,
+    propiedad_id    INTEGER REFERENCES propiedades(id) ON DELETE CASCADE,
+    agente_id       INTEGER REFERENCES usuarios(id),
+    descripcion     TEXT NOT NULL,
+    categoria       VARCHAR(50),
+    resuelto        BOOLEAN DEFAULT FALSE,
+    accion_tomada   TEXT,
+    resuelto_por    INTEGER REFERENCES usuarios(id),
+    resuelto_at     TIMESTAMP,
+    created_at      TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS sprint_reviews (
+    id          SERIAL PRIMARY KEY,
+    sprint_id   INTEGER REFERENCES sprints(id) ON DELETE CASCADE,
+    data_json   JSONB DEFAULT '{}',
+    created_at  TIMESTAMP DEFAULT NOW()
+);
+"""
+
+CREATE_RESTATEFLOW_INDEXES = [
+    "CREATE INDEX IF NOT EXISTS idx_sprint_items_sprint ON sprint_items(sprint_id);",
+    "CREATE INDEX IF NOT EXISTS idx_sprint_items_agente ON sprint_items(agente_id);",
+    "CREATE INDEX IF NOT EXISTS idx_sprint_items_columna ON sprint_items(columna);",
+    "CREATE INDEX IF NOT EXISTS idx_respuestas_agente ON respuestas_diarias(agente_id);",
+    "CREATE INDEX IF NOT EXISTS idx_respuestas_fecha ON respuestas_diarias(fecha);",
+    "CREATE INDEX IF NOT EXISTS idx_bloqueos_agente ON bloqueos_historico(agente_id);",
+    "CREATE INDEX IF NOT EXISTS idx_bloqueos_resuelto ON bloqueos_historico(resuelto);",
+]
+
+
+async def init_restateflow():
+    """Crea tablas de REstateFlow."""
+    await database.execute(CREATE_RESTATEFLOW)
+    for idx in CREATE_RESTATEFLOW_INDEXES:
+        try:
+            await database.execute(idx)
+        except Exception:
+            pass
+
+
+# ── Sprint CRUD ──
+
+async def crear_sprint(nombre, fecha_inicio, fecha_fin, meta_texto, created_by):
+    query = """
+    INSERT INTO sprints (nombre, fecha_inicio, fecha_fin, meta_texto, created_by)
+    VALUES (:nombre, :fi, :ff, :meta, :cb) RETURNING id
+    """
+    return await database.execute(query=query, values={
+        "nombre": nombre, "fi": fecha_inicio, "ff": fecha_fin,
+        "meta": meta_texto, "cb": created_by
+    })
+
+
+async def get_sprint_activo():
+    query = "SELECT * FROM sprints WHERE estado = 'activo' ORDER BY fecha_inicio DESC LIMIT 1"
+    row = await database.fetch_one(query=query)
+    return dict(row._mapping) if row else None
+
+
+async def get_sprint_by_id(sprint_id):
+    row = await database.fetch_one("SELECT * FROM sprints WHERE id = :id", {"id": sprint_id})
+    return dict(row._mapping) if row else None
+
+
+async def cerrar_sprint(sprint_id):
+    await database.execute("UPDATE sprints SET estado = 'cerrado' WHERE id = :id", {"id": sprint_id})
+
+
+async def get_sprints_historial(limit=20):
+    rows = await database.fetch_all(
+        "SELECT * FROM sprints ORDER BY fecha_inicio DESC LIMIT :lim", {"lim": limit}
+    )
+    return [dict(r._mapping) for r in rows]
+
+
+# ── Sprint Items ──
+
+async def agregar_sprint_item(sprint_id, propiedad_id, agente_id, columna="para_esta_semana"):
+    query = """
+    INSERT INTO sprint_items (sprint_id, propiedad_id, agente_id, columna)
+    VALUES (:sid, :pid, :aid, :col) RETURNING id
+    """
+    return await database.execute(query=query, values={
+        "sid": sprint_id, "pid": propiedad_id, "aid": agente_id, "col": columna
+    })
+
+
+async def mover_sprint_item(item_id, nueva_columna, bloqueo_texto=None):
+    query = """
+    UPDATE sprint_items SET columna = :col, bloqueo_texto = :bt, updated_at = NOW()
+    WHERE id = :id
+    """
+    await database.execute(query=query, values={
+        "id": item_id, "col": nueva_columna, "bt": bloqueo_texto
+    })
+
+
+async def get_sprint_items(sprint_id, agente_id=None):
+    where = "WHERE si.sprint_id = :sid"
+    values = {"sid": sprint_id}
+    if agente_id:
+        where += " AND si.agente_id = :aid"
+        values["aid"] = agente_id
+    query = f"""
+    SELECT si.*, p.tipo_propiedad, p.operacion, p.direccion, p.ciudad,
+           p.foto_portada_url, p.precio_formateado,
+           u_v.nombre as vendedor_nombre, u_c.nombre as comprador_nombre
+    FROM sprint_items si
+    JOIN propiedades p ON si.propiedad_id = p.id
+    LEFT JOIN usuarios u_v ON p.vendedor_id = u_v.id
+    LEFT JOIN usuarios u_c ON p.comprador_id = u_c.id
+    {where}
+    ORDER BY si.columna, si.created_at
+    """
+    rows = await database.fetch_all(query=query, values=values)
+    return [dict(r._mapping) for r in rows]
+
+
+async def eliminar_sprint_item(item_id):
+    await database.execute("DELETE FROM sprint_items WHERE id = :id", {"id": item_id})
+
+
+# ── Respuestas diarias (standup) ──
+
+async def guardar_standup(agente_id, sprint_id, que_avance, bloqueos, plan_hoy):
+    query = """
+    INSERT INTO respuestas_diarias (agente_id, sprint_id, que_avance, bloqueos, plan_hoy)
+    VALUES (:aid, :sid, :qa, :bl, :ph) RETURNING id
+    """
+    return await database.execute(query=query, values={
+        "aid": agente_id, "sid": sprint_id, "qa": que_avance, "bl": bloqueos, "ph": plan_hoy
+    })
+
+
+async def get_standup_hoy(agente_id):
+    query = """
+    SELECT * FROM respuestas_diarias
+    WHERE agente_id = :aid AND fecha = CURRENT_DATE
+    ORDER BY created_at DESC LIMIT 1
+    """
+    row = await database.fetch_one(query=query, values={"aid": agente_id})
+    return dict(row._mapping) if row else None
+
+
+async def get_standups_sprint(sprint_id):
+    query = """
+    SELECT rd.*, u.nombre as agente_nombre
+    FROM respuestas_diarias rd
+    JOIN usuarios u ON rd.agente_id = u.id
+    WHERE rd.sprint_id = :sid
+    ORDER BY rd.fecha DESC, rd.created_at DESC
+    """
+    rows = await database.fetch_all(query=query, values={"sid": sprint_id})
+    return [dict(r._mapping) for r in rows]
+
+
+# ── Bloqueos ──
+
+async def registrar_bloqueo(sprint_item_id, propiedad_id, agente_id, descripcion, categoria=None):
+    query = """
+    INSERT INTO bloqueos_historico (sprint_item_id, propiedad_id, agente_id, descripcion, categoria)
+    VALUES (:sii, :pid, :aid, :desc, :cat) RETURNING id
+    """
+    return await database.execute(query=query, values={
+        "sii": sprint_item_id, "pid": propiedad_id, "aid": agente_id,
+        "desc": descripcion, "cat": categoria
+    })
+
+
+async def resolver_bloqueo(bloqueo_id, accion_tomada, resuelto_por):
+    query = """
+    UPDATE bloqueos_historico
+    SET resuelto = TRUE, accion_tomada = :acc, resuelto_por = :rpor, resuelto_at = NOW()
+    WHERE id = :id
+    """
+    await database.execute(query=query, values={
+        "id": bloqueo_id, "acc": accion_tomada, "rpor": resuelto_por
+    })
+
+
+async def get_bloqueos_activos(agente_id=None):
+    where = "WHERE bh.resuelto = FALSE"
+    values = {}
+    if agente_id:
+        where += " AND bh.agente_id = :aid"
+        values["aid"] = agente_id
+    query = f"""
+    SELECT bh.*, p.tipo_propiedad, p.direccion, p.ciudad, u.nombre as agente_nombre,
+           EXTRACT(DAY FROM NOW() - bh.created_at) as dias_abierto
+    FROM bloqueos_historico bh
+    JOIN propiedades p ON bh.propiedad_id = p.id
+    JOIN usuarios u ON bh.agente_id = u.id
+    {where}
+    ORDER BY bh.created_at ASC
+    """
+    rows = await database.fetch_all(query=query, values=values)
+    return [dict(r._mapping) for r in rows]
+
+
+# ── KPI Calculations ──
+
+async def get_kpis_agente(agente_id: int) -> dict:
+    """Calcula KPIs para un agente específico."""
+    r1 = await database.fetch_one("""
+        SELECT COUNT(*) as total FROM propiedades
+        WHERE user_id = :aid AND activa = TRUE
+          AND created_at >= NOW() - INTERVAL '30 days'
+    """, {"aid": agente_id})
+
+    r2 = await database.fetch_one("""
+        SELECT COUNT(*) as total FROM propiedades WHERE user_id = :aid AND activa = TRUE
+    """, {"aid": agente_id})
+
+    r3 = await database.fetch_one("""
+        SELECT COUNT(*) as total FROM propiedades
+        WHERE user_id = :aid AND vendida = TRUE
+    """, {"aid": agente_id})
+
+    total_asignadas = r2["total"] if r2 else 0
+    ventas = r3["total"] if r3 else 0
+    ratio = round((ventas / total_asignadas * 100), 1) if total_asignadas > 0 else 0
+
+    r4 = await database.fetch_one("""
+        SELECT COUNT(DISTINCT p.id) as total
+        FROM propiedades p
+        JOIN documentos d ON d.propiedad_id = p.id
+        WHERE p.user_id = :aid AND d.estado = 'pendiente'
+          AND d.created_at < NOW() - INTERVAL '72 hours'
+    """, {"aid": agente_id})
+
+    r5 = await database.fetch_one("""
+        SELECT COUNT(*) as total FROM propiedades p
+        WHERE p.user_id = :aid AND p.vendedor_id IS NOT NULL AND p.activa = TRUE
+          AND NOT EXISTS (SELECT 1 FROM documentos d WHERE d.propiedad_id = p.id)
+    """, {"aid": agente_id})
+
+    r6 = await database.fetch_all("""
+        SELECT DATE_TRUNC('month', fecha_venta) as mes, COUNT(*) as total
+        FROM propiedades
+        WHERE user_id = :aid AND vendida = TRUE AND fecha_venta IS NOT NULL
+          AND fecha_venta >= NOW() - INTERVAL '6 months'
+        GROUP BY mes ORDER BY mes
+    """, {"aid": agente_id})
+
+    r7 = await database.fetch_one("""
+        SELECT COUNT(*) as total FROM prospectos
+        WHERE created_at >= NOW() - INTERVAL '30 days'
+    """)
+
+    return {
+        "propiedades_activas_30d": r1["total"] if r1 else 0,
+        "total_asignadas": total_asignadas,
+        "ventas_completadas": ventas,
+        "ratio_cierre": ratio,
+        "docs_pendientes_72h": r4["total"] if r4 else 0,
+        "clientes_sin_docs": r5["total"] if r5 else 0,
+        "ventas_por_mes": [dict(r._mapping) for r in r6] if r6 else [],
+        "prospectos_30d": r7["total"] if r7 else 0,
+    }
+
+
+async def get_kpis_referido(referido_id: int) -> dict:
+    """Calcula KPIs para un referido."""
+    r1 = await database.fetch_one("""
+        SELECT COUNT(*) as total FROM prospectos WHERE referido_id = :rid
+    """, {"rid": referido_id})
+
+    r2 = await database.fetch_one("""
+        SELECT COUNT(*) as total FROM prospectos
+        WHERE referido_id = :rid AND estado NOT IN ('nuevo', 'descartado')
+    """, {"rid": referido_id})
+
+    r3 = await database.fetch_one("""
+        SELECT COUNT(*) as total FROM prospectos
+        WHERE referido_id = :rid AND estado = 'cerrado'
+    """, {"rid": referido_id})
+
+    r4 = await database.fetch_one("""
+        SELECT MAX(created_at) as ultima FROM prospectos WHERE referido_id = :rid
+    """, {"rid": referido_id})
+
+    r5 = await database.fetch_all("""
+        SELECT DATE_TRUNC('month', created_at) as mes, COUNT(*) as total
+        FROM prospectos WHERE referido_id = :rid
+          AND created_at >= NOW() - INTERVAL '6 months'
+        GROUP BY mes ORDER BY mes
+    """, {"rid": referido_id})
+
+    return {
+        "total_referidos": r1["total"] if r1 else 0,
+        "convertidos": r2["total"] if r2 else 0,
+        "ventas_cerradas": r3["total"] if r3 else 0,
+        "ultima_actividad": r4["ultima"] if r4 else None,
+        "referidos_por_mes": [dict(r._mapping) for r in r5] if r5 else [],
+    }
+
+
+async def get_kpis_todos_agentes() -> list:
+    """KPIs de todos los agentes para vista admin."""
+    agentes = await database.fetch_all("""
+        SELECT id, nombre, email, rol FROM usuarios WHERE rol IN ('agente', 'admin') AND activo = TRUE
+    """)
+    result = []
+    for a in agentes:
+        a_dict = dict(a._mapping)
+        kpis = await get_kpis_agente(a_dict["id"])
+        a_dict.update(kpis)
+        result.append(a_dict)
+    return result
+
+
+async def get_kpis_todos_referidos() -> list:
+    """KPIs de todos los referidos."""
+    referidos = await database.fetch_all("""
+        SELECT id, nombre, email, prefijo_whatsapp FROM usuarios
+        WHERE rol = 'referido' AND activo = TRUE
+    """)
+    result = []
+    for r in referidos:
+        r_dict = dict(r._mapping)
+        kpis = await get_kpis_referido(r_dict["id"])
+        r_dict.update(kpis)
+        result.append(r_dict)
+    return result
+
+
+async def get_sprint_review_data(sprint_id: int) -> dict:
+    """Genera datos para Sprint Review."""
+    sprint = await get_sprint_by_id(sprint_id)
+    if not sprint:
+        return {}
+
+    items = await get_sprint_items(sprint_id)
+    standups = await get_standups_sprint(sprint_id)
+    bloqueos = await get_bloqueos_activos()
+
+    por_agente = {}
+    for item in items:
+        aid = item["agente_id"]
+        if aid not in por_agente:
+            por_agente[aid] = {"total": 0, "completados": 0, "bloqueados": 0, "en_progreso": 0}
+        por_agente[aid]["total"] += 1
+        if item["columna"] == "completado":
+            por_agente[aid]["completados"] += 1
+        elif item["columna"] == "bloqueado":
+            por_agente[aid]["bloqueados"] += 1
+        elif item["columna"] == "en_progreso":
+            por_agente[aid]["en_progreso"] += 1
+
+    cat_count = {}
+    for b in bloqueos:
+        cat = b.get("categoria") or "Sin categoría"
+        cat_count[cat] = cat_count.get(cat, 0) + 1
+    top_bloqueos = sorted(cat_count.items(), key=lambda x: x[1], reverse=True)[:5]
+
+    return {
+        "sprint": sprint,
+        "items": items,
+        "por_agente": por_agente,
+        "total_items": len(items),
+        "completados": sum(1 for i in items if i["columna"] == "completado"),
+        "bloqueados_count": sum(1 for i in items if i["columna"] == "bloqueado"),
+        "standups_count": len(standups),
+        "bloqueos_activos": bloqueos,
+        "top_bloqueos": top_bloqueos,
+    }

@@ -50,6 +50,13 @@ from database import (
     crear_notificacion, get_notificaciones, marcar_notificacion_leida,
     contar_notificaciones_no_leidas, get_propiedades_con_docs_pendientes,
     get_site_config, set_site_config, get_all_site_config,
+    # REstateFlow
+    crear_sprint, get_sprint_activo, get_sprint_by_id, cerrar_sprint, get_sprints_historial,
+    agregar_sprint_item, mover_sprint_item, get_sprint_items, eliminar_sprint_item,
+    guardar_standup, get_standup_hoy, get_standups_sprint,
+    registrar_bloqueo, resolver_bloqueo, get_bloqueos_activos,
+    get_kpis_agente, get_kpis_referido, get_kpis_todos_agentes, get_kpis_todos_referidos,
+    get_sprint_review_data,
 )
 
 # ─── Sesiones con cookie firmada ───
@@ -6960,6 +6967,187 @@ async def nueva_propiedad_vendedor_submit(request: Request):
 
     await save_property(db_data)
     return RedirectResponse("/mis-documentos", status_code=302)
+
+
+# ═══════════════════════════════════════════════════════════
+# REstateFlow — Accountability & KPIs
+# ═══════════════════════════════════════════════════════════
+
+@app.get("/restateflow", response_class=HTMLResponse)
+async def restateflow_page(request: Request, vista: str = "dashboard"):
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    if user["rol"] not in ("admin", "agente"):
+        return RedirectResponse("/", status_code=302)
+
+    context = {"user": user, "vista": vista}
+
+    # Sprint activo
+    sprint = await get_sprint_activo()
+    context["sprint"] = sprint
+
+    # Bloqueos activos
+    if user["rol"] == "admin":
+        bloqueos = await get_bloqueos_activos()
+    else:
+        bloqueos = await get_bloqueos_activos(agente_id=user["id"])
+    context["bloqueos_activos"] = bloqueos
+
+    if vista == "dashboard":
+        # Standup
+        context["standup_hoy"] = await get_standup_hoy(user["id"])
+
+        if user["rol"] == "admin":
+            agentes_kpis = await get_kpis_todos_agentes()
+            context["agentes_kpis"] = agentes_kpis
+            context["kpis_global"] = {
+                "total_propiedades": sum(a["total_asignadas"] for a in agentes_kpis),
+                "total_ventas": sum(a["ventas_completadas"] for a in agentes_kpis),
+                "total_docs_pendientes": sum(a["docs_pendientes_72h"] for a in agentes_kpis),
+                "total_prospectos": agentes_kpis[0]["prospectos_30d"] if agentes_kpis else 0,
+            }
+        else:
+            context["mis_kpis"] = await get_kpis_agente(user["id"])
+
+    elif vista == "scrum":
+        if sprint:
+            if user["rol"] == "admin":
+                context["sprint_items"] = await get_sprint_items(sprint["id"])
+            else:
+                context["sprint_items"] = await get_sprint_items(sprint["id"], agente_id=user["id"])
+            # Propiedades disponibles para agregar
+            all_props = await get_all_properties(active_only=True, limit=200, offset=0)
+            items_ids = {i["propiedad_id"] for i in context["sprint_items"]}
+            context["propiedades_disponibles"] = [p for p in all_props if p["id"] not in items_ids]
+        else:
+            context["sprint_items"] = []
+            context["propiedades_disponibles"] = []
+
+    elif vista == "referidos":
+        context["referidos_kpis"] = await get_kpis_todos_referidos()
+
+    elif vista == "review":
+        if user["rol"] != "admin":
+            return RedirectResponse("/restateflow", status_code=302)
+        context["sprints_historial"] = await get_sprints_historial()
+        # Último sprint cerrado para review
+        historial = context["sprints_historial"]
+        cerrados = [s for s in historial if s["estado"] == "cerrado"]
+        if cerrados:
+            context["review_data"] = await get_sprint_review_data(cerrados[0]["id"])
+        else:
+            context["review_data"] = {}
+
+    return templates.TemplateResponse(request=request, name="restateflow.html", context=context)
+
+
+# ── Sprint CRUD routes ──
+
+@app.post("/restateflow/sprint/crear")
+async def restateflow_crear_sprint(request: Request):
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    form = await request.form()
+    nombre = form.get("nombre", "")
+    fecha_inicio = form.get("fecha_inicio", "")
+    fecha_fin = form.get("fecha_fin", "")
+    meta_texto = form.get("meta_texto", "")
+    if nombre and fecha_inicio and fecha_fin:
+        await crear_sprint(nombre, fecha_inicio, fecha_fin, meta_texto, user["id"])
+    return RedirectResponse("/restateflow?vista=scrum", status_code=302)
+
+
+@app.post("/restateflow/sprint/cerrar")
+async def restateflow_cerrar_sprint(request: Request):
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    form = await request.form()
+    sprint_id = int(form.get("sprint_id", 0))
+    if sprint_id:
+        await cerrar_sprint(sprint_id)
+    return RedirectResponse("/restateflow?vista=review", status_code=302)
+
+
+@app.post("/restateflow/sprint/agregar")
+async def restateflow_agregar_item(request: Request):
+    user = await require_auth(request)
+    if not user or user["rol"] not in ("admin", "agente"):
+        return RedirectResponse("/login", status_code=302)
+    form = await request.form()
+    sprint_id = int(form.get("sprint_id", 0))
+    propiedad_id = int(form.get("propiedad_id", 0))
+    if sprint_id and propiedad_id:
+        await agregar_sprint_item(sprint_id, propiedad_id, user["id"])
+    return RedirectResponse("/restateflow?vista=scrum", status_code=302)
+
+
+@app.post("/restateflow/sprint/mover")
+async def restateflow_mover_item(request: Request):
+    user = await require_auth(request)
+    if not user or user["rol"] not in ("admin", "agente"):
+        return RedirectResponse("/login", status_code=302)
+    form = await request.form()
+    item_id = int(form.get("item_id", 0))
+    columna = form.get("columna", "")
+    bloqueo_texto = form.get("bloqueo_texto", "")
+    if item_id and columna in ("para_esta_semana", "en_progreso", "bloqueado", "por_revisar", "completado"):
+        await mover_sprint_item(item_id, columna, bloqueo_texto or None)
+    return RedirectResponse("/restateflow?vista=scrum", status_code=302)
+
+
+# ── Daily Standup ──
+
+@app.post("/restateflow/standup")
+async def restateflow_standup(request: Request):
+    user = await require_auth(request)
+    if not user or user["rol"] not in ("admin", "agente"):
+        return RedirectResponse("/login", status_code=302)
+    form = await request.form()
+    que_avance = form.get("que_avance", "")
+    bloqueos_text = form.get("bloqueos", "")
+    plan_hoy = form.get("plan_hoy", "")
+    sprint = await get_sprint_activo()
+    sprint_id = sprint["id"] if sprint else None
+    if que_avance and plan_hoy:
+        await guardar_standup(user["id"], sprint_id, que_avance, bloqueos_text, plan_hoy)
+    return RedirectResponse("/restateflow", status_code=302)
+
+
+# ── Bloqueos ──
+
+@app.post("/restateflow/bloqueo/crear")
+async def restateflow_crear_bloqueo(request: Request):
+    user = await require_auth(request)
+    if not user or user["rol"] not in ("admin", "agente"):
+        return RedirectResponse("/login", status_code=302)
+    form = await request.form()
+    sprint_item_id = int(form.get("sprint_item_id", 0))
+    descripcion = form.get("descripcion", "")
+    categoria = form.get("categoria", "")
+    if sprint_item_id and descripcion:
+        # Obtener propiedad_id del sprint item
+        items = await database.fetch_one(
+            "SELECT propiedad_id FROM sprint_items WHERE id = :id", {"id": sprint_item_id}
+        )
+        if items:
+            await registrar_bloqueo(sprint_item_id, items["propiedad_id"], user["id"], descripcion, categoria)
+            # Mover item a bloqueado
+            await mover_sprint_item(sprint_item_id, "bloqueado", descripcion)
+    return RedirectResponse("/restateflow?vista=scrum", status_code=302)
+
+
+@app.post("/restateflow/bloqueo/{bloqueo_id}/resolver")
+async def restateflow_resolver_bloqueo(request: Request, bloqueo_id: int):
+    user = await require_auth(request)
+    if not user or user["rol"] != "admin":
+        return RedirectResponse("/login", status_code=302)
+    form = await request.form()
+    accion = form.get("accion", "Resuelto")
+    await resolver_bloqueo(bloqueo_id, accion, user["id"])
+    return RedirectResponse("/restateflow", status_code=302)
 
 
 if __name__ == "__main__":

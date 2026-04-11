@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>REstateFlow — Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="/static/css/sidebar.css"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Inter',sans-serif;background:#0d0d0d;color:#e0e0e0;min-height:100vh}
+    .container{max-width:1200px;margin:24px auto;padding:0 20px}
+    h1{font-size:24px;color:#c9a227;font-family:'Playfair Display',serif;margin-bottom:4px}
+    .sub{font-size:13px;color:rgba(255,255,255,.4);margin-bottom:24px}
+    .tabs{display:flex;gap:6px;margin-bottom:24px;flex-wrap:wrap}
+    .tab{padding:8px 18px;border-radius:8px;border:1px solid rgba(255,255,255,.1);background:transparent;color:rgba(255,255,255,.5);font-size:13px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;text-decoration:none;transition:all .2s}
+    .tab:hover,.tab.active{background:rgba(201,162,39,.15);border-color:#c9a227;color:#c9a227}
+
+    /* KPI Cards */
+    .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:28px}
+    .kpi-card{background:#1a1a1a;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:18px;text-align:center;transition:border-color .2s}
+    .kpi-card:hover{border-color:rgba(201,162,39,.25)}
+    .kpi-num{font-size:32px;font-weight:700;line-height:1}
+    .kpi-label{font-size:11px;color:rgba(255,255,255,.4);margin-top:6px}
+    .kpi-sub{font-size:10px;margin-top:4px}
+    .green{color:#68d391}.yellow{color:#c9a227}.red{color:#fc8181}.blue{color:#63b3ed}.purple{color:#9f7aea}.gray{color:rgba(255,255,255,.35)}
+
+    /* Semaforo */
+    .semaforo{display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:6px}
+    .sem-verde{background:#68d391}.sem-amarillo{background:#c9a227}.sem-rojo{background:#fc8181}
+
+    /* Agent table */
+    .agent-table{width:100%;border-collapse:collapse;margin-bottom:28px}
+    .agent-table th{text-align:left;font-size:11px;color:rgba(255,255,255,.4);padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.08);font-weight:600}
+    .agent-table td{padding:12px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px}
+    .agent-table tr:hover td{background:rgba(201,162,39,.03)}
+    .agent-name{font-weight:600;color:#fff}
+    .agent-role{font-size:10px;color:rgba(255,255,255,.3);margin-left:6px}
+
+    /* Sprint section */
+    .section{margin-bottom:32px}
+    .section-title{font-size:18px;font-weight:700;color:#c9a227;margin-bottom:14px;font-family:'Playfair Display',serif;display:flex;align-items:center;gap:10px}
+    .badge{font-size:11px;padding:3px 10px;border-radius:12px;font-weight:600}
+    .badge-active{background:rgba(104,211,145,.15);color:#68d391}
+    .badge-closed{background:rgba(255,255,255,.06);color:rgba(255,255,255,.3)}
+
+    /* Kanban */
+    .kanban{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px}
+    .kanban-col{background:#111;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px;min-height:200px}
+    .kanban-col-title{font-size:12px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
+    .kanban-col-title .count{background:rgba(255,255,255,.08);padding:1px 7px;border-radius:8px;font-size:10px}
+    .k-card{background:#1a1a1a;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:grab;transition:border-color .2s}
+    .k-card:hover{border-color:rgba(201,162,39,.25)}
+    .k-card-title{font-size:12px;font-weight:600;color:#fff;margin-bottom:2px}
+    .k-card-sub{font-size:11px;color:rgba(255,255,255,.35)}
+    .k-card-block{font-size:10px;color:#fc8181;margin-top:4px;padding:3px 6px;background:rgba(252,129,129,.08);border-radius:4px}
+    .k-card-actions{display:flex;gap:4px;margin-top:6px}
+    .k-btn{padding:3px 8px;border:1px solid rgba(255,255,255,.1);border-radius:5px;background:transparent;color:rgba(255,255,255,.5);font-size:10px;cursor:pointer;font-family:'Inter',sans-serif}
+    .k-btn:hover{border-color:#c9a227;color:#c9a227}
+
+    /* Bloqueos */
+    .bloq-card{background:#1a1a1a;border:1px solid rgba(252,129,129,.15);border-left:4px solid #fc8181;border-radius:10px;padding:14px 18px;margin-bottom:10px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+    .bloq-info{flex:1;min-width:200px}
+    .bloq-title{font-size:13px;font-weight:600;color:#fff}
+    .bloq-sub{font-size:11px;color:rgba(255,255,255,.4)}
+    .bloq-days{font-size:12px;font-weight:700;color:#fc8181}
+    .bloq-actions{display:flex;gap:6px}
+
+    /* Standup */
+    .standup-form{background:#1a1a1a;border:1px solid rgba(201,162,39,.15);border-radius:12px;padding:24px;margin-bottom:24px}
+    .standup-form h3{font-size:16px;color:#c9a227;margin-bottom:14px}
+    .sf-field{margin-bottom:14px}
+    .sf-field label{font-size:12px;font-weight:600;color:rgba(255,255,255,.5);display:block;margin-bottom:4px}
+    .sf-field textarea{width:100%;padding:10px 14px;background:#111;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#e0e0e0;font-size:13px;font-family:'Inter',sans-serif;resize:vertical;min-height:60px}
+    .sf-field textarea:focus{outline:none;border-color:#c9a227}
+    .standup-done{background:#111;border:1px solid rgba(104,211,145,.15);border-radius:10px;padding:16px;text-align:center;color:#68d391;font-size:14px;margin-bottom:24px}
+
+    .btn-primary{padding:10px 24px;background:linear-gradient(135deg,#c9a227,#d4af37);color:#000;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif}
+    .btn-primary:hover{opacity:.9}
+    .btn-outline{padding:8px 16px;border:1px solid rgba(201,162,39,.3);border-radius:8px;background:transparent;color:#c9a227;font-size:12px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;text-decoration:none}
+    .btn-outline:hover{background:rgba(201,162,39,.1)}
+    .btn-danger{padding:6px 14px;border:1px solid rgba(252,129,129,.3);border-radius:8px;background:transparent;color:#fc8181;font-size:11px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif}
+    .btn-success{padding:6px 14px;border:1px solid rgba(104,211,145,.3);border-radius:8px;background:transparent;color:#68d391;font-size:11px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif}
+
+    /* Referidos table */
+    .ref-table{width:100%;border-collapse:collapse}
+    .ref-table th{text-align:left;font-size:11px;color:rgba(255,255,255,.4);padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.08)}
+    .ref-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px}
+
+    /* Modal sprint */
+    .modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;display:none;align-items:center;justify-content:center;padding:20px}
+    .modal-ov.open{display:flex}
+    .modal-box{background:#1a1a1a;border:1px solid rgba(201,162,39,.2);border-radius:14px;max-width:500px;width:100%;padding:28px;position:relative}
+    .modal-box h3{font-size:16px;color:#c9a227;margin-bottom:14px}
+    .modal-close{position:absolute;top:12px;right:16px;background:none;border:none;color:rgba(255,255,255,.4);font-size:22px;cursor:pointer}
+    .mf-field{margin-bottom:12px}
+    .mf-field label{font-size:12px;font-weight:600;color:rgba(255,255,255,.5);display:block;margin-bottom:4px}
+    .mf-field input,.mf-field textarea,.mf-field select{width:100%;padding:10px 14px;background:#111;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#e0e0e0;font-size:13px;font-family:'Inter',sans-serif}
+    .mf-field input:focus,.mf-field textarea:focus{outline:none;border-color:#c9a227}
+
+    /* Sprint review card */
+    .review-card{background:#1a1a1a;border:1px solid rgba(201,162,39,.15);border-radius:12px;padding:20px;margin-bottom:16px}
+    .review-card h4{font-size:14px;color:#c9a227;margin-bottom:10px}
+    .review-bar{height:10px;background:rgba(255,255,255,.08);border-radius:6px;overflow:hidden;margin:8px 0}
+    .review-fill{height:100%;border-radius:6px;transition:width .4s}
+    .review-pct{font-size:12px;color:rgba(255,255,255,.5)}
+
+    @media(max-width:900px){
+      .kanban{grid-template-columns:1fr 1fr;gap:8px}
+    }
+    @media(max-width:600px){
+      .kanban{grid-template-columns:1fr}
+      .kpi-grid{grid-template-columns:repeat(2,1fr)}
+    }
+  </style>
+</head>
+<body>
+  {% set page = 'restateflow' %}
+  {% include '_sidebar.html' %}
+  <div class="layout">
+  <div class="layout-main">
+  <div class="container">
+    <h1>REstateFlow</h1>
+    <p class="sub">Accountability &amp; KPIs — Control estrat&eacute;gico de la inmobiliaria</p>
+
+    <!-- Tabs -->
+    <div class="tabs">
+      <a href="/restateflow" class="tab {{ 'active' if vista == 'dashboard' }}">Dashboard</a>
+      <a href="/restateflow?vista=scrum" class="tab {{ 'active' if vista == 'scrum' }}">Scrum Board</a>
+      <a href="/restateflow?vista=referidos" class="tab {{ 'active' if vista == 'referidos' }}">KPIs Referidos</a>
+      {% if user.rol == 'admin' %}
+      <a href="/restateflow?vista=review" class="tab {{ 'active' if vista == 'review' }}">Sprint Review</a>
+      {% endif %}
+    </div>
+
+    {% if vista == 'dashboard' %}
+    <!-- ═══ DASHBOARD KPIs ═══ -->
+
+    {% if user.rol == 'admin' %}
+    <!-- Vista admin: todos los agentes -->
+    <div class="section">
+      <div class="section-title">KPIs por Agente</div>
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-num yellow">{{ kpis_global.total_propiedades }}</div>
+          <div class="kpi-label">Propiedades activas</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-num green">{{ kpis_global.total_ventas }}</div>
+          <div class="kpi-label">Ventas cerradas</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-num red">{{ kpis_global.total_docs_pendientes }}</div>
+          <div class="kpi-label">Docs pendientes &gt;72h</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-num blue">{{ kpis_global.total_prospectos }}</div>
+          <div class="kpi-label">Prospectos (30d)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-num purple">{{ bloqueos_activos|length }}</div>
+          <div class="kpi-label">Bloqueos activos</div>
+        </div>
+      </div>
+
+      <table class="agent-table">
+        <thead>
+          <tr>
+            <th>Agente</th>
+            <th>Propiedades (30d)</th>
+            <th>Total activas</th>
+            <th>Ventas</th>
+            <th>Ratio cierre</th>
+            <th>Docs &gt;72h</th>
+            <th>Sin docs</th>
+            <th>Sem&aacute;foro</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for a in agentes_kpis %}
+          <tr>
+            <td>
+              <span class="agent-name">{{ a.nombre }}</span>
+              <span class="agent-role">{{ a.rol }}</span>
+            </td>
+            <td>{{ a.propiedades_activas_30d }}</td>
+            <td>{{ a.total_asignadas }}</td>
+            <td style="color:#68d391;font-weight:600;">{{ a.ventas_completadas }}</td>
+            <td>
+              {% if a.ratio_cierre >= 30 %}<span style="color:#68d391;font-weight:600;">{{ a.ratio_cierre }}%</span>
+              {% elif a.ratio_cierre >= 15 %}<span style="color:#c9a227;">{{ a.ratio_cierre }}%</span>
+              {% else %}<span style="color:#fc8181;">{{ a.ratio_cierre }}%</span>{% endif %}
+            </td>
+            <td>{% if a.docs_pendientes_72h > 0 %}<span style="color:#fc8181;font-weight:600;">{{ a.docs_pendientes_72h }}</span>{% else %}0{% endif %}</td>
+            <td>{{ a.clientes_sin_docs }}</td>
+            <td>
+              {% if a.ratio_cierre >= 30 and a.docs_pendientes_72h == 0 %}<span class="semaforo sem-verde"></span>Cumple
+              {% elif a.ratio_cierre >= 15 or a.docs_pendientes_72h <= 2 %}<span class="semaforo sem-amarillo"></span>Cerca
+              {% else %}<span class="semaforo sem-rojo"></span>Bajo{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <!-- Vista agente: sus KPIs individuales -->
+    <div class="section">
+      <div class="section-title">Mis KPIs</div>
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <div class="kpi-num yellow">{{ mis_kpis.propiedades_activas_30d }}</div>
+          <div class="kpi-label">Propiedades nuevas (30d)</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-num">{{ mis_kpis.total_asignadas }}</div>
+          <div class="kpi-label">Total activas</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-num green">{{ mis_kpis.ventas_completadas }}</div>
+          <div class="kpi-label">Ventas cerradas</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-num {% if mis_kpis.ratio_cierre >= 30 %}green{% elif mis_kpis.ratio_cierre >= 15 %}yellow{% else %}red{% endif %}">{{ mis_kpis.ratio_cierre }}%</div>
+          <div class="kpi-label">Ratio cierre</div>
+          <div class="kpi-sub">
+            {% if mis_kpis.ratio_cierre >= 30 %}<span class="semaforo sem-verde"></span>Cumple meta
+            {% elif mis_kpis.ratio_cierre >= 15 %}<span class="semaforo sem-amarillo"></span>Cerca de meta
+            {% else %}<span class="semaforo sem-rojo"></span>Bajo meta{% endif %}
+          </div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-num red">{{ mis_kpis.docs_pendientes_72h }}</div>
+          <div class="kpi-label">Docs pendientes &gt;72h</div>
+        </div>
+        <div class="kpi-card">
+          <div class="kpi-num gray">{{ mis_kpis.clientes_sin_docs }}</div>
+          <div class="kpi-label">Clientes sin docs</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Daily Standup -->
+    <div class="section">
+      <div class="section-title">Daily Standup</div>
+      {% if standup_hoy %}
+      <div class="standup-done">
+        &#x2705; Ya completaste tu standup de hoy
+        <div style="font-size:12px;color:rgba(255,255,255,.4);margin-top:6px">
+          <strong>Avance:</strong> {{ standup_hoy.que_avance }}<br/>
+          {% if standup_hoy.bloqueos %}<strong>Bloqueos:</strong> {{ standup_hoy.bloqueos }}<br/>{% endif %}
+          <strong>Plan:</strong> {{ standup_hoy.plan_hoy }}
+        </div>
+      </div>
+      {% else %}
+      <form class="standup-form" method="post" action="/restateflow/standup">
+        <h3>&#x1F4AC; &iquest;C&oacute;mo va tu d&iacute;a?</h3>
+        <div class="sf-field">
+          <label>&iquest;Qu&eacute; transacci&oacute;n avanzaste ayer?</label>
+          <textarea name="que_avance" required placeholder="Ej: Avancé con los documentos del vendedor de la casa en Col. Centro..."></textarea>
+        </div>
+        <div class="sf-field">
+          <label>&iquest;Tienes alg&uacute;n bloqueo?</label>
+          <textarea name="bloqueos" placeholder="Ej: El vendedor no ha enviado escrituras, llevo 3 días esperando..."></textarea>
+        </div>
+        <div class="sf-field">
+          <label>&iquest;Qu&eacute; planeas hacer hoy?</label>
+          <textarea name="plan_hoy" required placeholder="Ej: Contactar al comprador para agendar cita notarial..."></textarea>
+        </div>
+        <button type="submit" class="btn-primary">Enviar standup</button>
+      </form>
+      {% endif %}
+    </div>
+
+    <!-- Bloqueos activos (solo si hay) -->
+    {% if bloqueos_activos %}
+    <div class="section">
+      <div class="section-title" style="color:#fc8181;">Bloqueos activos ({{ bloqueos_activos|length }})</div>
+      {% for b in bloqueos_activos %}
+      <div class="bloq-card">
+        <div class="bloq-info">
+          <div class="bloq-title">{{ b.descripcion }}</div>
+          <div class="bloq-sub">{{ b.tipo_propiedad }} — {{ b.direccion }}, {{ b.ciudad }} &middot; {{ b.agente_nombre }}</div>
+          {% if b.categoria %}<div class="bloq-sub" style="color:#c9a227;">{{ b.categoria }}</div>{% endif %}
+        </div>
+        <div class="bloq-days">{{ b.dias_abierto|int }}d</div>
+        {% if user.rol == 'admin' %}
+        <div class="bloq-actions">
+          <form method="post" action="/restateflow/bloqueo/{{ b.id }}/resolver" style="display:inline">
+            <input type="hidden" name="accion" value="Resuelta por admin"/>
+            <button type="submit" class="btn-success">Resolver</button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% elif vista == 'scrum' %}
+    <!-- ═══ SCRUM BOARD ═══ -->
+    <div class="section">
+      {% if sprint %}
+      <div class="section-title">
+        Sprint: {{ sprint.nombre }}
+        <span class="badge badge-active">{{ sprint.fecha_inicio }} → {{ sprint.fecha_fin }}</span>
+        {% if sprint.meta_texto %}<span style="font-size:12px;color:rgba(255,255,255,.4);font-weight:400;font-family:'Inter',sans-serif;">Meta: {{ sprint.meta_texto }}</span>{% endif %}
+      </div>
+
+      <!-- Kanban Board -->
+      <div class="kanban">
+        {% set columnas = [
+          ("para_esta_semana", "Para esta semana", ""),
+          ("en_progreso", "En progreso", ""),
+          ("bloqueado", "Bloqueado", "border-top:3px solid #fc8181"),
+          ("por_revisar", "Por revisar del cliente", ""),
+          ("completado", "Completado", "border-top:3px solid #68d391")
+        ] %}
+        {% for col_key, col_name, col_style in columnas %}
+        {% set col_items = sprint_items|selectattr("columna","equalto",col_key)|list %}
+        <div class="kanban-col" style="{{ col_style }}">
+          <div class="kanban-col-title">{{ col_name }} <span class="count">{{ col_items|length }}</span></div>
+          {% for item in col_items %}
+          <div class="k-card" data-id="{{ item.id }}">
+            <div class="k-card-title">{{ item.tipo_propiedad }} — {{ item.operacion }}</div>
+            <div class="k-card-sub">{{ item.direccion }}, {{ item.ciudad }}</div>
+            {% if item.vendedor_nombre %}<div class="k-card-sub">Vendedor: {{ item.vendedor_nombre }}</div>{% endif %}
+            {% if item.bloqueo_texto %}<div class="k-card-block">&#x26A0; {{ item.bloqueo_texto }}</div>{% endif %}
+            <div class="k-card-actions">
+              {% if col_key != 'en_progreso' %}<button class="k-btn" onclick="moverItem({{ item.id }},'en_progreso')">&#x25B6; Progreso</button>{% endif %}
+              {% if col_key != 'bloqueado' %}<button class="k-btn" onclick="moverItem({{ item.id }},'bloqueado')">&#x1F6D1; Bloq</button>{% endif %}
+              {% if col_key != 'por_revisar' %}<button class="k-btn" onclick="moverItem({{ item.id }},'por_revisar')">&#x23F3; Espera</button>{% endif %}
+              {% if col_key != 'completado' %}<button class="k-btn" onclick="moverItem({{ item.id }},'completado')" style="border-color:rgba(104,211,145,.3);color:#68d391;">&#x2705;</button>{% endif %}
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+        {% endfor %}
+      </div>
+
+      <!-- Agregar propiedad al sprint -->
+      {% if user.rol in ('admin','agente') %}
+      <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <form method="post" action="/restateflow/sprint/agregar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <input type="hidden" name="sprint_id" value="{{ sprint.id }}"/>
+          <select name="propiedad_id" class="mf-field" style="padding:8px 12px;background:#111;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#e0e0e0;font-size:12px;min-width:250px">
+            <option value="">— Agregar propiedad al sprint —</option>
+            {% for p in propiedades_disponibles %}
+            <option value="{{ p.id }}">{{ p.tipo_propiedad }} — {{ p.direccion }}, {{ p.ciudad }}</option>
+            {% endfor %}
+          </select>
+          <button type="submit" class="btn-outline">Agregar</button>
+        </form>
+        {% if user.rol == 'admin' %}
+        <form method="post" action="/restateflow/sprint/cerrar" style="display:inline" onsubmit="return confirm('&iquest;Cerrar este sprint? Se generar&aacute; el Sprint Review.')">
+          <input type="hidden" name="sprint_id" value="{{ sprint.id }}"/>
+          <button type="submit" class="btn-danger">Cerrar sprint</button>
+        </form>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% else %}
+      <!-- No hay sprint activo -->
+      <div style="text-align:center;padding:40px 20px;color:rgba(255,255,255,.35)">
+        <p style="font-size:16px;margin-bottom:12px">No hay sprint activo</p>
+        {% if user.rol == 'admin' %}
+        <button class="btn-primary" onclick="document.getElementById('modalSprint').classList.add('open')">Crear nuevo sprint</button>
+        {% else %}
+        <p style="font-size:13px;">El admin debe crear un nuevo sprint para comenzar.</p>
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {% if user.rol == 'admin' and sprint %}
+      <div style="margin-top:16px;">
+        <button class="btn-outline" onclick="document.getElementById('modalSprint').classList.add('open')">+ Nuevo sprint</button>
+      </div>
+      {% endif %}
+    </div>
+
+    {% elif vista == 'referidos' %}
+    <!-- ═══ KPIs REFERIDOS ═══ -->
+    <div class="section">
+      <div class="section-title">KPIs por Referido</div>
+      {% if referidos_kpis %}
+      <table class="ref-table">
+        <thead>
+          <tr>
+            <th>Referido</th>
+            <th>Prefijo</th>
+            <th>Clientes referidos</th>
+            <th>Convertidos</th>
+            <th>Ventas cerradas</th>
+            <th>&Uacute;ltima actividad</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in referidos_kpis %}
+          <tr>
+            <td class="agent-name">{{ r.nombre }}</td>
+            <td><span style="background:rgba(201,162,39,.15);color:#c9a227;padding:2px 8px;border-radius:6px;font-size:11px">{{ r.prefijo_whatsapp or '—' }}</span></td>
+            <td>{{ r.total_referidos }}</td>
+            <td style="color:#63b3ed;font-weight:600;">{{ r.convertidos }}</td>
+            <td style="color:#68d391;font-weight:600;">{{ r.ventas_cerradas }}</td>
+            <td style="font-size:12px;color:rgba(255,255,255,.4);">{{ r.ultima_actividad.strftime('%d/%m/%Y') if r.ultima_actividad else 'Sin actividad' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="color:rgba(255,255,255,.35);text-align:center;padding:40px;">No hay referidos registrados a&uacute;n.</p>
+      {% endif %}
+    </div>
+
+    {% elif vista == 'review' %}
+    <!-- ═══ SPRINT REVIEW ═══ -->
+    <div class="section">
+      <div class="section-title">Sprint Review</div>
+      {% if review_data and review_data.sprint %}
+      <div class="review-card">
+        <h4>{{ review_data.sprint.nombre }} ({{ review_data.sprint.fecha_inicio }} → {{ review_data.sprint.fecha_fin }})</h4>
+        <div style="display:flex;gap:20px;flex-wrap:wrap;margin-bottom:12px">
+          <div><span style="font-size:24px;font-weight:700;color:#68d391">{{ review_data.completados }}</span><span style="font-size:12px;color:rgba(255,255,255,.4);margin-left:4px">completados</span></div>
+          <div><span style="font-size:24px;font-weight:700;color:#c9a227">{{ review_data.total_items }}</span><span style="font-size:12px;color:rgba(255,255,255,.4);margin-left:4px">total</span></div>
+          <div><span style="font-size:24px;font-weight:700;color:#fc8181">{{ review_data.bloqueados_count }}</span><span style="font-size:12px;color:rgba(255,255,255,.4);margin-left:4px">bloqueados</span></div>
+        </div>
+        {% set pct = ((review_data.completados / review_data.total_items * 100)|round|int) if review_data.total_items > 0 else 0 %}
+        <div class="review-bar"><div class="review-fill" style="width:{{ pct }}%;background:{% if pct >= 80 %}#68d391{% elif pct >= 50 %}#c9a227{% else %}#fc8181{% endif %}"></div></div>
+        <div class="review-pct">{{ pct }}% completado</div>
+      </div>
+
+      <!-- Por agente -->
+      {% for aid, data in review_data.por_agente.items() %}
+      <div class="review-card">
+        {% set apct = ((data.completados / data.total * 100)|round|int) if data.total > 0 else 0 %}
+        <h4 style="font-size:13px;">Agente ID {{ aid }} — {{ data.completados }}/{{ data.total }} completadas</h4>
+        <div class="review-bar"><div class="review-fill" style="width:{{ apct }}%;background:{% if apct >= 80 %}#68d391{% elif apct >= 50 %}#c9a227{% else %}#fc8181{% endif %}"></div></div>
+        <div class="review-pct">{{ apct }}% &middot; {{ data.bloqueados }} bloqueados &middot; {{ data.en_progreso }} en progreso</div>
+      </div>
+      {% endfor %}
+
+      <!-- Top bloqueos -->
+      {% if review_data.top_bloqueos %}
+      <div class="review-card" style="border-color:rgba(252,129,129,.15)">
+        <h4 style="color:#fc8181">Top bloqueos recurrentes</h4>
+        {% for cat, count in review_data.top_bloqueos %}
+        <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:13px">
+          <span>{{ cat }}</span>
+          <span style="font-weight:600;color:#fc8181">{{ count }}x</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% else %}
+      <p style="color:rgba(255,255,255,.35);text-align:center;padding:40px;">Cierra un sprint para generar el review.</p>
+      {% endif %}
+
+      <!-- Historial de sprints -->
+      {% if sprints_historial %}
+      <div style="margin-top:24px;">
+        <h4 style="font-size:14px;color:rgba(255,255,255,.5);margin-bottom:10px;">Historial de sprints</h4>
+        {% for s in sprints_historial %}
+        <div style="display:flex;justify-content:space-between;padding:8px 12px;background:#1a1a1a;border-radius:8px;margin-bottom:6px;font-size:13px;align-items:center">
+          <span>{{ s.nombre }}</span>
+          <span style="font-size:11px;color:rgba(255,255,255,.3)">{{ s.fecha_inicio }} → {{ s.fecha_fin }}</span>
+          <span class="badge {{ 'badge-active' if s.estado == 'activo' else 'badge-closed' }}">{{ s.estado }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+  </div>
+  </div><!-- layout-main -->
+  </div><!-- layout -->
+
+  <!-- Modal crear sprint -->
+  <div class="modal-ov" id="modalSprint" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="modal-box">
+      <button class="modal-close" onclick="document.getElementById('modalSprint').classList.remove('open')">&times;</button>
+      <h3>Crear nuevo sprint</h3>
+      <form method="post" action="/restateflow/sprint/crear">
+        <div class="mf-field">
+          <label>Nombre del sprint</label>
+          <input type="text" name="nombre" required placeholder="Ej: Sprint Semana 15 — Abril"/>
+        </div>
+        <div class="mf-field">
+          <label>Fecha inicio</label>
+          <input type="date" name="fecha_inicio" required/>
+        </div>
+        <div class="mf-field">
+          <label>Fecha fin</label>
+          <input type="date" name="fecha_fin" required/>
+        </div>
+        <div class="mf-field">
+          <label>Meta del sprint</label>
+          <textarea name="meta_texto" placeholder="Ej: Cerrar 3 ventas, avanzar documentación de 5 propiedades" style="min-height:60px;resize:vertical"></textarea>
+        </div>
+        <button type="submit" class="btn-primary" style="width:100%;margin-top:8px">Crear sprint</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal bloqueo -->
+  <div class="modal-ov" id="modalBloqueo" onclick="if(event.target===this)this.classList.remove('open')">
+    <div class="modal-box">
+      <button class="modal-close" onclick="document.getElementById('modalBloqueo').classList.remove('open')">&times;</button>
+      <h3 style="color:#fc8181">Reportar bloqueo</h3>
+      <form method="post" action="/restateflow/bloqueo/crear" id="formBloqueo">
+        <input type="hidden" name="sprint_item_id" id="bloqItemId"/>
+        <div class="mf-field">
+          <label>Descripci&oacute;n del bloqueo</label>
+          <textarea name="descripcion" required placeholder="Ej: El vendedor no entrega escrituras desde hace 5 días..."></textarea>
+        </div>
+        <div class="mf-field">
+          <label>Categor&iacute;a</label>
+          <select name="categoria">
+            <option value="Documentos vendedor">Documentos vendedor</option>
+            <option value="Documentos comprador">Documentos comprador</option>
+            <option value="Cr&eacute;dito/Financiamiento">Cr&eacute;dito/Financiamiento</option>
+            <option value="Notar&iacute;a">Notar&iacute;a</option>
+            <option value="Legal">Legal</option>
+            <option value="Cliente no responde">Cliente no responde</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <button type="submit" class="btn-primary" style="width:100%;margin-top:8px;background:#fc8181;color:#000">Reportar bloqueo</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+  function moverItem(itemId, columna) {
+    if (columna === 'bloqueado') {
+      document.getElementById('bloqItemId').value = itemId;
+      document.getElementById('modalBloqueo').classList.add('open');
+      return;
+    }
+    var form = document.createElement('form');
+    form.method = 'POST';
+    form.action = '/restateflow/sprint/mover';
+    var f1 = document.createElement('input'); f1.type='hidden'; f1.name='item_id'; f1.value=itemId; form.appendChild(f1);
+    var f2 = document.createElement('input'); f2.type='hidden'; f2.name='columna'; f2.value=columna; form.appendChild(f2);
+    document.body.appendChild(form);
+    form.submit();
+  }
+  </script>
+</body>
+</html>
