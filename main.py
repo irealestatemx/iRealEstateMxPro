@@ -3840,6 +3840,25 @@ async def admin_update_prospecto_estado(
     return RedirectResponse("/admin/prospectos", status_code=302)
 
 
+@app.post("/mis-prospectos/{prospecto_id}/estado")
+async def referido_update_prospecto_estado(
+    request: Request,
+    prospecto_id: int,
+    estado: str = Form(...),
+):
+    user = await require_auth(request)
+    if not user:
+        return RedirectResponse("/login", status_code=302)
+    # Verificar que el prospecto pertenece al referido
+    prospecto = await get_prospecto_by_id(prospecto_id)
+    if not prospecto or prospecto["referido_id"] != user["id"]:
+        return RedirectResponse("/mis-prospectos", status_code=302)
+    estados_validos = ["nuevo", "contactado", "cita_agendada", "cita_asistio", "en_negociacion", "venta_cerrada", "perdido"]
+    if estado in estados_validos:
+        await update_prospecto(prospecto_id, {"estado": estado})
+    return RedirectResponse("/mis-prospectos", status_code=302)
+
+
 @app.post("/admin/prospectos/crear")
 async def admin_create_prospecto(
     request: Request,
