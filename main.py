@@ -3915,6 +3915,7 @@ _active_chats: Dict[str, float] = {}  # telefono -> timestamp de cuando se activ
 _bot_last_sent: Dict[str, float] = {}  # telefono -> timestamp de cuando el bot envio su ultima respuesta
 _last_processed: Dict[str, float] = {}  # telefono -> timestamp de ultimo process:true (cooldown anti-doble)
 _seen_messages: Dict[str, float] = {}  # "phone:hash" -> timestamp (dedup exacto)
+_phone_locks: Dict[str, asyncio.Lock] = {}  # lock por teléfono para evitar procesamiento concurrente
 PROCESS_COOLDOWN = 30  # segundos de cooldown después de responder (anti-doble respuesta)
 PAUSE_DURATION = 3600 * 24  # 24 horas de pausa cuando Esteban escribe manualmente
 ACTIVE_DURATION = 60 * 30  # 30 minutos de actividad máxima del bot
@@ -4355,8 +4356,20 @@ async def whatsapp_debounce(request: Request):
     if phone in _message_buffer and _message_buffer[phone]["sequence"] != my_sequence:
         return JSONResponse({"process": False, "reason": "debounce_waiting"})
 
-    # Somos el último mensaje, combinar todo y responder
-    if phone in _message_buffer:
+    # Lock por teléfono: evita que dos requests procesen al mismo tiempo
+    if phone not in _phone_locks:
+        _phone_locks[phone] = asyncio.Lock()
+    async with _phone_locks[phone]:
+
+        # Re-verificar cooldown dentro del lock (otro request pudo haber procesado mientras esperábamos)
+        if phone in _last_processed and (time.time() - _last_processed[phone]) < PROCESS_COOLDOWN:
+            print(f"[BOT] Cooldown post-lock para {phone} → ignorar")
+            return JSONResponse({"process": False, "reason": "cooldown_post_lock"})
+
+        # Somos el último mensaje, combinar todo y responder
+        if phone not in _message_buffer:
+            return JSONResponse({"process": False, "reason": "already_processed"})
+
         final = _message_buffer.pop(phone)
         combined = "\n".join(final["messages"])
 
