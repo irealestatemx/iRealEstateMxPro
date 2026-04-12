@@ -3913,6 +3913,9 @@ _kommo_created: Dict[str, float] = {}  # telefono -> timestamp de ultimo lead cr
 _paused_chats: Dict[str, float] = {}  # telefono -> timestamp de cuando se pauso
 _active_chats: Dict[str, float] = {}  # telefono -> timestamp de cuando se activo la conversacion
 _bot_last_sent: Dict[str, float] = {}  # telefono -> timestamp de cuando el bot envio su ultima respuesta
+_last_processed: Dict[str, float] = {}  # telefono -> timestamp de ultimo process:true (cooldown anti-doble)
+_seen_messages: Dict[str, float] = {}  # "phone:hash" -> timestamp (dedup exacto)
+PROCESS_COOLDOWN = 30  # segundos de cooldown después de responder (anti-doble respuesta)
 PAUSE_DURATION = 3600 * 24  # 24 horas de pausa cuando Esteban escribe manualmente
 ACTIVE_DURATION = 60 * 30  # 30 minutos de actividad máxima del bot
 BOT_ECHO_WINDOW = 90  # segundos para considerar un fromMe como eco del bot (no de Esteban)
@@ -4261,6 +4264,24 @@ async def whatsapp_debounce(request: Request):
         print(f"[BOT] Teléfono {phone} está BLOQUEADO → ignorar")
         return JSONResponse({"process": False, "reason": "blocked_phone"})
 
+    # ─── 0b. Dedup: ignorar mensaje exacto duplicado (mismo phone+texto en <15s) ───
+    import hashlib
+    msg_hash = hashlib.md5(f"{phone}:{message}".encode()).hexdigest()[:12]
+    dedup_key = f"{phone}:{msg_hash}"
+    if dedup_key in _seen_messages and (now - _seen_messages[dedup_key]) < 15:
+        print(f"[BOT] Mensaje duplicado de {phone} → ignorar")
+        return JSONResponse({"process": False, "reason": "duplicate_message"})
+    _seen_messages[dedup_key] = now
+    # Limpiar entradas viejas de dedup (>60s)
+    _seen_messages_expired = [k for k, v in _seen_messages.items() if now - v > 60]
+    for k in _seen_messages_expired:
+        _seen_messages.pop(k, None)
+
+    # ─── 0c. Cooldown: si el bot acaba de responder a este phone, no procesar ───
+    if phone in _last_processed and (now - _last_processed[phone]) < PROCESS_COOLDOWN:
+        print(f"[BOT] Cooldown activo para {phone} ({now - _last_processed[phone]:.0f}s) → ignorar")
+        return JSONResponse({"process": False, "reason": "cooldown"})
+
     # ─── 1. Si fromMe → ¿es eco del bot o Esteban escribiendo? ───
     if from_me:
         last_bot = _bot_last_sent.get(phone, 0)
@@ -4389,6 +4410,7 @@ async def whatsapp_debounce(request: Request):
 
         # ─── Marcar que el bot va a responder (para ignorar el eco fromMe) ───
         _bot_last_sent[phone] = time.time()
+        _last_processed[phone] = time.time()  # Cooldown anti-doble respuesta
 
         return JSONResponse({
             "process": True,
