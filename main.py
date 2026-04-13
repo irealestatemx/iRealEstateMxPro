@@ -3919,7 +3919,7 @@ _phone_locks: Dict[str, asyncio.Lock] = {}  # lock por teléfono para evitar pro
 PROCESS_COOLDOWN = 30  # segundos de cooldown después de responder (anti-doble respuesta)
 PAUSE_DURATION = 3600 * 24  # 24 horas de pausa cuando Esteban escribe manualmente
 ACTIVE_DURATION = 60 * 30  # 30 minutos de actividad máxima del bot
-BOT_ECHO_WINDOW = 90  # segundos para considerar un fromMe como eco del bot (no de Esteban)
+BOT_ECHO_WINDOW = 8  # segundos: solo el eco inmediato del bot (WAHA reenvía en <5s)
 
 # Números bloqueados: el bot NUNCA se activa con estos teléfonos
 # (desarrolladores, dueños de fraccionamiento, proveedores, etc.)
@@ -4278,27 +4278,28 @@ async def whatsapp_debounce(request: Request):
     for k in _seen_messages_expired:
         _seen_messages.pop(k, None)
 
-    # ─── 0c. Cooldown: si el bot acaba de responder a este phone, no procesar ───
-    if phone in _last_processed and (now - _last_processed[phone]) < PROCESS_COOLDOWN:
-        print(f"[BOT] Cooldown activo para {phone} ({now - _last_processed[phone]:.0f}s) → ignorar")
-        return JSONResponse({"process": False, "reason": "cooldown"})
-
     # ─── 1. Si fromMe → ¿es eco del bot o Esteban escribiendo? ───
+    # IMPORTANTE: este check va ANTES del cooldown para que siempre pausemos si Esteban escribe
     if from_me:
         last_bot = _bot_last_sent.get(phone, 0)
         seconds_since_bot = now - last_bot
         if seconds_since_bot < BOT_ECHO_WINDOW:
-            # El bot acaba de responder → este fromMe es el eco del bot, ignorar
+            # El bot acaba de responder (<8s) → este fromMe es el eco del bot, ignorar
             print(f"[BOT] Eco del bot en {phone} (hace {seconds_since_bot:.0f}s) → ignorar")
             return JSONResponse({"process": False, "reason": "bot_echo"})
         else:
-            # No hay respuesta reciente del bot → Esteban escribió manualmente → pausar
+            # Esteban escribió manualmente → pausar bot 24h
             _paused_chats[phone] = now
             _active_chats.pop(phone, None)
-            if phone in _message_buffer:
-                _message_buffer.pop(phone, None)
-            print(f"[BOT] Esteban escribió en {phone} → bot pausado 4h")
+            _message_buffer.pop(phone, None)
+            _last_processed.pop(phone, None)
+            print(f"[BOT] Esteban escribió en {phone} → bot pausado 24h")
             return JSONResponse({"process": False, "reason": "fromMe_paused"})
+
+    # ─── 1b. Cooldown: si el bot acaba de responder a este phone, no procesar ───
+    if phone in _last_processed and (now - _last_processed[phone]) < PROCESS_COOLDOWN:
+        print(f"[BOT] Cooldown activo para {phone} ({now - _last_processed[phone]:.0f}s) → ignorar")
+        return JSONResponse({"process": False, "reason": "cooldown"})
 
     # ─── 2. Verificar si el bot está pausado ───
     if phone in _paused_chats:
