@@ -2146,7 +2146,12 @@ async def dashboard(request: Request, agente: Optional[str] = None):
 
 
 @app.get("/dashboard/editar/{prop_id}", response_class=HTMLResponse)
-async def edit_property_page(request: Request, prop_id: int):
+async def edit_property_page(
+    request: Request, prop_id: int,
+    warn_desasignar: Optional[str] = None,
+    pending_vendedor: Optional[str] = None,
+    pending_comprador: Optional[str] = None,
+):
     user = await require_auth(request)
     if not user:
         return RedirectResponse("/login", status_code=302)
@@ -2170,6 +2175,9 @@ async def edit_property_page(request: Request, prop_id: int):
         "vendedores": vendedores + agentes_admins,
         "compradores": compradores + agentes_admins,
         "desarrollos_dict": DESARROLLOS_DATA,
+        "warn_desasignar": warn_desasignar,
+        "pending_vendedor": pending_vendedor or "",
+        "pending_comprador": pending_comprador or "",
     })
 
 
@@ -2355,6 +2363,7 @@ async def asignar_vendedor_comprador(
     prop_id: int,
     vendedor_id: Optional[str] = Form(None),
     comprador_id: Optional[str] = Form(None),
+    confirmar_desasignar: Optional[str] = Form(None),
 ):
     user = await require_auth(request)
     if not user:
@@ -2368,11 +2377,36 @@ async def asignar_vendedor_comprador(
     if user["rol"] != "admin" and prop.get("user_id") != user["id"]:
         return RedirectResponse("/dashboard", status_code=302)
 
+    new_vendedor = int(vendedor_id) if vendedor_id else None
+    new_comprador = int(comprador_id) if comprador_id else None
+
+    # Si se está quitando un vendedor/comprador que ya tenía, verificar documentos
+    if not confirmar_desasignar:
+        docs = await get_documentos_by_propiedad(prop_id)
+        advertencias = []
+        if prop.get("vendedor_id") and not new_vendedor:
+            docs_vendedor = [d for d in docs if d.get("categoria") == "vendedor"]
+            if docs_vendedor:
+                advertencias.append(f"El vendedor actual tiene {len(docs_vendedor)} documento(s) subido(s).")
+        if prop.get("comprador_id") and not new_comprador:
+            docs_comprador = [d for d in docs if d.get("categoria") == "comprador"]
+            if docs_comprador:
+                advertencias.append(f"El comprador actual tiene {len(docs_comprador)} documento(s) subido(s).")
+        if advertencias:
+            # Redirigir con advertencia para confirmar
+            import urllib.parse
+            msg = " ".join(advertencias) + " ¿Deseas continuar?"
+            return RedirectResponse(
+                f"/dashboard/editar/{prop_id}?warn_desasignar={urllib.parse.quote(msg)}"
+                f"&pending_vendedor={vendedor_id or ''}&pending_comprador={comprador_id or ''}",
+                status_code=302
+            )
+
     updates = {}
     if vendedor_id is not None:
-        updates["vendedor_id"] = int(vendedor_id) if vendedor_id else None
+        updates["vendedor_id"] = new_vendedor
     if comprador_id is not None:
-        updates["comprador_id"] = int(comprador_id) if comprador_id else None
+        updates["comprador_id"] = new_comprador
 
     if updates:
         await update_property(prop_id, updates)
@@ -4162,6 +4196,27 @@ async def chatbot_registrar_cita(request: Request):
                     f"Nueva cita: {nombre} - {desarrollo}", cuerpo_email
                 ))
 
+            # 5. Notificar al referido si el prospecto tiene uno
+            prospecto_actual = await get_prospecto_by_id(prospecto_id) if prospecto_id else None
+            referido_id = prospecto_actual.get("referido_id") if prospecto_actual else None
+            if referido_id:
+                referido_user = await get_user_by_id(referido_id)
+                if referido_user and referido_user.get("email"):
+                    cuerpo_referido = (
+                        f"¡Hola {referido_user['nombre']}! 🎉\n\n"
+                        f"Se registró una <b>nueva cita</b> de un cliente referido tuyo.\n\n"
+                        f"<b>Cliente:</b> {nombre}\n"
+                        f"<b>Desarrollo:</b> {desarrollo}\n"
+                        f"<b>Fecha:</b> {fecha}\n"
+                        f"<b>Hora:</b> {hora}\n\n"
+                        f"Revisa tu app para más detalles: "
+                        f"<a href='https://irealestatemx.com/mis-prospectos'>Ver mis prospectos</a>"
+                    )
+                    asyncio.create_task(enviar_email_notificacion(
+                        referido_user["email"], referido_user["nombre"],
+                        f"🏠 Tu referido {nombre} agendó una cita", cuerpo_referido
+                    ))
+
         return JSONResponse({
             "ok": True,
             "prospecto_id": prospecto_id,
@@ -4516,6 +4571,26 @@ async def api_citas_registrar(request: Request):
             "datos": {"cita_id": cita_id, "fecha": fecha, "hora": hora},
         })
 
+    # Notificar al referido si el prospecto tiene uno
+    if prospecto and prospecto.get("referido_id"):
+        referido_user = await get_user_by_id(prospecto["referido_id"])
+        if referido_user and referido_user.get("email"):
+            cuerpo_referido = (
+                f"¡Hola {referido_user['nombre']}! 🎉\n\n"
+                f"Se registró una <b>nueva cita</b> de un cliente referido tuyo.\n\n"
+                f"<b>Cliente:</b> {nombre}\n"
+                f"<b>Desarrollo:</b> {desarrollo}\n"
+                f"<b>Fecha:</b> {fecha}\n"
+                f"<b>Hora:</b> {hora}\n\n"
+                f"Revisa tu app para más detalles: "
+                f"<a href='https://irealestatemx.com/mis-prospectos'>Ver mis prospectos</a>"
+            )
+            import asyncio
+            asyncio.create_task(enviar_email_notificacion(
+                referido_user["email"], referido_user["nombre"],
+                f"🏠 Tu referido {nombre} agendó una cita", cuerpo_referido
+            ))
+
     print(f"[CITA] Nueva cita #{cita_id} — {nombre} → {fecha} {hora} ({desarrollo})")
     return JSONResponse({
         "ok": True,
@@ -4615,7 +4690,7 @@ DESARROLLOS_DATA = {
             "Promoción vigente",
         ],
         "tags": ["Alta plusvalía", "Casas nuevas", "Personalizable"],
-        "pdf_url": "/static/docs/carcamos-residencial.pdf",
+        "pdf_url": "https://api.irealestatemx.cloud/static/docs/carcamos-residencial.pdf",
     },
     "privada-del-fresno": {
         "slug": "privada-del-fresno",
@@ -4636,7 +4711,7 @@ DESARROLLOS_DATA = {
             "Entrega en 7 meses",
         ],
         "tags": ["Exclusivo", "Preventa", "Amenidades"],
-        "pdf_url": "/static/docs/privada-del-fresno.pdf",
+        "pdf_url": "https://api.irealestatemx.cloud/static/docs/privada-del-fresno.pdf",
     },
 }
 
@@ -5407,7 +5482,12 @@ async def api_chatbot_search(
         })
 
     devs_resumen = []
+    base = "https://api.irealestatemx.cloud"
     for d in devs:
+        raw_pdf = d.get("pdf_url") or ""
+        pdf_full = raw_pdf if raw_pdf.startswith("http") else f"{base}{raw_pdf}" if raw_pdf else None
+        raw_foto = d.get("foto_portada_url") or ""
+        foto_full = raw_foto if raw_foto.startswith("http") else f"{base}{raw_foto}" if raw_foto else None
         devs_resumen.append({
             "id": d["id"],
             "tipo": "desarrollo",
@@ -5419,8 +5499,8 @@ async def api_chatbot_search(
             "descripcion": (d.get("descripcion", "") or "")[:300],
             "caracteristicas": d.get("caracteristicas"),
             "amenidades": d.get("amenidades", []),
-            "pdf_url": d.get("pdf_url"),
-            "foto": d.get("foto_portada_url"),
+            "pdf_url": pdf_full,
+            "foto": foto_full,
             "agente_nombre": d.get("agente_nombre"),
             "agente_telefono": d.get("agente_telefono"),
         })

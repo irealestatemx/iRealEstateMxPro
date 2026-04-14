@@ -223,6 +223,21 @@
     <!-- ═══ Asignación de vendedor y comprador ═══ -->
     <div class="card">
       <h2 style="font-size:18px;color:#c9a227;margin-bottom:16px;font-family:'Playfair Display',serif;">Asignar clientes</h2>
+
+      {% if warn_desasignar %}
+      <div style="background:rgba(231,76,60,.15);border:1px solid rgba(231,76,60,.4);border-radius:10px;padding:16px;margin-bottom:16px;">
+        <p style="color:#e74c3c;font-size:14px;font-weight:600;margin-bottom:8px;">Advertencia</p>
+        <p style="color:#e0e0e0;font-size:13px;margin-bottom:12px;">{{ warn_desasignar }}</p>
+        <form method="post" action="/dashboard/editar/{{ prop.id }}/asignar" style="display:flex;gap:8px;">
+          <input type="hidden" name="vendedor_id" value="{{ pending_vendedor }}">
+          <input type="hidden" name="comprador_id" value="{{ pending_comprador }}">
+          <input type="hidden" name="confirmar_desasignar" value="1">
+          <button type="submit" style="background:#e74c3c;color:#fff;border:none;border-radius:8px;padding:8px 20px;font-size:13px;font-weight:600;cursor:pointer;">Si, quitar asignacion</button>
+          <a href="/dashboard/editar/{{ prop.id }}" style="background:#333;color:#e0e0e0;border-radius:8px;padding:8px 20px;font-size:13px;font-weight:600;text-decoration:none;display:inline-block;">Cancelar</a>
+        </form>
+      </div>
+      {% endif %}
+
       <form method="post" action="/dashboard/editar/{{ prop.id }}/asignar">
         <div class="form-grid">
           <div class="form-group">
@@ -251,7 +266,7 @@
           </div>
         </div>
         <div class="btn-row" style="margin-top:4px;">
-          <button type="submit" class="btn-save" style="padding:10px 24px;font-size:13px;">Guardar asignación</button>
+          <button type="submit" class="btn-save" style="padding:10px 24px;font-size:13px;">Guardar asignacion</button>
         </div>
       </form>
     </div>
