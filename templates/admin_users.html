@@ -24,6 +24,7 @@
     .badge-referido { background: rgba(39,174,96,.2); color: #2ecc71; }
     .badge-vendedor { background: rgba(52,152,219,.2); color: #3498db; }
     .badge-comprador { background: rgba(155,89,182,.2); color: #9b59b6; }
+    .badge-pm { background: rgba(230,126,34,.2); color: #e67e22; }
     .badge-activo { background: rgba(39,174,96,.2); color: #2ecc71; }
     .badge-inactivo { background: rgba(192,57,43,.2); color: #e74c3c; }
     .btn-sm {
@@ -168,6 +169,7 @@
             <label>Rol</label>
             <select name="rol" id="rol-select" onchange="togglePrefijo()">
               <option value="agente">Agente</option>
+              <option value="pm">Project Manager (PM)</option>
               <option value="vendedor">Vendedor</option>
               <option value="comprador">Comprador</option>
               <option value="referido">Referido</option>
@@ -181,6 +183,15 @@
           <div>
             <label>Teléfono</label>
             <input type="text" name="telefono" placeholder="Ej: 4771234567" maxlength="20"/>
+          </div>
+          <div id="pm-group">
+            <label>PM responsable (solo agentes)</label>
+            <select name="pm_id">
+              <option value="">— Sin PM —</option>
+              {% for pm in pms_disponibles or [] %}
+              <option value="{{ pm.id }}">{{ pm.nombre }} ({{ pm.rol }})</option>
+              {% endfor %}
+            </select>
           </div>
           <div class="full">
             <button type="submit" class="btn-add">Agregar usuario</button>
@@ -205,10 +216,11 @@
               <span>📧 {{ u.email }}</span>
               {% if u.prefijo_whatsapp %}<span>🏷️ {{ u.prefijo_whatsapp }}</span>{% endif %}
               {% if u.telefono %}<span>📱 {{ u.telefono }}</span>{% endif %}
+              {% if u.pm_nombre %}<span>👤 PM: {{ u.pm_nombre }}</span>{% endif %}
             </div>
           </div>
           <div class="user-actions">
-            <button type="button" class="btn-sm btn-edit" onclick="openEditModal({{ u.id }}, '{{ u.nombre|e }}', '{{ u.email|e }}', '{{ u.rol }}', '{{ u.prefijo_whatsapp or '' }}', '{{ u.telefono or '' }}')">Editar</button>
+            <button type="button" class="btn-sm btn-edit" onclick="openEditModal({{ u.id }}, '{{ u.nombre|e }}', '{{ u.email|e }}', '{{ u.rol }}', '{{ u.prefijo_whatsapp or '' }}', '{{ u.telefono or '' }}', '{{ u.pm_id or '' }}')">Editar</button>
             {% if u.id != user.id %}
             <form method="post" action="/admin/usuarios/{{ u.id }}/toggle" style="display:inline">
               <button type="submit" class="btn-sm btn-toggle">
@@ -246,6 +258,7 @@
             <label>Rol</label>
             <select name="rol" id="edit-rol" onchange="toggleEditPrefijo()">
               <option value="agente">Agente</option>
+              <option value="pm">Project Manager (PM)</option>
               <option value="vendedor">Vendedor</option>
               <option value="comprador">Comprador</option>
               <option value="referido">Referido</option>
@@ -264,6 +277,15 @@
             <label>Nueva contraseña</label>
             <input type="password" name="password" id="edit-password" placeholder="Dejar vacío para no cambiar" autocomplete="new-password"/>
           </div>
+          <div class="full" id="edit-pm-group">
+            <label>PM responsable (solo agentes)</label>
+            <select name="pm_id" id="edit-pm-id">
+              <option value="">— Sin PM —</option>
+              {% for pm in pms_disponibles or [] %}
+              <option value="{{ pm.id }}">{{ pm.nombre }} ({{ pm.rol }})</option>
+              {% endfor %}
+            </select>
+          </div>
         </div>
         <div class="modal-actions">
           <button type="button" class="btn-cancel" onclick="closeEditModal()">Cancelar</button>
@@ -277,16 +299,20 @@
     function togglePrefijo() {
       var rol = document.getElementById('rol-select').value;
       var prefijoGroup = document.getElementById('prefijo-group');
+      var pmGroup = document.getElementById('pm-group');
       prefijoGroup.style.display = (rol === 'referido') ? 'block' : 'none';
+      if (pmGroup) pmGroup.style.display = (rol === 'agente') ? 'block' : 'none';
     }
     togglePrefijo();
 
     function toggleEditPrefijo() {
       var rol = document.getElementById('edit-rol').value;
       document.getElementById('edit-prefijo-group').style.display = (rol === 'referido') ? 'block' : 'none';
+      var pmG = document.getElementById('edit-pm-group');
+      if (pmG) pmG.style.display = (rol === 'agente') ? 'block' : 'none';
     }
 
-    function openEditModal(id, nombre, email, rol, prefijo, telefono) {
+    function openEditModal(id, nombre, email, rol, prefijo, telefono, pmId) {
       document.getElementById('editForm').action = '/admin/usuarios/' + id + '/editar';
       document.getElementById('edit-nombre').value = nombre;
       document.getElementById('edit-email').value = email;
@@ -294,6 +320,8 @@
       document.getElementById('edit-prefijo').value = prefijo;
       document.getElementById('edit-telefono').value = telefono;
       document.getElementById('edit-password').value = '';
+      var pmSel = document.getElementById('edit-pm-id');
+      if (pmSel) pmSel.value = pmId || '';
       toggleEditPrefijo();
       document.getElementById('editModal').classList.add('open');
     }

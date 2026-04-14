@@ -6,7 +6,7 @@
   </div>
 
   <nav class="sb-nav">
-    {% if user and user.rol in ('admin', 'agente') %}
+    {% if user and user.rol in ('admin', 'agente', 'pm') %}
     <!-- Propiedades (solo admin/agente) -->
     <div class="sb-section">PROPIEDADES</div>
     <a href="/" class="sb-link {{ 'active' if page == 'nueva' }}">

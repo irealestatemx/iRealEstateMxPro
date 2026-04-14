@@ -57,6 +57,12 @@ from database import (
     registrar_bloqueo, resolver_bloqueo, get_bloqueos_activos,
     get_kpis_agente, get_kpis_referido, get_kpis_todos_agentes, get_kpis_todos_referidos,
     get_sprint_review_data,
+    # PM + KPIs Formatos.xlsx
+    get_pms_disponibles, get_equipo_de_pm, asignar_pm_a_agente, get_user_with_pm,
+    KPI_TIPOS, get_kpi_goal, set_kpi_goal, registrar_kpi,
+    get_kpi_actuals_mes, get_kpi_actuals_semana, get_kpi_resumen_equipo,
+    guardar_accountability, get_accountability_semana, get_accountability_historial,
+    crear_sprint_pm, get_sprint_activo_pm,
 )
 
 # ─── Sesiones con cookie firmada ───
@@ -1979,9 +1985,10 @@ async def admin_users_page(request: Request):
     if not user or user["rol"] != "admin":
         return RedirectResponse("/login", status_code=302)
     users = await get_all_users()
+    pms_disponibles = await get_pms_disponibles()
     # Credenciales del usuario recién creado (si las hay en el query string)
     params = request.query_params
-    context = {"user": user, "users": users}
+    context = {"user": user, "users": users, "pms_disponibles": pms_disponibles}
     if params.get("created") == "1":
         context.update({
             "created": True,
@@ -2003,6 +2010,7 @@ async def admin_create_user(
     rol: str = Form("agente"),
     prefijo_whatsapp: str = Form(""),
     telefono: str = Form(""),
+    pm_id: str = Form(""),
 ):
     user = await require_auth(request)
     if not user or user["rol"] != "admin":
@@ -2015,6 +2023,11 @@ async def admin_create_user(
             updates["prefijo_whatsapp"] = prefijo_whatsapp.strip().upper()
         if telefono.strip():
             updates["telefono"] = telefono.strip()
+        if rol == "agente" and pm_id.strip():
+            try:
+                updates["pm_id"] = int(pm_id.strip())
+            except ValueError:
+                pass
         if updates:
             await update_user(user_id, updates)
         # Redirigir sin exponer contraseña en URL
@@ -2058,6 +2071,7 @@ async def admin_edit_user_submit(
     prefijo_whatsapp: str = Form(""),
     telefono: str = Form(""),
     password: str = Form(""),
+    pm_id: str = Form(""),
 ):
     user = await require_auth(request)
     if not user or user["rol"] != "admin":
@@ -2066,12 +2080,21 @@ async def admin_edit_user_submit(
     if not target:
         return RedirectResponse("/admin/usuarios", status_code=302)
 
+    # pm_id solo aplica cuando es agente; en cualquier otro caso lo reseteamos
+    pm_value = None
+    if rol == "agente" and pm_id.strip():
+        try:
+            pm_value = int(pm_id.strip())
+        except ValueError:
+            pm_value = None
+
     updates = {
         "nombre": nombre,
         "email": email,
         "rol": rol,
         "prefijo_whatsapp": prefijo_whatsapp.strip().upper() or None,
         "telefono": telefono.strip() or None,
+        "pm_id": pm_value,
     }
     if password.strip():
         updates["password"] = password.strip()
@@ -7090,18 +7113,31 @@ async def restateflow_page(request: Request, vista: str = "dashboard"):
     user = await require_auth(request)
     if not user:
         return RedirectResponse("/login", status_code=302)
-    if user["rol"] not in ("admin", "agente"):
+    if user["rol"] not in ("admin", "agente", "pm"):
         return RedirectResponse("/", status_code=302)
 
-    context = {"user": user, "vista": vista}
+    rol = user["rol"]
+    is_admin = (rol == "admin")
+    is_pm = (rol == "pm")
+    # IDs del equipo que puede ver el PM (sus agentes + el mismo)
+    team_ids = None
+    if is_pm:
+        equipo = await get_equipo_de_pm(user["id"])
+        team_ids = [a["id"] for a in equipo] + [user["id"]]
+
+    context = {"user": user, "vista": vista, "is_admin": is_admin, "is_pm": is_pm}
 
     # Sprint activo
     sprint = await get_sprint_activo()
     context["sprint"] = sprint
 
     # Bloqueos activos
-    if user["rol"] == "admin":
+    if is_admin:
         bloqueos = await get_bloqueos_activos()
+    elif is_pm and team_ids:
+        # Bloqueos del equipo
+        all_bloq = await get_bloqueos_activos()
+        bloqueos = [b for b in all_bloq if b.get("agente_id") in team_ids]
     else:
         bloqueos = await get_bloqueos_activos(agente_id=user["id"])
     context["bloqueos_activos"] = bloqueos
@@ -7110,7 +7146,7 @@ async def restateflow_page(request: Request, vista: str = "dashboard"):
         # Standup
         context["standup_hoy"] = await get_standup_hoy(user["id"])
 
-        if user["rol"] == "admin":
+        if is_admin:
             agentes_kpis = await get_kpis_todos_agentes()
             context["agentes_kpis"] = agentes_kpis
             context["kpis_global"] = {
@@ -7119,13 +7155,32 @@ async def restateflow_page(request: Request, vista: str = "dashboard"):
                 "total_docs_pendientes": sum(a["docs_pendientes_72h"] for a in agentes_kpis),
                 "total_prospectos": agentes_kpis[0]["prospectos_30d"] if agentes_kpis else 0,
             }
+        elif is_pm:
+            # KPIs de los agentes del equipo
+            equipo = await get_equipo_de_pm(user["id"])
+            agentes_kpis = []
+            for a in equipo:
+                kpis = await get_kpis_agente(a["id"])
+                a.update(kpis)
+                agentes_kpis.append(a)
+            context["agentes_kpis"] = agentes_kpis
+            context["kpis_global"] = {
+                "total_propiedades": sum(a["total_asignadas"] for a in agentes_kpis),
+                "total_ventas": sum(a["ventas_completadas"] for a in agentes_kpis),
+                "total_docs_pendientes": sum(a["docs_pendientes_72h"] for a in agentes_kpis),
+                "total_prospectos": agentes_kpis[0]["prospectos_30d"] if agentes_kpis else 0,
+            }
+            context["mis_kpis"] = await get_kpis_agente(user["id"])
         else:
             context["mis_kpis"] = await get_kpis_agente(user["id"])
 
     elif vista == "scrum":
         if sprint:
-            if user["rol"] == "admin":
+            if is_admin:
                 context["sprint_items"] = await get_sprint_items(sprint["id"])
+            elif is_pm and team_ids:
+                all_items = await get_sprint_items(sprint["id"])
+                context["sprint_items"] = [i for i in all_items if i.get("agente_id") in team_ids]
             else:
                 context["sprint_items"] = await get_sprint_items(sprint["id"], agente_id=user["id"])
             # Propiedades disponibles para agregar
@@ -7139,8 +7194,40 @@ async def restateflow_page(request: Request, vista: str = "dashboard"):
     elif vista == "referidos":
         context["referidos_kpis"] = await get_kpis_todos_referidos()
 
+    elif vista == "equipo":
+        # Vista PM: su equipo + KPIs Formatos.xlsx del mes actual
+        if not (is_pm or is_admin):
+            return RedirectResponse("/restateflow", status_code=302)
+        from datetime import datetime as _dt
+        now = _dt.now()
+        pm_id_view = user["id"] if is_pm else int(request.query_params.get("pm_id", 0) or 0)
+        if is_admin and not pm_id_view:
+            context["pms_disponibles"] = await get_pms_disponibles()
+            context["resumen_equipo"] = []
+        else:
+            context["resumen_equipo"] = await get_kpi_resumen_equipo(pm_id_view, now.year, now.month)
+            context["pm_id_view"] = pm_id_view
+            context["anio_view"] = now.year
+            context["mes_view"] = now.month
+
+    elif vista == "kpis":
+        # Vista individual: mis metas, mis registros, accountability
+        from datetime import datetime as _dt, timedelta as _td
+        now = _dt.now()
+        context["anio_view"] = now.year
+        context["mes_view"] = now.month
+        context["meta_mes"] = await get_kpi_goal(user["id"], now.year, now.month)
+        context["kpis_mes"] = await get_kpi_actuals_mes(user["id"], now.year, now.month)
+        # Lunes de esta semana
+        hoy = now.date()
+        lunes = hoy - _td(days=hoy.weekday())
+        context["semana_inicio"] = lunes
+        context["kpis_semana"] = await get_kpi_actuals_semana(user["id"], lunes)
+        context["accountability"] = await get_accountability_semana(user["id"], lunes)
+        context["historial_accountability"] = await get_accountability_historial(user["id"], limit=6)
+
     elif vista == "review":
-        if user["rol"] != "admin":
+        if not is_admin and not is_pm:
             return RedirectResponse("/restateflow", status_code=302)
         context["sprints_historial"] = await get_sprints_historial()
         # Último sprint cerrado para review
@@ -7159,26 +7246,33 @@ async def restateflow_page(request: Request, vista: str = "dashboard"):
 @app.post("/restateflow/sprint/crear")
 async def restateflow_crear_sprint(request: Request):
     user = await require_auth(request)
-    if not user or user["rol"] != "admin":
+    if not user or user["rol"] not in ("admin", "pm"):
         return RedirectResponse("/login", status_code=302)
     form = await request.form()
     nombre = form.get("nombre", "")
     fecha_inicio = form.get("fecha_inicio", "")
     fecha_fin = form.get("fecha_fin", "")
     meta_texto = form.get("meta_texto", "")
+    # Si es PM, el sprint queda ligado a su equipo automáticamente
+    pm_id = user["id"] if user["rol"] == "pm" else None
     if nombre and fecha_inicio and fecha_fin:
-        await crear_sprint(nombre, fecha_inicio, fecha_fin, meta_texto, user["id"])
+        await crear_sprint_pm(nombre, fecha_inicio, fecha_fin, meta_texto, user["id"], pm_id)
     return RedirectResponse("/restateflow?vista=scrum", status_code=302)
 
 
 @app.post("/restateflow/sprint/cerrar")
 async def restateflow_cerrar_sprint(request: Request):
     user = await require_auth(request)
-    if not user or user["rol"] != "admin":
+    if not user or user["rol"] not in ("admin", "pm"):
         return RedirectResponse("/login", status_code=302)
     form = await request.form()
     sprint_id = int(form.get("sprint_id", 0))
     if sprint_id:
+        # PM solo puede cerrar sprints suyos
+        if user["rol"] == "pm":
+            sp = await get_sprint_by_id(sprint_id)
+            if not sp or sp.get("pm_id") != user["id"]:
+                return RedirectResponse("/restateflow?vista=scrum", status_code=302)
         await cerrar_sprint(sprint_id)
     return RedirectResponse("/restateflow?vista=review", status_code=302)
 
@@ -7186,7 +7280,7 @@ async def restateflow_cerrar_sprint(request: Request):
 @app.post("/restateflow/sprint/agregar")
 async def restateflow_agregar_item(request: Request):
     user = await require_auth(request)
-    if not user or user["rol"] not in ("admin", "agente"):
+    if not user or user["rol"] not in ("admin", "agente", "pm"):
         return RedirectResponse("/login", status_code=302)
     form = await request.form()
     sprint_id = int(form.get("sprint_id", 0))
@@ -7199,7 +7293,7 @@ async def restateflow_agregar_item(request: Request):
 @app.post("/restateflow/sprint/mover")
 async def restateflow_mover_item(request: Request):
     user = await require_auth(request)
-    if not user or user["rol"] not in ("admin", "agente"):
+    if not user or user["rol"] not in ("admin", "agente", "pm"):
         return RedirectResponse("/login", status_code=302)
     form = await request.form()
     item_id = int(form.get("item_id", 0))
@@ -7215,7 +7309,7 @@ async def restateflow_mover_item(request: Request):
 @app.post("/restateflow/standup")
 async def restateflow_standup(request: Request):
     user = await require_auth(request)
-    if not user or user["rol"] not in ("admin", "agente"):
+    if not user or user["rol"] not in ("admin", "agente", "pm"):
         return RedirectResponse("/login", status_code=302)
     form = await request.form()
     que_avance = form.get("que_avance", "")
@@ -7233,7 +7327,7 @@ async def restateflow_standup(request: Request):
 @app.post("/restateflow/bloqueo/crear")
 async def restateflow_crear_bloqueo(request: Request):
     user = await require_auth(request)
-    if not user or user["rol"] not in ("admin", "agente"):
+    if not user or user["rol"] not in ("admin", "agente", "pm"):
         return RedirectResponse("/login", status_code=302)
     form = await request.form()
     sprint_item_id = int(form.get("sprint_item_id", 0))
@@ -7254,12 +7348,115 @@ async def restateflow_crear_bloqueo(request: Request):
 @app.post("/restateflow/bloqueo/{bloqueo_id}/resolver")
 async def restateflow_resolver_bloqueo(request: Request, bloqueo_id: int):
     user = await require_auth(request)
-    if not user or user["rol"] != "admin":
+    if not user or user["rol"] not in ("admin", "pm"):
         return RedirectResponse("/login", status_code=302)
     form = await request.form()
     accion = form.get("accion", "Resuelto")
     await resolver_bloqueo(bloqueo_id, accion, user["id"])
     return RedirectResponse("/restateflow", status_code=302)
+
+
+# ══════════════════════════════════════════════════════════════
+# ── KPIs Formatos.xlsx: metas, registros, accountability ──
+# ══════════════════════════════════════════════════════════════
+
+@app.post("/restateflow/kpi/registrar")
+async def restateflow_kpi_registrar(request: Request):
+    """Un agente, PM o admin registra un KPI diario."""
+    user = await require_auth(request)
+    if not user or user["rol"] not in ("admin", "agente", "pm"):
+        return RedirectResponse("/login", status_code=302)
+    form = await request.form()
+    kpi = form.get("kpi", "").strip()
+    try:
+        cantidad = int(form.get("cantidad", "1") or "1")
+    except ValueError:
+        cantidad = 1
+    try:
+        monto = float(form.get("monto", "0") or "0")
+    except ValueError:
+        monto = 0
+    notas = form.get("notas", "")
+    # agente_id: PM/admin puede registrar a nombre de otro agente de su equipo
+    ag_raw = form.get("agente_id", "").strip()
+    agente_id = user["id"]
+    if ag_raw and user["rol"] in ("admin", "pm"):
+        try:
+            agente_id = int(ag_raw)
+        except ValueError:
+            agente_id = user["id"]
+    if kpi in KPI_TIPOS:
+        try:
+            await registrar_kpi(agente_id, kpi, cantidad, monto, notas)
+        except Exception as e:
+            print(f"[KPI] Error registrando: {e}")
+    return RedirectResponse("/restateflow?vista=kpis", status_code=302)
+
+
+@app.post("/restateflow/kpi/meta")
+async def restateflow_kpi_meta(request: Request):
+    """PM o admin define metas mensuales para un agente del equipo."""
+    user = await require_auth(request)
+    if not user or user["rol"] not in ("admin", "pm"):
+        return RedirectResponse("/login", status_code=302)
+    form = await request.form()
+    try:
+        agente_id = int(form.get("agente_id", "0"))
+        anio = int(form.get("anio", "0"))
+        mes = int(form.get("mes", "0"))
+    except ValueError:
+        return RedirectResponse("/restateflow?vista=equipo", status_code=302)
+    if not agente_id or not anio or not mes:
+        return RedirectResponse("/restateflow?vista=equipo", status_code=302)
+    # PM solo puede asignar metas a su propio equipo
+    if user["rol"] == "pm":
+        target = await get_user_with_pm(agente_id)
+        if not target or target.get("pm_id") != user["id"]:
+            return RedirectResponse("/restateflow?vista=equipo", status_code=302)
+
+    def _int(name):
+        try:
+            return int(form.get(name, "0") or "0")
+        except ValueError:
+            return 0
+
+    def _float(name):
+        try:
+            return float(form.get(name, "0") or "0")
+        except ValueError:
+            return 0.0
+
+    goals = {
+        "leads_perfilados": _int("leads_perfilados"),
+        "leads_propios": _int("leads_propios"),
+        "citas_agendadas": _int("citas_agendadas"),
+        "citas_efectivas": _int("citas_efectivas"),
+        "reservas": _int("reservas"),
+        "cierres": _int("cierres"),
+        "monto_venta": _float("monto_venta"),
+    }
+    await set_kpi_goal(agente_id, anio, mes, goals, user["id"])
+    return RedirectResponse("/restateflow?vista=equipo", status_code=302)
+
+
+@app.post("/restateflow/accountability")
+async def restateflow_accountability(request: Request):
+    """Agente guarda su accountability semanal (3 preguntas)."""
+    user = await require_auth(request)
+    if not user or user["rol"] not in ("admin", "agente", "pm"):
+        return RedirectResponse("/login", status_code=302)
+    form = await request.form()
+    bien = form.get("que_hice_bien", "")
+    mal = form.get("que_no_salio_bien", "")
+    mejorare = form.get("en_que_mejorare", "")
+    from datetime import datetime as _dt, timedelta as _td
+    hoy = _dt.now().date()
+    lunes = hoy - _td(days=hoy.weekday())
+    try:
+        await guardar_accountability(user["id"], lunes, bien, mal, mejorare)
+    except Exception as e:
+        print(f"[ACCOUNT] Error guardando: {e}")
+    return RedirectResponse("/restateflow?vista=kpis", status_code=302)
 
 
 if __name__ == "__main__":

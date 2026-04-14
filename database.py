@@ -197,6 +197,9 @@ MIGRATIONS = [
     # Vincular propiedades a desarrollos
     "ALTER TABLE propiedades ADD COLUMN IF NOT EXISTS desarrollo_slug VARCHAR(100);",
     "CREATE INDEX IF NOT EXISTS idx_propiedades_desarrollo ON propiedades(desarrollo_slug);",
+    # PM (Project Manager) — un agente puede tener un PM responsable
+    "ALTER TABLE usuarios ADD COLUMN IF NOT EXISTS pm_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;",
+    "CREATE INDEX IF NOT EXISTS idx_usuarios_pm ON usuarios(pm_id);",
 ]
 
 CREATE_CITAS_CHATBOT = """
@@ -724,7 +727,14 @@ async def get_user_by_id(user_id: int):
 
 async def get_all_users():
     """Lista todos los usuarios."""
-    query = "SELECT id, email, nombre, rol, prefijo_whatsapp, telefono, activo, created_at FROM usuarios ORDER BY created_at DESC"
+    query = """
+        SELECT u.id, u.email, u.nombre, u.rol, u.prefijo_whatsapp, u.telefono,
+               u.activo, u.created_at, u.pm_id,
+               pm.nombre AS pm_nombre
+        FROM usuarios u
+        LEFT JOIN usuarios pm ON u.pm_id = pm.id
+        ORDER BY u.created_at DESC
+    """
     rows = await database.fetch_all(query=query)
     return [dict(r._mapping) for r in rows]
 
@@ -738,7 +748,7 @@ async def get_users_by_rol(rol: str):
 
 async def update_user(user_id: int, updates: dict):
     """Actualiza un usuario."""
-    allowed = {"nombre", "email", "rol", "activo", "prefijo_whatsapp", "telefono"}
+    allowed = {"nombre", "email", "rol", "activo", "prefijo_whatsapp", "telefono", "pm_id"}
     fields = {k: v for k, v in updates.items() if k in allowed}
     if "password" in updates and updates["password"]:
         fields["password"] = bcrypt.hash(updates["password"])
@@ -1307,6 +1317,45 @@ RESTATEFLOW_TABLES = [
         data_json   JSONB DEFAULT '{}',
         created_at  TIMESTAMP DEFAULT NOW()
     )""",
+    # Metas mensuales por agente (desde Formatos.xlsx)
+    """CREATE TABLE IF NOT EXISTS kpi_goals (
+        id                  SERIAL PRIMARY KEY,
+        agente_id           INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+        anio                INTEGER NOT NULL,
+        mes                 INTEGER NOT NULL,
+        leads_perfilados    INTEGER DEFAULT 0,
+        leads_propios       INTEGER DEFAULT 0,
+        citas_agendadas     INTEGER DEFAULT 0,
+        citas_efectivas     INTEGER DEFAULT 0,
+        reservas            INTEGER DEFAULT 0,
+        cierres             INTEGER DEFAULT 0,
+        monto_venta         NUMERIC(14,2) DEFAULT 0,
+        created_by          INTEGER REFERENCES usuarios(id),
+        created_at          TIMESTAMP DEFAULT NOW(),
+        UNIQUE(agente_id, anio, mes)
+    )""",
+    # Registros diarios de KPIs (cada accion contabiliza)
+    """CREATE TABLE IF NOT EXISTS kpi_registros (
+        id          SERIAL PRIMARY KEY,
+        agente_id   INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+        fecha       DATE DEFAULT CURRENT_DATE,
+        kpi         VARCHAR(50) NOT NULL,
+        cantidad    INTEGER DEFAULT 1,
+        monto       NUMERIC(14,2) DEFAULT 0,
+        notas       TEXT,
+        created_at  TIMESTAMP DEFAULT NOW()
+    )""",
+    # Accountability semanal (3 preguntas del formato original)
+    """CREATE TABLE IF NOT EXISTS weekly_accountability (
+        id                  SERIAL PRIMARY KEY,
+        agente_id           INTEGER REFERENCES usuarios(id) ON DELETE CASCADE,
+        semana_inicio       DATE NOT NULL,
+        que_hice_bien       TEXT,
+        que_no_salio_bien   TEXT,
+        en_que_mejorare     TEXT,
+        created_at          TIMESTAMP DEFAULT NOW(),
+        UNIQUE(agente_id, semana_inicio)
+    )""",
 ]
 
 CREATE_RESTATEFLOW_INDEXES = [
@@ -1317,6 +1366,13 @@ CREATE_RESTATEFLOW_INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_respuestas_fecha ON respuestas_diarias(fecha);",
     "CREATE INDEX IF NOT EXISTS idx_bloqueos_agente ON bloqueos_historico(agente_id);",
     "CREATE INDEX IF NOT EXISTS idx_bloqueos_resuelto ON bloqueos_historico(resuelto);",
+    "CREATE INDEX IF NOT EXISTS idx_kpi_goals_agente ON kpi_goals(agente_id);",
+    "CREATE INDEX IF NOT EXISTS idx_kpi_reg_agente ON kpi_registros(agente_id);",
+    "CREATE INDEX IF NOT EXISTS idx_kpi_reg_fecha ON kpi_registros(fecha);",
+    "CREATE INDEX IF NOT EXISTS idx_weekly_acc_agente ON weekly_accountability(agente_id);",
+    # sprints.pm_id (corre despues de crear la tabla sprints)
+    "ALTER TABLE sprints ADD COLUMN IF NOT EXISTS pm_id INTEGER REFERENCES usuarios(id) ON DELETE SET NULL;",
+    "CREATE INDEX IF NOT EXISTS idx_sprints_pm ON sprints(pm_id);",
 ]
 
 
@@ -1657,3 +1713,233 @@ async def get_sprint_review_data(sprint_id: int) -> dict:
         "bloqueos_activos": bloqueos,
         "top_bloqueos": top_bloqueos,
     }
+
+
+# ══════════════════════════════════════════════════════════════
+# ── PM (Project Manager) + Equipos ──
+# ══════════════════════════════════════════════════════════════
+
+async def get_pms_disponibles():
+    """Lista usuarios con rol pm o admin (candidatos para asignar como PM)."""
+    rows = await database.fetch_all("""
+        SELECT id, nombre, email, rol FROM usuarios
+        WHERE rol IN ('pm', 'admin') AND activo = TRUE
+        ORDER BY nombre
+    """)
+    return [dict(r._mapping) for r in rows]
+
+
+async def get_equipo_de_pm(pm_id: int):
+    """Agentes que reportan a un PM especifico."""
+    rows = await database.fetch_all("""
+        SELECT id, nombre, email, rol, telefono, pm_id, activo
+        FROM usuarios
+        WHERE pm_id = :pm AND activo = TRUE
+        ORDER BY nombre
+    """, {"pm": pm_id})
+    return [dict(r._mapping) for r in rows]
+
+
+async def asignar_pm_a_agente(agente_id: int, pm_id):
+    """Asigna o quita el PM responsable de un agente. pm_id puede ser None."""
+    await database.execute(
+        "UPDATE usuarios SET pm_id = :pm WHERE id = :id",
+        {"id": agente_id, "pm": pm_id}
+    )
+
+
+async def get_user_with_pm(user_id: int):
+    """Usuario + datos de su PM."""
+    row = await database.fetch_one("""
+        SELECT u.*, pm.nombre AS pm_nombre, pm.email AS pm_email
+        FROM usuarios u
+        LEFT JOIN usuarios pm ON u.pm_id = pm.id
+        WHERE u.id = :id
+    """, {"id": user_id})
+    return dict(row._mapping) if row else None
+
+
+# ══════════════════════════════════════════════════════════════
+# ── KPIs mensuales (Formatos.xlsx) ──
+# ══════════════════════════════════════════════════════════════
+
+KPI_TIPOS = [
+    "leads_perfilados", "leads_propios",
+    "citas_agendadas", "citas_efectivas",
+    "reservas", "cierres",
+]
+
+
+async def get_kpi_goal(agente_id: int, anio: int, mes: int):
+    row = await database.fetch_one("""
+        SELECT * FROM kpi_goals
+        WHERE agente_id = :a AND anio = :y AND mes = :m
+    """, {"a": agente_id, "y": anio, "m": mes})
+    return dict(row._mapping) if row else None
+
+
+async def set_kpi_goal(agente_id: int, anio: int, mes: int, goals: dict, created_by: int):
+    """Crea o actualiza la meta mensual de un agente."""
+    existing = await get_kpi_goal(agente_id, anio, mes)
+    if existing:
+        set_clause = ", ".join(f"{k} = :{k}" for k in goals.keys())
+        values = {**goals, "id": existing["id"]}
+        await database.execute(
+            f"UPDATE kpi_goals SET {set_clause} WHERE id = :id",
+            values=values
+        )
+        return existing["id"]
+    values = {
+        "a": agente_id, "y": anio, "m": mes, "cb": created_by,
+        "lp": goals.get("leads_perfilados", 0),
+        "lo": goals.get("leads_propios", 0),
+        "ca": goals.get("citas_agendadas", 0),
+        "ce": goals.get("citas_efectivas", 0),
+        "re": goals.get("reservas", 0),
+        "ci": goals.get("cierres", 0),
+        "mv": goals.get("monto_venta", 0),
+    }
+    return await database.execute("""
+        INSERT INTO kpi_goals
+            (agente_id, anio, mes, leads_perfilados, leads_propios,
+             citas_agendadas, citas_efectivas, reservas, cierres, monto_venta, created_by)
+        VALUES (:a, :y, :m, :lp, :lo, :ca, :ce, :re, :ci, :mv, :cb)
+        RETURNING id
+    """, values=values)
+
+
+async def registrar_kpi(agente_id: int, kpi: str, cantidad: int = 1, monto: float = 0, notas: str = ""):
+    """Registra un KPI diario. fecha = hoy."""
+    if kpi not in KPI_TIPOS:
+        raise ValueError(f"KPI invalido: {kpi}")
+    return await database.execute("""
+        INSERT INTO kpi_registros (agente_id, kpi, cantidad, monto, notas)
+        VALUES (:a, :k, :c, :m, :n) RETURNING id
+    """, {"a": agente_id, "k": kpi, "c": cantidad, "m": monto, "n": notas})
+
+
+async def get_kpi_actuals_mes(agente_id: int, anio: int, mes: int) -> dict:
+    """Suma KPIs de un agente en un mes especifico."""
+    rows = await database.fetch_all("""
+        SELECT kpi, SUM(cantidad) AS total, SUM(monto) AS monto_total
+        FROM kpi_registros
+        WHERE agente_id = :a
+          AND EXTRACT(YEAR FROM fecha) = :y
+          AND EXTRACT(MONTH FROM fecha) = :m
+        GROUP BY kpi
+    """, {"a": agente_id, "y": anio, "m": mes})
+    result = {t: 0 for t in KPI_TIPOS}
+    result["monto_venta"] = 0.0
+    for r in rows:
+        d = dict(r._mapping)
+        k = d["kpi"]
+        if k in result:
+            result[k] = int(d["total"] or 0)
+        if k == "cierres":
+            result["monto_venta"] = float(d["monto_total"] or 0)
+    return result
+
+
+async def get_kpi_actuals_semana(agente_id: int, inicio_lunes):
+    """KPIs de la semana (lunes a domingo)."""
+    rows = await database.fetch_all("""
+        SELECT kpi, SUM(cantidad) AS total
+        FROM kpi_registros
+        WHERE agente_id = :a
+          AND fecha >= :ini AND fecha < :ini + INTERVAL '7 days'
+        GROUP BY kpi
+    """, {"a": agente_id, "ini": inicio_lunes})
+    result = {t: 0 for t in KPI_TIPOS}
+    for r in rows:
+        d = dict(r._mapping)
+        if d["kpi"] in result:
+            result[d["kpi"]] = int(d["total"] or 0)
+    return result
+
+
+async def get_kpi_resumen_equipo(pm_id: int, anio: int, mes: int) -> list:
+    """KPIs de cada agente de un equipo PM para un mes."""
+    agentes = await get_equipo_de_pm(pm_id)
+    out = []
+    for a in agentes:
+        goal = await get_kpi_goal(a["id"], anio, mes) or {}
+        actual = await get_kpi_actuals_mes(a["id"], anio, mes)
+        out.append({
+            "agente": a,
+            "meta": goal,
+            "actual": actual,
+        })
+    return out
+
+
+# ══════════════════════════════════════════════════════════════
+# ── Accountability semanal ──
+# ══════════════════════════════════════════════════════════════
+
+async def guardar_accountability(agente_id: int, semana_inicio, bien: str, mal: str, mejorare: str):
+    """Upsert de accountability semanal."""
+    existing = await database.fetch_one("""
+        SELECT id FROM weekly_accountability
+        WHERE agente_id = :a AND semana_inicio = :s
+    """, {"a": agente_id, "s": semana_inicio})
+    if existing:
+        await database.execute("""
+            UPDATE weekly_accountability
+            SET que_hice_bien = :b, que_no_salio_bien = :m, en_que_mejorare = :mj
+            WHERE id = :id
+        """, {"id": existing._mapping["id"], "b": bien, "m": mal, "mj": mejorare})
+        return existing._mapping["id"]
+    return await database.execute("""
+        INSERT INTO weekly_accountability
+            (agente_id, semana_inicio, que_hice_bien, que_no_salio_bien, en_que_mejorare)
+        VALUES (:a, :s, :b, :m, :mj) RETURNING id
+    """, {"a": agente_id, "s": semana_inicio, "b": bien, "m": mal, "mj": mejorare})
+
+
+async def get_accountability_semana(agente_id: int, semana_inicio):
+    row = await database.fetch_one("""
+        SELECT * FROM weekly_accountability
+        WHERE agente_id = :a AND semana_inicio = :s
+    """, {"a": agente_id, "s": semana_inicio})
+    return dict(row._mapping) if row else None
+
+
+async def get_accountability_historial(agente_id: int, limit: int = 8):
+    rows = await database.fetch_all("""
+        SELECT * FROM weekly_accountability
+        WHERE agente_id = :a
+        ORDER BY semana_inicio DESC LIMIT :lim
+    """, {"a": agente_id, "lim": limit})
+    return [dict(r._mapping) for r in rows]
+
+
+# ══════════════════════════════════════════════════════════════
+# ── Sprints con alcance de equipo ──
+# ══════════════════════════════════════════════════════════════
+
+async def crear_sprint_pm(nombre, fecha_inicio, fecha_fin, meta_texto, created_by, pm_id=None):
+    """Version de crear_sprint con pm_id opcional."""
+    return await database.execute("""
+        INSERT INTO sprints (nombre, fecha_inicio, fecha_fin, meta_texto, created_by, pm_id)
+        VALUES (:nombre, :fi, :ff, :meta, :cb, :pm) RETURNING id
+    """, {
+        "nombre": nombre, "fi": fecha_inicio, "ff": fecha_fin,
+        "meta": meta_texto, "cb": created_by, "pm": pm_id
+    })
+
+
+async def get_sprint_activo_pm(pm_id=None):
+    """Sprint activo. Si pm_id, solo del equipo; si None y admin, el global (pm_id IS NULL)."""
+    if pm_id is None:
+        row = await database.fetch_one("""
+            SELECT * FROM sprints
+            WHERE estado = 'activo' AND pm_id IS NULL
+            ORDER BY fecha_inicio DESC LIMIT 1
+        """)
+    else:
+        row = await database.fetch_one("""
+            SELECT * FROM sprints
+            WHERE estado = 'activo' AND pm_id = :pm
+            ORDER BY fecha_inicio DESC LIMIT 1
+        """, {"pm": pm_id})
+    return dict(row._mapping) if row else None

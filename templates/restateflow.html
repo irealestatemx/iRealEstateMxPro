@@ -128,8 +128,14 @@
     <div class="tabs">
       <a href="/restateflow" class="tab {{ 'active' if vista == 'dashboard' }}">Dashboard</a>
       <a href="/restateflow?vista=scrum" class="tab {{ 'active' if vista == 'scrum' }}">Scrum Board</a>
-      <a href="/restateflow?vista=referidos" class="tab {{ 'active' if vista == 'referidos' }}">KPIs Referidos</a>
+      <a href="/restateflow?vista=kpis" class="tab {{ 'active' if vista == 'kpis' }}">Mis KPIs</a>
+      {% if user.rol in ('admin', 'pm') %}
+      <a href="/restateflow?vista=equipo" class="tab {{ 'active' if vista == 'equipo' }}">Mi equipo</a>
+      {% endif %}
       {% if user.rol == 'admin' %}
+      <a href="/restateflow?vista=referidos" class="tab {{ 'active' if vista == 'referidos' }}">KPIs Referidos</a>
+      {% endif %}
+      {% if user.rol in ('admin', 'pm') %}
       <a href="/restateflow?vista=review" class="tab {{ 'active' if vista == 'review' }}">Sprint Review</a>
       {% endif %}
     </div>
@@ -137,10 +143,10 @@
     {% if vista == 'dashboard' %}
     <!-- ═══ DASHBOARD KPIs ═══ -->
 
-    {% if user.rol == 'admin' %}
-    <!-- Vista admin: todos los agentes -->
+    {% if is_admin or is_pm %}
+    <!-- Vista admin/PM: todos los agentes (o solo equipo) -->
     <div class="section">
-      <div class="section-title">KPIs por Agente</div>
+      <div class="section-title">KPIs por Agente{% if is_pm %} — Mi equipo{% endif %}</div>
       <div class="kpi-grid">
         <div class="kpi-card">
           <div class="kpi-num yellow">{{ kpis_global.total_propiedades }}</div>
@@ -286,7 +292,7 @@
           {% if b.categoria %}<div class="bloq-sub" style="color:#c9a227;">{{ b.categoria }}</div>{% endif %}
         </div>
         <div class="bloq-days">{{ b.dias_abierto|int }}d</div>
-        {% if user.rol == 'admin' %}
+        {% if is_admin or is_pm %}
         <div class="bloq-actions">
           <form method="post" action="/restateflow/bloqueo/{{ b.id }}/resolver" style="display:inline">
             <input type="hidden" name="accion" value="Resuelta por admin"/>
@@ -341,7 +347,7 @@
       </div>
 
       <!-- Agregar propiedad al sprint -->
-      {% if user.rol in ('admin','agente') %}
+      {% if user.rol in ('admin','agente','pm') %}
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
         <form method="post" action="/restateflow/sprint/agregar" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
           <input type="hidden" name="sprint_id" value="{{ sprint.id }}"/>
@@ -353,7 +359,7 @@
           </select>
           <button type="submit" class="btn-outline">Agregar</button>
         </form>
-        {% if user.rol == 'admin' %}
+        {% if is_admin or is_pm %}
         <form method="post" action="/restateflow/sprint/cerrar" style="display:inline" onsubmit="return confirm('&iquest;Cerrar este sprint? Se generar&aacute; el Sprint Review.')">
           <input type="hidden" name="sprint_id" value="{{ sprint.id }}"/>
           <button type="submit" class="btn-danger">Cerrar sprint</button>
@@ -366,15 +372,15 @@
       <!-- No hay sprint activo -->
       <div style="text-align:center;padding:40px 20px;color:rgba(255,255,255,.35)">
         <p style="font-size:16px;margin-bottom:12px">No hay sprint activo</p>
-        {% if user.rol == 'admin' %}
+        {% if is_admin or is_pm %}
         <button class="btn-primary" onclick="document.getElementById('modalSprint').classList.add('open')">Crear nuevo sprint</button>
         {% else %}
-        <p style="font-size:13px;">El admin debe crear un nuevo sprint para comenzar.</p>
+        <p style="font-size:13px;">El admin o tu PM debe crear un nuevo sprint para comenzar.</p>
         {% endif %}
       </div>
       {% endif %}
 
-      {% if user.rol == 'admin' and sprint %}
+      {% if (is_admin or is_pm) and sprint %}
       <div style="margin-top:16px;">
         <button class="btn-outline" onclick="document.getElementById('modalSprint').classList.add('open')">+ Nuevo sprint</button>
       </div>
@@ -412,6 +418,194 @@
       </table>
       {% else %}
       <p style="color:rgba(255,255,255,.35);text-align:center;padding:40px;">No hay referidos registrados a&uacute;n.</p>
+      {% endif %}
+    </div>
+
+    {% elif vista == 'equipo' %}
+    <!-- ═══ EQUIPO PM (roll-up mensual estilo Formatos.xlsx) ═══ -->
+    <div class="section">
+      <div class="section-title">Mi equipo — Metas &amp; Resultados del mes</div>
+      <p class="sub" style="margin-bottom:16px;">Mes {{ mes_view }}/{{ anio_view }} &middot; Semáforo: <span class="semaforo sem-verde"></span>Superó meta &middot; <span class="semaforo sem-amarillo"></span>Alcanzó/Cerca &middot; <span class="semaforo sem-rojo"></span>Bajo</p>
+
+      {% if resumen_equipo %}
+      <table class="agent-table">
+        <thead>
+          <tr>
+            <th>Agente</th>
+            <th>Leads perf.</th>
+            <th>Leads propios</th>
+            <th>Citas A</th>
+            <th>Citas E</th>
+            <th>Reservas</th>
+            <th>Cierres</th>
+            <th>Monto</th>
+            <th>Acción</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in resumen_equipo %}
+          {% set a = row.agente %}
+          {% set m = row.meta %}
+          {% set ac = row.actual %}
+          {% macro semaforo(actual, meta) %}
+            {% if meta and meta > 0 %}
+              {% set pct = (actual / meta * 100)|round|int %}
+              {% if pct >= 100 %}<span class="semaforo sem-verde"></span>
+              {% elif pct >= 70 %}<span class="semaforo sem-amarillo"></span>
+              {% else %}<span class="semaforo sem-rojo"></span>{% endif %}
+              {{ actual }} / {{ meta }}
+            {% else %}
+              {{ actual }} / <span style="opacity:.3">—</span>
+            {% endif %}
+          {% endmacro %}
+          <tr>
+            <td><span class="agent-name">{{ a.nombre }}</span></td>
+            <td>{{ semaforo(ac.leads_perfilados, m.leads_perfilados or 0) }}</td>
+            <td>{{ semaforo(ac.leads_propios, m.leads_propios or 0) }}</td>
+            <td>{{ semaforo(ac.citas_agendadas, m.citas_agendadas or 0) }}</td>
+            <td>{{ semaforo(ac.citas_efectivas, m.citas_efectivas or 0) }}</td>
+            <td>{{ semaforo(ac.reservas, m.reservas or 0) }}</td>
+            <td style="color:#68d391;font-weight:600;">{{ semaforo(ac.cierres, m.cierres or 0) }}</td>
+            <td style="font-size:12px;">${{ '{:,.0f}'.format(ac.monto_venta or 0) }}{% if m.monto_venta %} <span style="opacity:.4">/ ${{ '{:,.0f}'.format(m.monto_venta) }}</span>{% endif %}</td>
+            <td>
+              <button type="button" class="k-btn" onclick='abrirMetaModal({{ a.id }}, "{{ a.nombre|e }}", {{ (m.leads_perfilados or 0) }}, {{ (m.leads_propios or 0) }}, {{ (m.citas_agendadas or 0) }}, {{ (m.citas_efectivas or 0) }}, {{ (m.reservas or 0) }}, {{ (m.cierres or 0) }}, {{ (m.monto_venta or 0) }})'>Meta</button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% elif is_admin and pms_disponibles %}
+      <p style="color:rgba(255,255,255,.5);margin-bottom:12px;">Elige un PM para ver su equipo:</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        {% for pm in pms_disponibles %}
+        <a href="/restateflow?vista=equipo&pm_id={{ pm.id }}" class="tab">{{ pm.nombre }}</a>
+        {% endfor %}
+      </div>
+      {% else %}
+      <p style="color:rgba(255,255,255,.35);text-align:center;padding:40px;">Aún no hay agentes asignados a este PM. Pide al admin que asigne agentes a tu equipo desde /admin/usuarios.</p>
+      {% endif %}
+    </div>
+
+    <!-- Modal para fijar meta mensual -->
+    <div class="modal-ov" id="modalMeta" onclick="if(event.target===this)this.classList.remove('open')">
+      <div class="modal-box">
+        <button class="modal-close" onclick="document.getElementById('modalMeta').classList.remove('open')">&times;</button>
+        <h3>Meta mensual — <span id="metaNombre"></span></h3>
+        <form method="post" action="/restateflow/kpi/meta">
+          <input type="hidden" name="agente_id" id="metaAgenteId"/>
+          <input type="hidden" name="anio" value="{{ anio_view }}"/>
+          <input type="hidden" name="mes" value="{{ mes_view }}"/>
+          <div class="mf-field"><label>Leads perfilados</label><input type="number" name="leads_perfilados" id="m_lp" min="0"/></div>
+          <div class="mf-field"><label>Leads propios</label><input type="number" name="leads_propios" id="m_lo" min="0"/></div>
+          <div class="mf-field"><label>Citas agendadas</label><input type="number" name="citas_agendadas" id="m_ca" min="0"/></div>
+          <div class="mf-field"><label>Citas efectivas</label><input type="number" name="citas_efectivas" id="m_ce" min="0"/></div>
+          <div class="mf-field"><label>Reservas</label><input type="number" name="reservas" id="m_re" min="0"/></div>
+          <div class="mf-field"><label>Cierres</label><input type="number" name="cierres" id="m_ci" min="0"/></div>
+          <div class="mf-field"><label>Monto de venta (MXN)</label><input type="number" name="monto_venta" id="m_mv" min="0" step="0.01"/></div>
+          <button type="submit" class="btn-primary" style="width:100%;margin-top:8px">Guardar meta</button>
+        </form>
+      </div>
+    </div>
+
+    {% elif vista == 'kpis' %}
+    <!-- ═══ MIS KPIs (Formatos.xlsx) ═══ -->
+    <div class="section">
+      <div class="section-title">Mi desempeño — {{ mes_view }}/{{ anio_view }}</div>
+
+      {% set kpi_defs = [
+        ('leads_perfilados', 'Leads perfilados'),
+        ('leads_propios', 'Leads propios'),
+        ('citas_agendadas', 'Citas agendadas'),
+        ('citas_efectivas', 'Citas efectivas'),
+        ('reservas', 'Reservas'),
+        ('cierres', 'Cierres'),
+      ] %}
+
+      <div class="kpi-grid">
+        {% for k, label in kpi_defs %}
+        {% set a = kpis_mes[k] %}
+        {% set m = (meta_mes[k] if meta_mes else 0) or 0 %}
+        {% set pct = ((a / m * 100)|round|int) if m > 0 else 0 %}
+        <div class="kpi-card">
+          <div class="kpi-num {% if m and pct >= 100 %}green{% elif m and pct >= 70 %}yellow{% elif m %}red{% else %}gray{% endif %}">{{ a }}{% if m %}<span style="font-size:14px;color:rgba(255,255,255,.35);"> / {{ m }}</span>{% endif %}</div>
+          <div class="kpi-label">{{ label }}</div>
+          <div class="kpi-sub">
+            {% if m and pct >= 100 %}<span class="semaforo sem-verde"></span>Supera meta
+            {% elif m and pct >= 70 %}<span class="semaforo sem-amarillo"></span>Cerca
+            {% elif m %}<span class="semaforo sem-rojo"></span>Bajo
+            {% else %}<span style="opacity:.3">sin meta</span>{% endif %}
+          </div>
+        </div>
+        {% endfor %}
+        <div class="kpi-card">
+          <div class="kpi-num yellow">${{ '{:,.0f}'.format(kpis_mes.monto_venta or 0) }}</div>
+          <div class="kpi-label">Monto de venta</div>
+          {% if meta_mes and meta_mes.monto_venta %}
+          <div class="kpi-sub" style="opacity:.5">Meta: ${{ '{:,.0f}'.format(meta_mes.monto_venta) }}</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Registrar KPI del día -->
+      <div class="standup-form" style="margin-bottom:20px">
+        <h3>Registrar actividad de hoy</h3>
+        <form method="post" action="/restateflow/kpi/registrar" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;align-items:end">
+          <div class="sf-field" style="margin:0">
+            <label>KPI</label>
+            <select name="kpi" required style="width:100%;padding:10px 14px;background:#111;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#e0e0e0;font-size:13px;font-family:'Inter',sans-serif">
+              {% for k, label in kpi_defs %}
+              <option value="{{ k }}">{{ label }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="sf-field" style="margin:0">
+            <label>Cantidad</label>
+            <input type="number" name="cantidad" value="1" min="1" style="width:100%;padding:10px 14px;background:#111;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#e0e0e0;font-size:13px;font-family:'Inter',sans-serif"/>
+          </div>
+          <div class="sf-field" style="margin:0">
+            <label>Monto (solo si es cierre)</label>
+            <input type="number" name="monto" value="0" min="0" step="0.01" style="width:100%;padding:10px 14px;background:#111;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#e0e0e0;font-size:13px;font-family:'Inter',sans-serif"/>
+          </div>
+          <div class="sf-field" style="margin:0;grid-column:span 2">
+            <label>Notas (opcional)</label>
+            <input type="text" name="notas" style="width:100%;padding:10px 14px;background:#111;border:1px solid rgba(255,255,255,.1);border-radius:8px;color:#e0e0e0;font-size:13px;font-family:'Inter',sans-serif"/>
+          </div>
+          <button type="submit" class="btn-primary">Registrar</button>
+        </form>
+      </div>
+
+      <!-- Accountability semanal -->
+      <div class="section-title">Accountability semanal — {{ semana_inicio }}</div>
+      <form class="standup-form" method="post" action="/restateflow/accountability">
+        <div class="sf-field">
+          <label>¿Qué hice bien esta semana?</label>
+          <textarea name="que_hice_bien" placeholder="Tus victorias y avances...">{{ accountability.que_hice_bien if accountability else '' }}</textarea>
+        </div>
+        <div class="sf-field">
+          <label>¿Qué no salió bien esta semana?</label>
+          <textarea name="que_no_salio_bien" placeholder="Lo que no funcionó, errores, bloqueos...">{{ accountability.que_no_salio_bien if accountability else '' }}</textarea>
+        </div>
+        <div class="sf-field">
+          <label>¿En qué mejoraré? Enfoque &amp; Compromiso</label>
+          <textarea name="en_que_mejorare" placeholder="Mi plan para la próxima semana...">{{ accountability.en_que_mejorare if accountability else '' }}</textarea>
+        </div>
+        <button type="submit" class="btn-primary">Guardar accountability</button>
+      </form>
+
+      {% if historial_accountability and historial_accountability|length > 1 %}
+      <div style="margin-top:24px">
+        <h4 style="font-size:14px;color:rgba(255,255,255,.5);margin-bottom:10px">Semanas anteriores</h4>
+        {% for h in historial_accountability %}
+        {% if h.semana_inicio != semana_inicio %}
+        <div class="review-card">
+          <h4>Semana {{ h.semana_inicio }}</h4>
+          {% if h.que_hice_bien %}<div style="font-size:12px;color:rgba(255,255,255,.6);margin-bottom:6px"><strong style="color:#68d391">Bien:</strong> {{ h.que_hice_bien }}</div>{% endif %}
+          {% if h.que_no_salio_bien %}<div style="font-size:12px;color:rgba(255,255,255,.6);margin-bottom:6px"><strong style="color:#fc8181">No bien:</strong> {{ h.que_no_salio_bien }}</div>{% endif %}
+          {% if h.en_que_mejorare %}<div style="font-size:12px;color:rgba(255,255,255,.6)"><strong style="color:#c9a227">Mejoraré:</strong> {{ h.en_que_mejorare }}</div>{% endif %}
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
       {% endif %}
     </div>
 
@@ -548,6 +742,19 @@
     var f2 = document.createElement('input'); f2.type='hidden'; f2.name='columna'; f2.value=columna; form.appendChild(f2);
     document.body.appendChild(form);
     form.submit();
+  }
+  function abrirMetaModal(aid, nombre, lp, lo, ca, ce, re, ci, mv) {
+    var el = function(id){ return document.getElementById(id); };
+    if (el('metaAgenteId')) el('metaAgenteId').value = aid;
+    if (el('metaNombre')) el('metaNombre').textContent = nombre;
+    if (el('m_lp')) el('m_lp').value = lp || 0;
+    if (el('m_lo')) el('m_lo').value = lo || 0;
+    if (el('m_ca')) el('m_ca').value = ca || 0;
+    if (el('m_ce')) el('m_ce').value = ce || 0;
+    if (el('m_re')) el('m_re').value = re || 0;
+    if (el('m_ci')) el('m_ci').value = ci || 0;
+    if (el('m_mv')) el('m_mv').value = mv || 0;
+    if (el('modalMeta')) el('modalMeta').classList.add('open');
   }
   </script>
 </body>
