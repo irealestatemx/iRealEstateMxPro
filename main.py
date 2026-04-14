@@ -2358,13 +2358,7 @@ async def edit_property_photos(request: Request, prop_id: int):
 
 
 @app.post("/dashboard/editar/{prop_id}/asignar")
-async def asignar_vendedor_comprador(
-    request: Request,
-    prop_id: int,
-    vendedor_id: Optional[str] = Form(None),
-    comprador_id: Optional[str] = Form(None),
-    confirmar_desasignar: Optional[str] = Form(None),
-):
+async def asignar_vendedor_comprador(request: Request, prop_id: int):
     user = await require_auth(request)
     if not user:
         return RedirectResponse("/login", status_code=302)
@@ -2372,44 +2366,44 @@ async def asignar_vendedor_comprador(
     prop = await get_property_by_id(prop_id)
     if not prop:
         return RedirectResponse("/dashboard", status_code=302)
-
-    # Seguridad: solo el dueño de la propiedad o admin
     if user["rol"] != "admin" and prop.get("user_id") != user["id"]:
         return RedirectResponse("/dashboard", status_code=302)
 
-    new_vendedor = int(vendedor_id) if vendedor_id else None
-    new_comprador = int(comprador_id) if comprador_id else None
+    form = await request.form()
+    raw_vendedor = form.get("vendedor_id", "")
+    raw_comprador = form.get("comprador_id", "")
+    confirmar = form.get("confirmar_desasignar", "")
 
-    # Si se está quitando un vendedor/comprador que ya tenía, verificar documentos
-    if not confirmar_desasignar:
-        docs = await get_documentos_by_propiedad(prop_id)
-        advertencias = []
-        if prop.get("vendedor_id") and not new_vendedor:
-            docs_vendedor = [d for d in docs if d.get("categoria") == "vendedor"]
-            if docs_vendedor:
-                advertencias.append(f"El vendedor actual tiene {len(docs_vendedor)} documento(s) subido(s).")
-        if prop.get("comprador_id") and not new_comprador:
-            docs_comprador = [d for d in docs if d.get("categoria") == "comprador"]
-            if docs_comprador:
-                advertencias.append(f"El comprador actual tiene {len(docs_comprador)} documento(s) subido(s).")
-        if advertencias:
-            # Redirigir con advertencia para confirmar
-            import urllib.parse
-            msg = " ".join(advertencias) + " ¿Deseas continuar?"
-            return RedirectResponse(
-                f"/dashboard/editar/{prop_id}?warn_desasignar={urllib.parse.quote(msg)}"
-                f"&pending_vendedor={vendedor_id or ''}&pending_comprador={comprador_id or ''}",
-                status_code=302
-            )
+    new_vendedor = int(raw_vendedor) if raw_vendedor.strip() else None
+    new_comprador = int(raw_comprador) if raw_comprador.strip() else None
 
-    updates = {}
-    if vendedor_id is not None:
-        updates["vendedor_id"] = new_vendedor
-    if comprador_id is not None:
-        updates["comprador_id"] = new_comprador
+    # Si quitan asignación y hay docs, pedir confirmación (solo si no viene confirmar)
+    if not confirmar:
+        quitando_vendedor = prop.get("vendedor_id") and new_vendedor is None
+        quitando_comprador = prop.get("comprador_id") and new_comprador is None
+        if quitando_vendedor or quitando_comprador:
+            docs = await get_documentos_by_propiedad(prop_id)
+            advertencias = []
+            if quitando_vendedor:
+                n = len([d for d in docs if d.get("categoria") == "vendedor"])
+                if n:
+                    advertencias.append(f"El vendedor tiene {n} documento(s).")
+            if quitando_comprador:
+                n = len([d for d in docs if d.get("categoria") == "comprador"])
+                if n:
+                    advertencias.append(f"El comprador tiene {n} documento(s).")
+            if advertencias:
+                import urllib.parse
+                msg = " ".join(advertencias) + " ¿Seguro que deseas quitar la asignacion?"
+                return RedirectResponse(
+                    f"/dashboard/editar/{prop_id}?warn_desasignar={urllib.parse.quote(msg)}"
+                    f"&pending_vendedor={raw_vendedor}&pending_comprador={raw_comprador}",
+                    status_code=302
+                )
 
-    if updates:
-        await update_property(prop_id, updates)
+    updates = {"vendedor_id": new_vendedor, "comprador_id": new_comprador}
+    await update_property(prop_id, updates)
+    print(f"[ASIGNAR] Propiedad #{prop_id}: vendedor={new_vendedor}, comprador={new_comprador}")
 
     return RedirectResponse(f"/dashboard/editar/{prop_id}", status_code=302)
 
