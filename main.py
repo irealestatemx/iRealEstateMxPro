@@ -133,6 +133,7 @@ RATE_LIMITS = {
     "/forgot-password": (3, 600), # 3 intentos cada 10 min
     "/reset-password": (5, 600),  # 5 intentos cada 10 min
     "/api/whatsapp/debounce": (60, 60),  # 60 req/min
+    "/api/whatsapp/bot-sent": (60, 60),  # 60 req/min
     "/api/prospectos/registrar": (30, 60),
 }
 
@@ -184,6 +185,7 @@ CSRF_EXEMPT_PATHS = {
     "/api/whatsapp/unpause",
     "/api/whatsapp/status",
     "/api/whatsapp/deactivate",
+    "/api/whatsapp/bot-sent",
     "/api/kommo/webhook",
     "/webhook/n8n",
 }
@@ -3964,13 +3966,48 @@ _kommo_created: Dict[str, float] = {}  # telefono -> timestamp de ultimo lead cr
 _paused_chats: Dict[str, float] = {}  # telefono -> timestamp de cuando se pauso
 _active_chats: Dict[str, float] = {}  # telefono -> timestamp de cuando se activo la conversacion
 _bot_last_sent: Dict[str, float] = {}  # telefono -> timestamp de cuando el bot envio su ultima respuesta
+_bot_sent_texts: Dict[str, list] = {}  # telefono -> [(timestamp, texto_normalizado)] de lo que el bot envió
 _last_processed: Dict[str, float] = {}  # telefono -> timestamp de ultimo process:true (cooldown anti-doble)
 _seen_messages: Dict[str, float] = {}  # "phone:hash" -> timestamp (dedup exacto)
 _phone_locks: Dict[str, asyncio.Lock] = {}  # lock por teléfono para evitar procesamiento concurrente
 PROCESS_COOLDOWN = 30  # segundos de cooldown después de responder (anti-doble respuesta)
 PAUSE_DURATION = 3600 * 24  # 24 horas de pausa cuando Esteban escribe manualmente
 ACTIVE_DURATION = 60 * 30  # 30 minutos de actividad máxima del bot
-BOT_ECHO_WINDOW = 8  # segundos: solo el eco inmediato del bot (WAHA reenvía en <5s)
+BOT_ECHO_WINDOW = 3  # segundos: ventana corta de fallback (la detección real es por contenido)
+BOT_SENT_TTL = 90  # segundos: cuánto retenemos los textos enviados por el bot para comparar ecos
+
+
+def _normalize_bot_text(t: str) -> str:
+    """Normaliza un texto para comparar ecos (quita espacios y pasa a minúsculas)."""
+    import re as _re
+    return _re.sub(r'\s+', ' ', (t or '')).strip().lower()
+
+
+def _is_bot_echo_by_content(phone: str, message: str) -> bool:
+    """True si el fromMe coincide (total o mayormente) con un mensaje que el bot envió
+    recientemente. Mucho más fiable que la ventana temporal pura."""
+    if not phone or not message:
+        return False
+    now = time.time()
+    lst = _bot_sent_texts.get(phone, [])
+    # Limpiar expirados
+    lst = [(t, h) for t, h in lst if now - t < BOT_SENT_TTL]
+    _bot_sent_texts[phone] = lst
+    if not lst:
+        return False
+    msg_n = _normalize_bot_text(message)
+    if len(msg_n) < 3:
+        return False
+    for _ts, sent in lst:
+        if not sent:
+            continue
+        if msg_n == sent:
+            return True
+        # Match parcial: WAHA a veces recorta o agrega emojis/enlaces
+        shorter, longer = (msg_n, sent) if len(msg_n) <= len(sent) else (sent, msg_n)
+        if len(shorter) >= 25 and shorter in longer:
+            return True
+    return False
 
 # Números bloqueados: el bot NUNCA se activa con estos teléfonos
 # (desarrolladores, dueños de fraccionamiento, proveedores, etc.)
@@ -4125,6 +4162,34 @@ async def whatsapp_paused_list():
     paused = {k: round((PAUSE_DURATION - (now - v)) / 60) for k, v in _paused_chats.items() if now - v < PAUSE_DURATION}
     active = {k: round((ACTIVE_DURATION - (now - v)) / 60) for k, v in _active_chats.items() if now - v < ACTIVE_DURATION}
     return JSONResponse({"paused": paused, "active_chats": active})
+
+
+@app.post("/api/whatsapp/bot-sent")
+async def whatsapp_bot_sent(request: Request):
+    """n8n llama a este endpoint INMEDIATAMENTE después de que el bot envía un mensaje.
+    Guarda el texto exacto para que podamos distinguir el eco del bot (fromMe) del
+    mensaje manual del humano. Body: {phone, message}.
+
+    Sin esto, si el humano escribe en los <3s posteriores a una respuesta del bot,
+    su mensaje se confundiría con el eco y el bot no se pausaría."""
+    try:
+        body = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "invalid_json"}, status_code=400)
+    phone = (body.get("phone") or "").strip()
+    message = body.get("message") or ""
+    if not phone:
+        return JSONResponse({"ok": False, "error": "missing_phone"}, status_code=400)
+    now = time.time()
+    _bot_last_sent[phone] = now
+    sent_norm = _normalize_bot_text(message)
+    if sent_norm:
+        _bot_sent_texts.setdefault(phone, []).append((now, sent_norm))
+        # Cap: máximo últimos 10 mensajes por teléfono
+        if len(_bot_sent_texts[phone]) > 10:
+            _bot_sent_texts[phone] = _bot_sent_texts[phone][-10:]
+    print(f"[BOT] Registrado envío a {phone} ({len(message)} chars)")
+    return JSONResponse({"ok": True})
 
 
 @app.post("/api/chatbot/registrar-cita")
@@ -4353,20 +4418,29 @@ async def whatsapp_debounce(request: Request):
     # ─── 1. Si fromMe → ¿es eco del bot o Esteban escribiendo? ───
     # IMPORTANTE: este check va ANTES del cooldown para que siempre pausemos si Esteban escribe
     if from_me:
+        # 1a. Primero intentar detectar eco por CONTENIDO (mucho más fiable que tiempo):
+        # si el mensaje fromMe coincide con algo que el bot acaba de enviar, es eco.
+        if _is_bot_echo_by_content(phone, message):
+            print(f"[BOT] Eco del bot en {phone} (match de contenido) → ignorar")
+            return JSONResponse({"process": False, "reason": "bot_echo_content"})
+
+        # 1b. Fallback temporal: solo si n8n NO reportó aún lo que envió (lista vacía)
+        # y pasaron <3s, asumir eco. Si ya hay registro de lo enviado y no coincidió,
+        # es Esteban escribiendo.
         last_bot = _bot_last_sent.get(phone, 0)
         seconds_since_bot = now - last_bot
-        if seconds_since_bot < BOT_ECHO_WINDOW:
-            # El bot acaba de responder (<8s) → este fromMe es el eco del bot, ignorar
-            print(f"[BOT] Eco del bot en {phone} (hace {seconds_since_bot:.0f}s) → ignorar")
-            return JSONResponse({"process": False, "reason": "bot_echo"})
-        else:
-            # Esteban escribió manualmente → pausar bot 24h
-            _paused_chats[phone] = now
-            _active_chats.pop(phone, None)
-            _message_buffer.pop(phone, None)
-            _last_processed.pop(phone, None)
-            print(f"[BOT] Esteban escribió en {phone} → bot pausado 24h")
-            return JSONResponse({"process": False, "reason": "fromMe_paused"})
+        has_sent_log = bool(_bot_sent_texts.get(phone))
+        if not has_sent_log and seconds_since_bot < BOT_ECHO_WINDOW:
+            print(f"[BOT] Eco probable en {phone} (sin log, hace {seconds_since_bot:.1f}s) → ignorar")
+            return JSONResponse({"process": False, "reason": "bot_echo_time"})
+
+        # Esteban escribió manualmente → pausar bot 24h INMEDIATAMENTE
+        _paused_chats[phone] = now
+        _active_chats.pop(phone, None)
+        _message_buffer.pop(phone, None)
+        _last_processed.pop(phone, None)
+        print(f"[BOT] Humano escribió en {phone} → bot pausado 24h")
+        return JSONResponse({"process": False, "reason": "fromMe_paused"})
 
     # ─── 1b. Cooldown: si el bot acaba de responder a este phone, no procesar ───
     if phone in _last_processed and (now - _last_processed[phone]) < PROCESS_COOLDOWN:
