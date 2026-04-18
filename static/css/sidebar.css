@@ -1,15 +1,15 @@
 /* ═══════════════════════════════
-   Sidebar — iRealEstateMxPro v2
-   Dark luxury · refined nav
+   Sidebar — iRealEstateMxPro
+   Dark luxury · deep navy-black
 ═══════════════════════════════ */
 
 :root {
-  --sb-width:   236px;
-  --sb-bg:      #07101d;
-  --sb-border:  rgba(255,255,255,.05);
-  --gold:       #c49a3c;
-  --gold-pale:  rgba(196,154,60,.12);
-  --gold-glow:  rgba(196,154,60,.18);
+  --sb-width:      242px;
+  --sb-bg:         #07101d;
+  --sb-border:     rgba(255,255,255,.05);
+  --gold:          #c49a3c;
+  --gold-pale:     rgba(196,154,60,.1);
+  --layout-bg:     #080f1c;
 }
 
 /* ── Layout wrapper ── */
@@ -19,7 +19,7 @@
   margin-left: var(--sb-width);
   padding: 28px 32px;
   min-width: 0;
-  background: #edf0f7;
+  background: var(--layout-bg);
 }
 
 /* ── Sidebar shell ── */
@@ -34,8 +34,6 @@
   z-index: 100;
   overflow-y: auto;
   overflow-x: hidden;
-  /* subtle inner shadow on the right edge */
-  box-shadow: inset -1px 0 0 rgba(255,255,255,.04);
 }
 
 /* ── Header ── */
@@ -67,8 +65,6 @@
   padding: 8px;
   overflow-y: auto;
 }
-
-/* Section labels */
 .sb-section {
   font-size: 9.5px;
   font-weight: 800;
@@ -79,14 +75,14 @@
   user-select: none;
 }
 
-/* Nav links — pill style */
+/* Nav links — pill con barra dorada */
 .sb-link {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 9px 12px;
   margin: 1px 0;
-  color: rgba(255,255,255,.45);
+  color: rgba(255,255,255,.42);
   text-decoration: none;
   font-size: 13px;
   font-weight: 500;
@@ -96,36 +92,32 @@
   letter-spacing: .01em;
 }
 .sb-link:hover {
-  color: rgba(255,255,255,.82);
+  color: rgba(255,255,255,.8);
   background: rgba(255,255,255,.05);
 }
 .sb-link.active {
   color: #fff;
-  background: var(--gold-pale);
-  box-shadow: inset 0 0 0 1px rgba(196,154,60,.22);
+  background: rgba(196,154,60,.1);
+  box-shadow: inset 0 0 0 1px rgba(196,154,60,.2);
 }
-/* Gold dot accent on active */
 .sb-link.active::before {
   content: '';
   position: absolute;
   left: 0; top: 50%;
   transform: translateY(-50%);
   width: 3px;
-  height: 60%;
+  height: 58%;
   background: var(--gold);
-  border-radius: 0 2px 2px 0;
-  margin-left: -8px;
+  border-radius: 0 3px 3px 0;
 }
-
 .sb-link svg {
-  width: 17px;
-  height: 17px;
+  width: 17px; height: 17px;
   fill: currentColor;
   flex-shrink: 0;
-  opacity: .6;
+  opacity: .55;
   transition: opacity .15s;
 }
-.sb-link:hover svg { opacity: .85; }
+.sb-link:hover svg { opacity: .8; }
 .sb-link.active svg { opacity: 1; color: var(--gold); }
 
 /* ── Footer ── */
@@ -134,19 +126,10 @@
   padding: 8px;
   flex-shrink: 0;
 }
+.sb-web  { color: rgba(255,255,255,.28); font-size: 12px; }
+.sb-logout { color: rgba(239,68,68,.5); font-size: 12px; }
+.sb-logout:hover { color: #ef4444; background: rgba(239,68,68,.08) !important; }
 
-/* Web link & logout */
-.sb-web {
-  color: rgba(255,255,255,.3);
-  font-size: 12px;
-}
-.sb-logout { color: rgba(230,70,70,.55); font-size: 12px; }
-.sb-logout:hover {
-  color: #ef4444;
-  background: rgba(239,68,68,.08) !important;
-}
-
-/* User info block */
 .sb-user {
   display: flex;
   align-items: center;
@@ -154,10 +137,9 @@
   padding: 10px 12px 6px;
 }
 .sb-avatar {
-  width: 32px;
-  height: 32px;
+  width: 32px; height: 32px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #a07820 0%, var(--gold) 60%, #e2b95a 100%);
+  background: linear-gradient(135deg, #9a7220 0%, #c49a3c 60%, #e2b95a 100%);
   color: #07101d;
   display: flex;
   align-items: center;
@@ -165,13 +147,13 @@
   font-weight: 800;
   font-size: 13px;
   flex-shrink: 0;
-  box-shadow: 0 0 0 2px rgba(196,154,60,.25), 0 2px 8px rgba(0,0,0,.3);
+  box-shadow: 0 0 0 2px rgba(196,154,60,.3), 0 2px 8px rgba(0,0,0,.4);
 }
 .sb-user-info { min-width: 0; }
 .sb-user-name {
   font-size: 13px;
   font-weight: 600;
-  color: rgba(255,255,255,.82);
+  color: rgba(255,255,255,.8);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -181,16 +163,13 @@
   font-size: 11px;
   color: rgba(255,255,255,.28);
   text-transform: capitalize;
-  letter-spacing: .02em;
 }
 
 /* ── Mobile topbar ── */
 .sb-topbar { display: none; }
 .sb-overlay { display: none; }
 
-/* ══════════════════════════════
-   RESPONSIVE
-══════════════════════════════ */
+/* ── Responsive ── */
 @media (max-width: 768px) {
   .sidebar {
     transform: translateX(-100%);
@@ -200,14 +179,10 @@
   }
   .sidebar.open {
     transform: translateX(0);
-    box-shadow: 6px 0 28px rgba(0,0,0,.5);
+    box-shadow: 6px 0 32px rgba(0,0,0,.6);
   }
   .sb-close { display: block; }
-  /* Active link bar — inside the sidebar, visible on mobile */
-  .sb-link.active::before { margin-left: -8px; }
-
   .layout-main { margin-left: 0; padding: 16px; }
-
   .sb-topbar {
     display: flex;
     align-items: center;
@@ -218,36 +193,21 @@
     position: sticky;
     top: 0;
     z-index: 50;
-    box-shadow: 0 2px 12px rgba(0,0,0,.25);
+    box-shadow: 0 2px 16px rgba(0,0,0,.3);
   }
   .sb-hamburger {
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 4px;
-    display: flex;
-    flex-direction: column;
-    gap: 5px;
+    background: none; border: none; cursor: pointer;
+    padding: 4px; display: flex; flex-direction: column; gap: 5px;
   }
   .sb-hamburger span {
-    display: block;
-    width: 20px;
-    height: 2px;
-    background: var(--gold);
-    border-radius: 2px;
-    transition: all .2s;
+    display: block; width: 20px; height: 2px;
+    background: var(--gold); border-radius: 2px;
   }
   .sb-topbar-logo { height: 26px; }
-  .sb-topbar-user {
-    margin-left: auto;
-    font-size: 12px;
-    color: rgba(255,255,255,.35);
-  }
+  .sb-topbar-user { margin-left: auto; font-size: 12px; color: rgba(255,255,255,.3); }
   .sb-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,.55);
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,.6);
     backdrop-filter: blur(2px);
     z-index: 99;
   }
