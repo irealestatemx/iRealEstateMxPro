@@ -4182,6 +4182,9 @@ async def whatsapp_bot_sent(request: Request):
         return JSONResponse({"ok": False, "error": "missing_phone"}, status_code=400)
     now = time.time()
     _bot_last_sent[phone] = now
+    # Refrescar conversación activa (reemplaza la llamada antigua a /deactivate)
+    if phone in _active_chats:
+        _active_chats[phone] = now
     sent_norm = _normalize_bot_text(message)
     if sent_norm:
         _bot_sent_texts.setdefault(phone, []).append((now, sent_norm))
