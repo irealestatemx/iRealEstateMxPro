@@ -7,9 +7,23 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/sidebar.css"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      corePlugins: { preflight: false },
+      theme: {
+        extend: {
+          colors: {
+            navy: { 950:'#04080f', 900:'#07101d', 800:'#0d1626', 700:'#111d30', 600:'#182437' },
+            gold: { DEFAULT:'#c49a3c', light:'#e2b95a', dim:'#9a7220' }
+          }
+        }
+      }
+    }
+  </script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: #0d0d0d; color: #e0e0e0; min-height: 100vh; }
+    body { font-family: 'Inter', sans-serif; background: #04080f; color: #e0e0e0; min-height: 100vh; }
     /* topbar replaced by sidebar */
     .notif-badge {
       background: #e74c3c; color: #fff; font-size: 10px; font-weight: 700;
@@ -21,8 +35,21 @@
     /* Stats row */
     .stats-row { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
     .stat-card {
-      background: #1a1a1a; border: 1px solid rgba(201,162,39,.15); border-radius: 10px;
+      background: linear-gradient(135deg, #0d1626 0%, #111d30 100%);
+      border: 1px solid rgba(196,154,60,.12);
+      border-radius: 12px;
       padding: 14px 20px; flex: 1; min-width: 100px; text-align: center;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+      transition: border-color .2s, transform .2s;
+    }
+    .stat-card:hover { border-color: rgba(196,154,60,.28); transform: translateY(-1px); }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 20%; right: 20%; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(196,154,60,.5), transparent);
     }
     .stat-card .num { font-size: 26px; font-weight: 700; }
     .stat-card .lbl { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 2px; }
@@ -45,10 +72,12 @@
     /* Property cards */
     .prop-list { display: flex; flex-direction: column; gap: 12px; }
     .prop-row {
-      background: #1a1a1a; border: 1px solid rgba(255,255,255,.08); border-radius: 12px;
-      padding: 18px 20px; transition: border-color .2s;
+      background: linear-gradient(145deg, #0d1626 0%, #0a1220 100%);
+      border: 1px solid rgba(255,255,255,.06); border-radius: 12px;
+      padding: 18px 20px; transition: border-color .2s, box-shadow .2s;
+      backdrop-filter: blur(6px);
     }
-    .prop-row:hover { border-color: rgba(201,162,39,.25); }
+    .prop-row:hover { border-color: rgba(196,154,60,.22); box-shadow: 0 4px 20px rgba(0,0,0,.3); }
     .prop-row.st-atorado { border-left: 4px solid #fc8181; }
     .prop-row.st-esperando_notaria { border-left: 4px solid #9f7aea; box-shadow: 0 0 12px rgba(159,122,234,.1); }
     .prop-row.st-en_cierre { border-left: 4px solid #48bb78; box-shadow: 0 0 12px rgba(72,187,120,.1); }

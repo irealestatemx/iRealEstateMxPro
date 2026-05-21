@@ -7,28 +7,62 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/sidebar.css"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      corePlugins: { preflight: false },
+      theme: {
+        extend: {
+          colors: {
+            navy: { 950:'#04080f', 900:'#07101d', 800:'#0d1626', 700:'#111d30', 600:'#182437' },
+            gold: { DEFAULT:'#c49a3c', light:'#e2b95a', dim:'#9a7220' }
+          }
+        }
+      }
+    }
+  </script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: #0d0d0d; color: #e0e0e0; min-height: 100vh; }
-    /* topbar replaced by sidebar */
+    body { font-family: 'Inter', sans-serif; background: #04080f; color: #e0e0e0; min-height: 100vh; }
     .container { max-width: 1200px; margin: 24px auto; padding: 0 20px; }
     .page-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; flex-wrap: wrap; gap: 12px; }
-    .page-header h1 { font-size: 24px; color: #c9a227; font-family: 'Playfair Display', serif; }
-    .filter-bar { display: flex; gap: 10px; align-items: center; }
+    .page-header h1 { font-size: 26px; color: #c9a227; font-family: 'Playfair Display', serif; letter-spacing: -.02em; }
+    .filter-bar { display: flex; gap: 8px; align-items: center; }
     .filter-bar select {
-      padding: 8px 14px; border: 2px solid #e2e8f0; border-radius: 8px;
-      font-size: 14px; font-family: 'Inter', sans-serif;
+      padding: 8px 32px 8px 12px; border: 1px solid rgba(196,154,60,.2); border-radius: 8px;
+      font-size: 13px; font-family: 'Inter', sans-serif;
+      background: rgba(13,22,38,.8) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='rgba(196,154,60,0.5)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+      color: rgba(255,255,255,.75); outline: none; cursor: pointer; -webkit-appearance: none; appearance: none;
+      transition: border-color .2s;
     }
+    .filter-bar select:focus { border-color: #c49a3c; box-shadow: 0 0 0 3px rgba(196,154,60,.12); }
     .stats-row { display: flex; gap: 16px; margin-bottom: 24px; flex-wrap: wrap; }
     .stat-card {
-      background: #1a1a1a; border: 1px solid rgba(201,162,39,.15); border-radius: 10px; padding: 16px 24px;
+      background: linear-gradient(135deg, #0d1626 0%, #111d30 100%);
+      border: 1px solid rgba(196,154,60,.12);
+      border-radius: 12px;
+      padding: 18px 24px;
       flex: 1; min-width: 140px;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+      transition: border-color .2s, transform .2s;
+    }
+    .stat-card:hover { border-color: rgba(196,154,60,.28); transform: translateY(-1px); }
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 20%; right: 20%; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(196,154,60,.5), transparent);
     }
     .stat-card .num { font-size: 28px; font-weight: 700; color: #c9a227; }
     .stat-card .lbl { font-size: 12px; color: rgba(255,255,255,.4); margin-top: 2px; }
     .props-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
     .prop-card {
-      background: #1a1a1a; border: 1px solid rgba(201,162,39,.1); border-radius: 12px; overflow: hidden;
+      background: linear-gradient(145deg, #0d1626 0%, #0a1220 100%);
+      border: 1px solid rgba(196,154,60,.08);
+      border-radius: 12px; overflow: hidden;
+      backdrop-filter: blur(8px);
       transition: transform 0.15s, border-color .2s;
     }
     .prop-card:hover { transform: translateY(-2px); border-color: rgba(201,162,39,.3); }

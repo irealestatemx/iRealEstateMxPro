@@ -7,6 +7,20 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/sidebar.css"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      corePlugins: { preflight: false },
+      theme: {
+        extend: {
+          colors: {
+            navy: { 950:'#04080f', 900:'#07101d', 800:'#0d1626', 700:'#111d30', 600:'#182437' },
+            gold: { DEFAULT:'#c49a3c', light:'#e2b95a', dim:'#9a7220' }
+          }
+        }
+      }
+    }
+  </script>
   <style>
     :root {
       --black: #0a0a0a;

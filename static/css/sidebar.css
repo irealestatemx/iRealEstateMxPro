@@ -1,16 +1,23 @@
-/* ═══════════════════════════════
-   Sidebar — iRealEstateMxPro
-   Dark luxury · deep navy-black
-═══════════════════════════════ */
+/* ═══════════════════════════════════════════════
+   Sidebar — iRealEstateMxPro  ·  Enhanced Dark
+═══════════════════════════════════════════════ */
 
 :root {
   --sb-width:      242px;
   --sb-bg:         #07101d;
   --sb-border:     rgba(255,255,255,.05);
   --gold:          #c49a3c;
+  --gold-light:    #e2b95a;
+  --gold-dim:      #9a7220;
   --gold-pale:     rgba(196,154,60,.1);
-  --layout-bg:     #080f1c;
+  --layout-bg:     #04080f;
 }
+
+/* ── Global scrollbar ── */
+*::-webkit-scrollbar { width: 5px; height: 5px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: rgba(196,154,60,.15); border-radius: 3px; }
+*::-webkit-scrollbar-thumb:hover { background: rgba(196,154,60,.35); }
 
 /* ── Layout wrapper ── */
 .layout { display: flex; min-height: 100vh; }
@@ -20,6 +27,10 @@
   padding: 28px 32px;
   min-width: 0;
   background: var(--layout-bg);
+  background-image:
+    linear-gradient(rgba(255,255,255,.014) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.014) 1px, transparent 1px);
+  background-size: 52px 52px;
 }
 
 /* ── Sidebar shell ── */
@@ -27,7 +38,7 @@
   position: fixed;
   top: 0; left: 0; bottom: 0;
   width: var(--sb-width);
-  background: var(--sb-bg);
+  background: linear-gradient(180deg, #07101d 0%, #060e1a 100%);
   border-right: 1px solid var(--sb-border);
   display: flex;
   flex-direction: column;
@@ -35,6 +46,12 @@
   overflow-y: auto;
   overflow-x: hidden;
 }
+
+/* custom scrollbar */
+.sidebar::-webkit-scrollbar { width: 3px; }
+.sidebar::-webkit-scrollbar-track { background: transparent; }
+.sidebar::-webkit-scrollbar-thumb { background: rgba(196,154,60,.15); border-radius: 2px; }
+.sidebar::-webkit-scrollbar-thumb:hover { background: rgba(196,154,60,.3); }
 
 /* ── Header ── */
 .sb-header {
@@ -44,6 +61,14 @@
   align-items: center;
   justify-content: space-between;
   flex-shrink: 0;
+  position: relative;
+}
+.sb-header::after {
+  content: '';
+  position: absolute;
+  bottom: 0; left: 16px; right: 16px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(196,154,60,.2), transparent);
 }
 .sb-logo { height: 30px; }
 .sb-close {
@@ -66,16 +91,16 @@
   overflow-y: auto;
 }
 .sb-section {
-  font-size: 9.5px;
+  font-size: 9px;
   font-weight: 800;
-  letter-spacing: 1.6px;
-  color: rgba(255,255,255,.2);
-  padding: 18px 8px 5px;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,.18);
+  padding: 20px 10px 6px;
   text-transform: uppercase;
   user-select: none;
 }
 
-/* Nav links — pill con barra dorada */
+/* Nav links */
 .sb-link {
   display: flex;
   align-items: center;
@@ -92,13 +117,13 @@
   letter-spacing: .01em;
 }
 .sb-link:hover {
-  color: rgba(255,255,255,.8);
+  color: rgba(255,255,255,.85);
   background: rgba(255,255,255,.05);
 }
 .sb-link.active {
   color: #fff;
-  background: rgba(196,154,60,.1);
-  box-shadow: inset 0 0 0 1px rgba(196,154,60,.2);
+  background: rgba(196,154,60,.08);
+  box-shadow: inset 0 0 0 1px rgba(196,154,60,.18);
 }
 .sb-link.active::before {
   content: '';
@@ -106,18 +131,19 @@
   left: 0; top: 50%;
   transform: translateY(-50%);
   width: 3px;
-  height: 58%;
-  background: var(--gold);
+  height: 60%;
+  background: linear-gradient(180deg, var(--gold-dim), var(--gold), var(--gold-light));
   border-radius: 0 3px 3px 0;
+  box-shadow: 0 0 8px rgba(196,154,60,.5);
 }
 .sb-link svg {
-  width: 17px; height: 17px;
+  width: 16px; height: 16px;
   fill: currentColor;
   flex-shrink: 0;
-  opacity: .55;
+  opacity: .5;
   transition: opacity .15s;
 }
-.sb-link:hover svg { opacity: .8; }
+.sb-link:hover svg { opacity: .85; }
 .sb-link.active svg { opacity: 1; color: var(--gold); }
 
 /* ── Footer ── */
@@ -125,6 +151,14 @@
   border-top: 1px solid var(--sb-border);
   padding: 8px;
   flex-shrink: 0;
+  position: relative;
+}
+.sb-footer::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 12px; right: 12px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(196,154,60,.15), transparent);
 }
 .sb-web  { color: rgba(255,255,255,.28); font-size: 12px; }
 .sb-logout { color: rgba(239,68,68,.5); font-size: 12px; }
@@ -145,24 +179,27 @@
   align-items: center;
   justify-content: center;
   font-weight: 800;
-  font-size: 13px;
+  font-size: 12px;
   flex-shrink: 0;
-  box-shadow: 0 0 0 2px rgba(196,154,60,.3), 0 2px 8px rgba(0,0,0,.4);
+  box-shadow: 0 0 0 2px rgba(196,154,60,.25), 0 2px 8px rgba(0,0,0,.4), 0 0 12px rgba(196,154,60,.15);
 }
 .sb-user-info { min-width: 0; }
 .sb-user-name {
   font-size: 13px;
   font-weight: 600;
-  color: rgba(255,255,255,.8);
+  color: rgba(255,255,255,.82);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: -.01em;
 }
 .sb-user-role {
-  font-size: 11px;
-  color: rgba(255,255,255,.28);
-  text-transform: capitalize;
+  font-size: 10px;
+  color: var(--gold);
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  font-weight: 600;
+  opacity: .7;
 }
 
 /* ── Mobile topbar ── */
@@ -179,7 +216,7 @@
   }
   .sidebar.open {
     transform: translateX(0);
-    box-shadow: 6px 0 32px rgba(0,0,0,.6);
+    box-shadow: 8px 0 40px rgba(0,0,0,.7);
   }
   .sb-close { display: block; }
   .layout-main { margin-left: 0; padding: 16px; }
@@ -193,7 +230,7 @@
     position: sticky;
     top: 0;
     z-index: 50;
-    box-shadow: 0 2px 16px rgba(0,0,0,.3);
+    box-shadow: 0 2px 20px rgba(0,0,0,.4);
   }
   .sb-hamburger {
     background: none; border: none; cursor: pointer;
@@ -202,13 +239,14 @@
   .sb-hamburger span {
     display: block; width: 20px; height: 2px;
     background: var(--gold); border-radius: 2px;
+    transition: all .2s;
   }
   .sb-topbar-logo { height: 26px; }
   .sb-topbar-user { margin-left: auto; font-size: 12px; color: rgba(255,255,255,.3); }
   .sb-overlay {
     display: none; position: fixed; inset: 0;
-    background: rgba(0,0,0,.6);
-    backdrop-filter: blur(2px);
+    background: rgba(0,0,0,.7);
+    backdrop-filter: blur(3px);
     z-index: 99;
   }
   .sidebar.open ~ .sb-overlay { display: block; }

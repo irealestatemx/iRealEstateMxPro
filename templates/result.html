@@ -7,16 +7,32 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/static/css/style.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      corePlugins: { preflight: false },
+      theme: {
+        extend: {
+          colors: {
+            navy: { 950:'#04080f', 900:'#07101d', 800:'#0d1626', 700:'#111d30', 600:'#182437' },
+            gold: { DEFAULT:'#c49a3c', light:'#e2b95a', dim:'#9a7220' }
+          }
+        }
+      }
+    }
+  </script>
   <style>
     /* ── Tabs navigation ── */
     .tabs-nav {
       display: flex;
       gap: 0;
-      background: #1a3c5e;
+      background: linear-gradient(135deg, #0d1626 0%, #111d30 100%);
       border-radius: 14px 14px 0 0;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
+      border: 1px solid rgba(196,154,60,.12);
+      border-bottom: none;
     }
     .tabs-nav::-webkit-scrollbar { display: none; }
     .tab-btn {

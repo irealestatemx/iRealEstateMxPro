@@ -83,6 +83,20 @@
     .share-btn:hover{border-color:var(--gold);color:var(--gold)}
     .share-btn svg{width:14px;height:14px;fill:currentColor}
   </style>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      corePlugins: { preflight: false },
+      theme: {
+        extend: {
+          colors: {
+            navy: { 950:'#04080f', 900:'#07101d', 800:'#0d1626', 700:'#111d30', 600:'#182437' },
+            gold: { DEFAULT:'#c49a3c', light:'#e2b95a', dim:'#9a7220' }
+          }
+        }
+      }
+    }
+  </script>
 </head>
 <body>
 

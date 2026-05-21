@@ -7,9 +7,23 @@
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="/static/css/sidebar.css"/>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      corePlugins: { preflight: false },
+      theme: {
+        extend: {
+          colors: {
+            navy: { 950:'#04080f', 900:'#07101d', 800:'#0d1626', 700:'#111d30', 600:'#182437' },
+            gold: { DEFAULT:'#c49a3c', light:'#e2b95a', dim:'#9a7220' }
+          }
+        }
+      }
+    }
+  </script>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
-    body{font-family:'Inter',sans-serif;background:#0d0d0d;color:#e0e0e0;min-height:100vh}
+    body{font-family:'Inter',sans-serif;background:#04080f;color:#e0e0e0;min-height:100vh}
     .container{max-width:1200px;margin:24px auto;padding:0 20px}
     h1{font-size:24px;color:#c9a227;font-family:'Playfair Display',serif;margin-bottom:4px}
     .sub{font-size:13px;color:rgba(255,255,255,.4);margin-bottom:24px}
@@ -19,7 +33,7 @@
 
     /* KPI Cards */
     .kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:14px;margin-bottom:28px}
-    .kpi-card{background:#1a1a1a;border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:18px;text-align:center;transition:border-color .2s}
+    .kpi-card{background:linear-gradient(135deg,#0d1626 0%,#111d30 100%);border:1px solid rgba(196,154,60,.1);border-radius:12px;padding:18px;text-align:center;transition:border-color .2s}
     .kpi-card:hover{border-color:rgba(201,162,39,.25)}
     .kpi-num{font-size:32px;font-weight:700;line-height:1}
     .kpi-label{font-size:11px;color:rgba(255,255,255,.4);margin-top:6px}
@@ -50,7 +64,7 @@
     .kanban-col{background:#111;border:1px solid rgba(255,255,255,.06);border-radius:10px;padding:12px;min-height:200px}
     .kanban-col-title{font-size:12px;font-weight:700;color:rgba(255,255,255,.5);text-transform:uppercase;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center}
     .kanban-col-title .count{background:rgba(255,255,255,.08);padding:1px 7px;border-radius:8px;font-size:10px}
-    .k-card{background:#1a1a1a;border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:grab;transition:border-color .2s}
+    .k-card{background:linear-gradient(135deg,#0d1626 0%,#0a1020 100%);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:grab;transition:border-color .2s}
     .k-card:hover{border-color:rgba(201,162,39,.25)}
     .k-card-title{font-size:12px;font-weight:600;color:#fff;margin-bottom:2px}
     .k-card-sub{font-size:11px;color:rgba(255,255,255,.35)}
@@ -60,7 +74,7 @@
     .k-btn:hover{border-color:#c9a227;color:#c9a227}
 
     /* Bloqueos */
-    .bloq-card{background:#1a1a1a;border:1px solid rgba(252,129,129,.15);border-left:4px solid #fc8181;border-radius:10px;padding:14px 18px;margin-bottom:10px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+    .bloq-card{background:linear-gradient(135deg,#0d1626 0%,#0a1020 100%);border:1px solid rgba(252,129,129,.18);border-left:4px solid #fc8181;border-radius:10px;padding:14px 18px;margin-bottom:10px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
     .bloq-info{flex:1;min-width:200px}
     .bloq-title{font-size:13px;font-weight:600;color:#fff}
     .bloq-sub{font-size:11px;color:rgba(255,255,255,.4)}
@@ -68,7 +82,7 @@
     .bloq-actions{display:flex;gap:6px}
 
     /* Standup */
-    .standup-form{background:#1a1a1a;border:1px solid rgba(201,162,39,.15);border-radius:12px;padding:24px;margin-bottom:24px}
+    .standup-form{background:linear-gradient(145deg,#0d1626 0%,#111d30 100%);border:1px solid rgba(196,154,60,.15);border-radius:12px;padding:24px;margin-bottom:24px}
     .standup-form h3{font-size:16px;color:#c9a227;margin-bottom:14px}
     .sf-field{margin-bottom:14px}
     .sf-field label{font-size:12px;font-weight:600;color:rgba(255,255,255,.5);display:block;margin-bottom:4px}
@@ -76,7 +90,7 @@
     .sf-field textarea:focus{outline:none;border-color:#c9a227}
     .standup-done{background:#111;border:1px solid rgba(104,211,145,.15);border-radius:10px;padding:16px;text-align:center;color:#68d391;font-size:14px;margin-bottom:24px}
 
-    .btn-primary{padding:10px 24px;background:linear-gradient(135deg,#c9a227,#d4af37);color:#000;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif}
+    .btn-primary{padding:10px 24px;background:linear-gradient(135deg,#9a7220,#c49a3c 50%,#e2b95a 100%);color:#07101d;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;box-shadow:0 2px 12px rgba(196,154,60,.3);transition:all .2s}
     .btn-primary:hover{opacity:.9}
     .btn-outline{padding:8px 16px;border:1px solid rgba(201,162,39,.3);border-radius:8px;background:transparent;color:#c9a227;font-size:12px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif;text-decoration:none}
     .btn-outline:hover{background:rgba(201,162,39,.1)}
@@ -91,7 +105,7 @@
     /* Modal sprint */
     .modal-ov{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999;display:none;align-items:center;justify-content:center;padding:20px}
     .modal-ov.open{display:flex}
-    .modal-box{background:#1a1a1a;border:1px solid rgba(201,162,39,.2);border-radius:14px;max-width:500px;width:100%;padding:28px;position:relative}
+    .modal-box{background:linear-gradient(145deg,#0d1626 0%,#0e1828 100%);border:1px solid rgba(196,154,60,.22);backdrop-filter:blur(16px);border-radius:14px;max-width:500px;width:100%;padding:28px;position:relative}
     .modal-box h3{font-size:16px;color:#c9a227;margin-bottom:14px}
     .modal-close{position:absolute;top:12px;right:16px;background:none;border:none;color:rgba(255,255,255,.4);font-size:22px;cursor:pointer}
     .mf-field{margin-bottom:12px}
@@ -100,7 +114,7 @@
     .mf-field input:focus,.mf-field textarea:focus{outline:none;border-color:#c9a227}
 
     /* Sprint review card */
-    .review-card{background:#1a1a1a;border:1px solid rgba(201,162,39,.15);border-radius:12px;padding:20px;margin-bottom:16px}
+    .review-card{background:linear-gradient(145deg,#0d1626 0%,#111d30 100%);border:1px solid rgba(196,154,60,.15);border-radius:12px;padding:20px;margin-bottom:16px}
     .review-card h4{font-size:14px;color:#c9a227;margin-bottom:10px}
     .review-bar{height:10px;background:rgba(255,255,255,.08);border-radius:6px;overflow:hidden;margin:8px 0}
     .review-fill{height:100%;border-radius:6px;transition:width .4s}

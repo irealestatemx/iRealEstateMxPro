@@ -84,17 +84,32 @@ body {
   display: flex;
   flex-direction: column;
   -webkit-font-smoothing: antialiased;
+  background-image:
+    linear-gradient(rgba(255,255,255,.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,.018) 1px, transparent 1px);
+  background-size: 52px 52px;
 }
+
+/* custom scrollbar */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(196,154,60,.2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(196,154,60,.4); }
 
 /* ══════════════════════════════
    HEADER
 ══════════════════════════════ */
 .site-header {
-  background: rgba(7,16,29,.95);
+  background: rgba(7,16,29,.9);
   color: var(--text-1);
   padding: 16px 28px;
-  border-bottom: 1px solid var(--border);
-  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(196,154,60,.1);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 1px 20px rgba(0,0,0,.3);
 }
 .header-inner {
   max-width: 1140px;
