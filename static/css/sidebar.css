@@ -1,17 +1,24 @@
 /* ═══════════════════════════════════════════════
-   Sidebar — iRealEstateMxPro  ·  Enhanced Dark
+   Sidebar — iRealEstateMxPro  ·  Cinematic Ink
 ═══════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800;900&family=Josefin+Sans:wght@300;400;500;600;700&display=swap');
 
 :root {
   --sb-width:      242px;
-  --sb-bg:         #07101d;
+  --sb-bg:         #0b0907;
   --sb-border:     rgba(255,255,255,.05);
   --gold:          #c49a3c;
   --gold-light:    #e2b95a;
   --gold-dim:      #9a7220;
   --gold-pale:     rgba(196,154,60,.1);
-  --layout-bg:     #04080f;
+  --layout-bg:     #070504;
 }
+
+/* ── Display headings → Cinzel ── */
+.layout-main h1,
+.layout-main h2,
+.layout-main h3 { font-family: 'Cinzel', Georgia, serif; letter-spacing: -.005em; }
 
 /* ── Global scrollbar ── */
 *::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -38,8 +45,9 @@
   position: fixed;
   top: 0; left: 0; bottom: 0;
   width: var(--sb-width);
-  background: linear-gradient(180deg, #07101d 0%, #060e1a 100%);
+  background: linear-gradient(180deg, #0b0907 0%, #080605 100%);
   border-right: 1px solid var(--sb-border);
+  font-family: 'Josefin Sans', system-ui, sans-serif;
   display: flex;
   flex-direction: column;
   z-index: 100;

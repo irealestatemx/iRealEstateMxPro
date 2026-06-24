@@ -14,7 +14,7 @@
       theme: {
         extend: {
           colors: {
-            navy: { 950:'#04080f', 900:'#07101d', 800:'#0d1626', 700:'#111d30', 600:'#182437' },
+            navy: { 950:'#070504', 900:'#0b0907', 800:'#12100c', 700:'#1a1712', 600:'#241f18' },
             gold: { DEFAULT:'#c49a3c', light:'#e2b95a', dim:'#9a7220' }
           }
         }
@@ -23,14 +23,14 @@
   </script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: #04080f; color: #e0e0e0; min-height: 100vh; }
+    body { font-family: 'Josefin Sans', sans-serif; background: #070504; color: #e0e0e0; min-height: 100vh; }
     /* topbar replaced by sidebar */
     .container { max-width: 900px; margin: 24px auto; padding: 0 20px; }
-    h1 { font-size: 22px; color: #c9a227; font-family: 'Playfair Display', serif; margin-bottom: 20px; }
+    h1 { font-size: 22px; color: #c49a3c; font-family: 'Cinzel', serif; margin-bottom: 20px; }
 
     /* Tarjeta propiedad */
     .prop-card {
-      background: #1a1a1a; border: 1px solid rgba(201,162,39,.15); border-radius: 12px;
+      background: #12100c; border: 1px solid rgba(201,162,39,.15); border-radius: 12px;
       display: flex; gap: 16px; padding: 16px; margin-bottom: 28px; align-items: center;
     }
     .prop-card img { width: 120px; height: 90px; object-fit: cover; border-radius: 8px; background: #222; flex-shrink: 0; }
@@ -51,36 +51,36 @@
       margin-bottom: 24px;
     }
     .tipo-option {
-      background: #1a1a1a; border: 2px solid rgba(255,255,255,.1); border-radius: 10px;
+      background: #12100c; border: 2px solid rgba(255,255,255,.1); border-radius: 10px;
       padding: 18px 16px; text-align: center; cursor: pointer; transition: all .2s;
     }
     .tipo-option:hover { border-color: rgba(201,162,39,.4); }
-    .tipo-option.selected { border-color: #c9a227; background: rgba(201,162,39,.08); }
+    .tipo-option.selected { border-color: #c49a3c; background: rgba(201,162,39,.08); }
     .tipo-option input { display: none; }
     .tipo-option .tipo-label { font-size: 14px; font-weight: 600; color: #fff; }
     .tipo-option .tipo-icon { font-size: 28px; margin-bottom: 8px; display: block; }
 
     .btn-guardar {
-      padding: 12px 32px; background: #c9a227; color: #0d0d0d; border: none; border-radius: 8px;
-      font-size: 14px; font-weight: 700; cursor: pointer; font-family: 'Inter', sans-serif;
+      padding: 12px 32px; background: #c49a3c; color: #070504; border: none; border-radius: 8px;
+      font-size: 14px; font-weight: 700; cursor: pointer; font-family: 'Josefin Sans', sans-serif;
       transition: background .2s; display: none;
     }
-    .btn-guardar:hover { background: #d4af37; }
+    .btn-guardar:hover { background: #e2b95a; }
     .btn-guardar.visible { display: inline-block; }
 
     /* Estado guardado */
     .tipo-guardado {
-      background: #1a1a1a; border: 2px solid #c9a227; border-radius: 10px;
+      background: #12100c; border: 2px solid #c49a3c; border-radius: 10px;
       padding: 20px; text-align: center;
     }
     .tipo-guardado .tipo-icon { font-size: 32px; margin-bottom: 8px; }
-    .tipo-guardado .tipo-label { font-size: 18px; font-weight: 700; color: #c9a227; }
+    .tipo-guardado .tipo-label { font-size: 18px; font-weight: 700; color: #c49a3c; }
     .tipo-guardado .tipo-nota { font-size: 13px; color: rgba(255,255,255,.4); margin-top: 6px; }
 
     /* Checklist docs */
     .doc-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 28px; }
     .doc-row {
-      background: #1a1a1a; border: 1px solid rgba(255,255,255,.08); border-radius: 10px;
+      background: #12100c; border: 1px solid rgba(255,255,255,.08); border-radius: 10px;
       padding: 14px 18px; display: flex; align-items: center; justify-content: space-between;
       gap: 12px; flex-wrap: wrap;
     }
@@ -93,25 +93,25 @@
       font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px;
       text-transform: uppercase; flex-shrink: 0;
     }
-    .badge-req { background: rgba(201,162,39,.15); color: #c9a227; }
+    .badge-req { background: rgba(201,162,39,.15); color: #c49a3c; }
     .badge-opt { background: rgba(255,255,255,.06); color: rgba(255,255,255,.4); }
     .badge-ok { background: rgba(104,211,145,.15); color: #68d391; }
-    .badge-pending { background: rgba(201,162,39,.15); color: #c9a227; }
+    .badge-pending { background: rgba(201,162,39,.15); color: #c49a3c; }
     .badge-rejected { background: rgba(252,129,129,.15); color: #fc8181; }
     .doc-notas { font-size: 12px; color: #fc8181; width: 100%; margin-top: 4px; padding: 6px 10px; background: rgba(252,129,129,.08); border-radius: 6px; }
     .doc-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
     .btn-upload {
       padding: 6px 14px; border: none; border-radius: 6px; font-size: 12px;
-      font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;
-      background: #c9a227; color: #000; transition: background .2s;
+      font-weight: 600; cursor: pointer; font-family: 'Josefin Sans', sans-serif;
+      background: #c49a3c; color: #000; transition: background .2s;
     }
-    .btn-upload:hover { background: #d4af37; }
+    .btn-upload:hover { background: #e2b95a; }
     .btn-view {
       padding: 6px 12px; border: 1px solid rgba(255,255,255,.15); border-radius: 6px;
       font-size: 11px; color: rgba(255,255,255,.6); background: none; cursor: pointer;
-      text-decoration: none; font-family: 'Inter', sans-serif;
+      text-decoration: none; font-family: 'Josefin Sans', sans-serif;
     }
-    .btn-view:hover { border-color: #c9a227; color: #c9a227; }
+    .btn-view:hover { border-color: #c49a3c; color: #c49a3c; }
     .status-msg { font-size: 12px; padding: 4px 0; display: none; }
     .status-msg.ok { color: #68d391; display: block; }
     .status-msg.err { color: #fc8181; display: block; }
@@ -159,7 +159,7 @@
           <div class="prop-card-info">
             <h2>{{ p.tipo_propiedad }} en {{ p.operacion }}</h2>
             <p>{{ p.direccion }}, {{ p.ciudad }}</p>
-            <p style="color:#c9a227; font-weight:600; margin-top:4px;">{{ p.precio_formateado }}</p>
+            <p style="color:#c49a3c; font-weight:600; margin-top:4px;">{{ p.precio_formateado }}</p>
           </div>
         </div>
       </a>
@@ -177,7 +177,7 @@
       <div class="prop-card-info">
         <h2>{{ propiedad.tipo_propiedad }} en {{ propiedad.operacion }}</h2>
         <p>{{ propiedad.direccion }}, {{ propiedad.ciudad }}</p>
-        <p style="color:#c9a227; font-weight:600; margin-top:4px;">{{ propiedad.precio_formateado }}</p>
+        <p style="color:#c49a3c; font-weight:600; margin-top:4px;">{{ propiedad.precio_formateado }}</p>
       </div>
     </div>
 
@@ -202,16 +202,16 @@
     <div class="section-title">Documentos requeridos</div>
 
     {% if progreso %}
-    <div id="progreso-box" style="background:#1a1a1a;border:1px solid rgba(201,162,39,.15);border-radius:10px;padding:16px 20px;margin-bottom:20px;">
-      <div style="font-size:15px;font-weight:700;color:#c9a227;margin-bottom:10px;">Progreso de tu trámite</div>
+    <div id="progreso-box" style="background:#12100c;border:1px solid rgba(201,162,39,.15);border-radius:10px;padding:16px 20px;margin-bottom:20px;">
+      <div style="font-size:15px;font-weight:700;color:#c49a3c;margin-bottom:10px;">Progreso de tu trámite</div>
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
         <span id="progreso-texto" style="font-size:13px;font-weight:600;color:#fff;">{{ progreso.obligatorios_subidos }} de {{ progreso.obligatorios_total }} obligatorios</span>
-        <span id="progreso-pct" style="font-size:13px;font-weight:700;color:#c9a227;">{{ progreso.porcentaje }}%</span>
+        <span id="progreso-pct" style="font-size:13px;font-weight:700;color:#c49a3c;">{{ progreso.porcentaje }}%</span>
       </div>
       <div style="background:rgba(255,255,255,.08);border-radius:6px;height:10px;overflow:hidden;">
-        <div id="progreso-bar" style="background:{% if progreso.porcentaje == 100 %}#68d391{% elif progreso.porcentaje >= 50 %}#c9a227{% else %}#fc8181{% endif %};height:100%;width:{{ progreso.porcentaje }}%;border-radius:6px;transition:width .4s;"></div>
+        <div id="progreso-bar" style="background:{% if progreso.porcentaje == 100 %}#68d391{% elif progreso.porcentaje >= 50 %}#c49a3c{% else %}#fc8181{% endif %};height:100%;width:{{ progreso.porcentaje }}%;border-radius:6px;transition:width .4s;"></div>
       </div>
-      <p id="progreso-msg" style="font-size:13px;margin-top:10px;font-weight:500;color:{% if progreso.porcentaje == 100 %}#68d391{% elif progreso.porcentaje > 80 %}#63b3ed{% elif progreso.porcentaje >= 30 %}#c9a227{% else %}rgba(255,255,255,.5){% endif %};">
+      <p id="progreso-msg" style="font-size:13px;margin-top:10px;font-weight:500;color:{% if progreso.porcentaje == 100 %}#68d391{% elif progreso.porcentaje > 80 %}#63b3ed{% elif progreso.porcentaje >= 30 %}#c49a3c{% else %}rgba(255,255,255,.5){% endif %};">
         {% if progreso.porcentaje == 100 %}Todo listo para avanzar a firma
         {% elif progreso.porcentaje > 80 %}Estás cerca de finalizar tu proceso
         {% elif progreso.porcentaje >= 30 %}Vas avanzando, pronto podremos continuar con el proceso
@@ -260,8 +260,8 @@
       {% endfor %}
     </div>
 
-    <div style="background:#1a1a1a;border:1px solid rgba(201,162,39,.1);border-radius:10px;padding:16px 20px;margin-bottom:16px;">
-      <h3 style="font-size:13px;color:#c9a227;margin-bottom:8px;">Links para tramitar documentos</h3>
+    <div style="background:#12100c;border:1px solid rgba(201,162,39,.1);border-radius:10px;padding:16px 20px;margin-bottom:16px;">
+      <h3 style="font-size:13px;color:#c49a3c;margin-bottom:8px;">Links para tramitar documentos</h3>
       <a href="https://www.gob.mx/curp/" target="_blank" style="color:#63b3ed;font-size:13px;text-decoration:none;display:block;margin-bottom:4px;">Consulta y descarga tu CURP</a>
       <a href="https://www.miregistrocivil.gob.mx/" target="_blank" style="color:#63b3ed;font-size:13px;text-decoration:none;display:block;">Solicita actas de nacimiento / matrimonio / divorcio</a>
     </div>
@@ -297,7 +297,7 @@
     {% endif %}
 
     <!-- Gastos de cierre (si existen) -->
-    <div id="gastosCompradorSection" style="display:none;background:#1a1a1a;border:1px solid rgba(99,179,237,.2);border-radius:10px;padding:16px 20px;margin-top:20px;">
+    <div id="gastosCompradorSection" style="display:none;background:#12100c;border:1px solid rgba(99,179,237,.2);border-radius:10px;padding:16px 20px;margin-top:20px;">
       <div style="font-size:15px;font-weight:700;color:#63b3ed;margin-bottom:12px;">&#x1F4B0; Tus gastos estimados de cierre</div>
       <div id="gastosCompradorLista"></div>
       <div style="border-top:1px solid rgba(255,255,255,.1);margin-top:10px;padding-top:10px;text-align:right;">
@@ -349,7 +349,7 @@
     var porcentaje = t > 0 ? Math.round(s / t * 100) : 0;
 
     bar.style.width = porcentaje + '%';
-    bar.style.background = porcentaje >= 100 ? '#68d391' : porcentaje >= 50 ? '#c9a227' : '#fc8181';
+    bar.style.background = porcentaje >= 100 ? '#68d391' : porcentaje >= 50 ? '#c49a3c' : '#fc8181';
     pct.textContent = porcentaje + '%';
     texto.textContent = s + ' de ' + t + ' obligatorios';
 
@@ -361,7 +361,7 @@
       msg.style.color = '#63b3ed';
     } else if (porcentaje >= 30) {
       msg.textContent = 'Vas avanzando, pronto podremos continuar con el proceso';
-      msg.style.color = '#c9a227';
+      msg.style.color = '#c49a3c';
     } else {
       msg.textContent = 'Completa tus documentos para avanzar con tu compra';
       msg.style.color = 'rgba(255,255,255,.5)';

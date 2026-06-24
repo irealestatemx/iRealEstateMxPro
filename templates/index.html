@@ -14,7 +14,7 @@
       theme: {
         extend: {
           colors: {
-            navy: { 950:'#04080f', 900:'#07101d', 800:'#0d1626', 700:'#111d30', 600:'#182437' },
+            navy: { 950:'#070504', 900:'#0b0907', 800:'#12100c', 700:'#1a1712', 600:'#241f18' },
             gold: { DEFAULT:'#c49a3c', light:'#e2b95a', dim:'#9a7220' }
           }
         }
@@ -30,10 +30,10 @@
       </div>
       <p class="header-tagline">Genera contenido profesional para tus propiedades en segundos</p>
       <div style="display:flex;gap:12px;align-items:center;">
-        <a href="/dashboard" style="color:#c9a227;font-size:13px;text-decoration:none;font-weight:500;">Propiedades</a>
+        <a href="/dashboard" style="color:#c49a3c;font-size:13px;text-decoration:none;font-weight:500;">Propiedades</a>
         {% if user and user.rol == 'admin' %}
-        <a href="/admin/prospectos" style="color:#c9a227;font-size:13px;text-decoration:none;font-weight:500;">Prospectos</a>
-        <a href="/admin/usuarios" style="color:#c9a227;font-size:13px;text-decoration:none;font-weight:500;">Usuarios</a>
+        <a href="/admin/prospectos" style="color:#c49a3c;font-size:13px;text-decoration:none;font-weight:500;">Prospectos</a>
+        <a href="/admin/usuarios" style="color:#c49a3c;font-size:13px;text-decoration:none;font-weight:500;">Usuarios</a>
         {% endif %}
         <a href="/logout" style="color:#e2e8f0;font-size:13px;text-decoration:none;font-weight:500;">Salir</a>
       </div>

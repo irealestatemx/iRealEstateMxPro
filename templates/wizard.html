@@ -14,7 +14,7 @@
       theme: {
         extend: {
           colors: {
-            navy: { 950:'#04080f', 900:'#07101d', 800:'#0d1626', 700:'#111d30', 600:'#182437' },
+            navy: { 950:'#070504', 900:'#0b0907', 800:'#12100c', 700:'#1a1712', 600:'#241f18' },
             gold: { DEFAULT:'#c49a3c', light:'#e2b95a', dim:'#9a7220' }
           }
         }
@@ -23,13 +23,13 @@
   </script>
   <style>
     :root {
-      --black: #0a0a0a;
+      --black: #070504;
       --black-soft: #141414;
-      --black-card: #1a1a1a;
+      --black-card: #12100c;
       --black-lighter: #232323;
-      --navy: #1a3c5e;
-      --navy-glow: #2a5a8a;
-      --gold: #c9a227;
+      --navy: #241f18;
+      --navy-glow: #c49a3c;
+      --gold: #c49a3c;
       --gold-light: #e0c050;
       --gold-dim: rgba(201,162,39,0.15);
       --red: #c0392b;
@@ -46,7 +46,7 @@
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      font-family: 'Inter', sans-serif;
+      font-family: 'Josefin Sans', sans-serif;
       background: var(--black);
       color: var(--gray-100);
       min-height: 100vh;
@@ -108,7 +108,7 @@
     @keyframes fadeIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
     .step-title {
-      font-family: 'Playfair Display', serif;
+      font-family: 'Cinzel', serif;
       font-size: 28px; color: var(--white); margin-bottom: 6px;
     }
     .step-subtitle {
@@ -150,7 +150,7 @@
       width: 100%; padding: 11px 14px;
       background: var(--black-lighter); border: 1.5px solid var(--gray-700);
       border-radius: var(--radius); color: var(--white);
-      font-family: 'Inter', sans-serif; font-size: 14px;
+      font-family: 'Josefin Sans', sans-serif; font-size: 14px;
       transition: border-color var(--transition), box-shadow var(--transition);
       outline: none;
     }
@@ -310,7 +310,7 @@
       width: 100%; min-height: 80px; padding: 12px;
       background: var(--black-lighter); border: 1.5px solid var(--gray-700);
       border-radius: var(--radius); color: var(--white);
-      font-family: 'Inter', sans-serif; font-size: 13px; line-height: 1.6;
+      font-family: 'Josefin Sans', sans-serif; font-size: 13px; line-height: 1.6;
       resize: vertical; outline: none; transition: border-color var(--transition);
     }
     .scene-textarea:focus { border-color: var(--gold); }
@@ -423,16 +423,16 @@
     .btn-back {
       padding: 12px 28px; background: transparent;
       border: 1.5px solid var(--gray-700); border-radius: var(--radius);
-      color: var(--gray-300); font-family: 'Inter', sans-serif;
+      color: var(--gray-300); font-family: 'Josefin Sans', sans-serif;
       font-size: 14px; font-weight: 600; cursor: pointer;
       transition: all var(--transition);
     }
     .btn-back:hover { border-color: var(--white); color: var(--white); }
     .btn-next {
       padding: 12px 32px;
-      background: linear-gradient(135deg, var(--gold), #d4af37);
+      background: linear-gradient(135deg, var(--gold), #e2b95a);
       border: none; border-radius: var(--radius);
-      color: var(--black); font-family: 'Inter', sans-serif;
+      color: var(--black); font-family: 'Josefin Sans', sans-serif;
       font-size: 14px; font-weight: 700; cursor: pointer;
       transition: all var(--transition);
       box-shadow: 0 4px 15px rgba(201,162,39,0.25);
@@ -445,7 +445,7 @@
       padding: 14px 40px;
       background: linear-gradient(135deg, var(--red), var(--red-soft));
       border: none; border-radius: var(--radius);
-      color: var(--white); font-family: 'Inter', sans-serif;
+      color: var(--white); font-family: 'Josefin Sans', sans-serif;
       font-size: 15px; font-weight: 700; cursor: pointer;
       transition: all var(--transition);
       box-shadow: 0 4px 15px rgba(192,57,43,0.3);

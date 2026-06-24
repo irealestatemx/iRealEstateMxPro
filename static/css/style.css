@@ -1,17 +1,18 @@
 /* ===========================
-   iRealEstateMxPro — Dark Design System
-   Fondo: Deep navy-black
+   iRealEstateMxPro — Cinematic Ink Design System
+   Fondo: Warm near-black
+   Tipografía: Cinzel (display) + Josefin Sans (cuerpo)
    Acento: Champagne gold
    =========================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,wght@0,400;0,500;0,600;0,700;0,800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;800;900&family=Josefin+Sans:wght@300;400;500;600;700&display=swap');
 
 :root {
   /* ── Fondo y superficies ── */
-  --bg:            #080f1c;       /* fondo de página */
-  --surface-1:     #0d1626;       /* cards */
-  --surface-2:     #111d30;       /* cards elevadas / hover */
-  --surface-3:     #162038;       /* más elevado */
+  --bg:            #070504;       /* fondo de página */
+  --surface-1:     #12100c;       /* cards */
+  --surface-2:     #1a1712;       /* cards elevadas / hover */
+  --surface-3:     #241f18;       /* más elevado */
   --surface-input: rgba(255,255,255,.04);
 
   /* ── Bordes ── */
@@ -35,8 +36,8 @@
 
   /* ── Legacy aliases ── */
   --white:         #ffffff;
-  --gray-50:       #111d30;
-  --gray-100:      #0d1626;
+  --gray-50:       #1a1712;
+  --gray-100:      #12100c;
   --gray-200:      rgba(255,255,255,.07);
   --gray-400:      rgba(255,255,255,.18);
   --gray-600:      rgba(240,244,248,.4);
@@ -76,7 +77,7 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Josefin Sans', system-ui, sans-serif;
   background: var(--bg);
   color: var(--text-1);
   line-height: 1.6;
@@ -90,6 +91,12 @@ body {
   background-size: 52px 52px;
 }
 
+/* Display headings → Cinzel */
+h1, h2, h3, .section-header h2, .logo, .font-display {
+  font-family: 'Cinzel', Georgia, serif;
+  letter-spacing: -.005em;
+}
+
 /* custom scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -100,7 +107,7 @@ body {
    HEADER
 ══════════════════════════════ */
 .site-header {
-  background: rgba(7,16,29,.9);
+  background: rgba(11,9,7,.9);
   color: var(--text-1);
   padding: 16px 28px;
   border-bottom: 1px solid rgba(196,154,60,.1);

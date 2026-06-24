@@ -14,7 +14,7 @@
       theme: {
         extend: {
           colors: {
-            navy: { 950:'#04080f', 900:'#07101d', 800:'#0d1626', 700:'#111d30', 600:'#182437' },
+            navy: { 950:'#070504', 900:'#0b0907', 800:'#12100c', 700:'#1a1712', 600:'#241f18' },
             gold: { DEFAULT:'#c49a3c', light:'#e2b95a', dim:'#9a7220' }
           }
         }
@@ -26,7 +26,7 @@
     .tabs-nav {
       display: flex;
       gap: 0;
-      background: linear-gradient(135deg, #0d1626 0%, #111d30 100%);
+      background: linear-gradient(135deg, #12100c 0%, #1a1712 100%);
       border-radius: 14px 14px 0 0;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
@@ -42,7 +42,7 @@
       background: transparent;
       border: none;
       color: rgba(255,255,255,.55);
-      font-family: 'Inter', sans-serif;
+      font-family: 'Josefin Sans', sans-serif;
       font-size: .82rem;
       font-weight: 600;
       cursor: pointer;
@@ -56,7 +56,7 @@
     }
     .tab-btn:hover { color: rgba(255,255,255,.85); background: rgba(255,255,255,.06); }
     .tab-btn.active {
-      color: #c9a227;
+      color: #c49a3c;
       background: rgba(201,162,39,.1);
     }
     .tab-btn.active::after {
@@ -64,7 +64,7 @@
       position: absolute;
       bottom: 0; left: 20%; right: 20%;
       height: 3px;
-      background: #c9a227;
+      background: #c49a3c;
       border-radius: 3px 3px 0 0;
     }
     .tab-btn .tab-icon { font-size: 1.1rem; }
@@ -162,7 +162,7 @@
       gap: 8px;
       padding: 10px 22px;
       border-radius: 10px;
-      font-family: 'Inter', sans-serif;
+      font-family: 'Josefin Sans', sans-serif;
       font-size: .88rem;
       font-weight: 600;
       cursor: pointer;
@@ -192,7 +192,7 @@
       gap: 10px;
       width: 100%;
       padding: 12px 18px;
-      font-family: 'Inter', sans-serif;
+      font-family: 'Josefin Sans', sans-serif;
       font-size: .85rem;
       font-weight: 500;
       color: #343a40;
@@ -243,11 +243,11 @@
     .carousel-slide:active { cursor: grabbing; }
     .carousel-slide.dragging {
       opacity: .5;
-      border-color: #c9a227;
+      border-color: #c49a3c;
       transform: scale(.95);
     }
     .carousel-slide.drag-over {
-      border-color: #c9a227;
+      border-color: #c49a3c;
       box-shadow: 0 0 0 3px rgba(201,162,39,.2);
     }
     .carousel-slide img {
@@ -297,7 +297,8 @@
 
     /* ── Video tab ── */
     .video-info-banner {
-      background: linear-gradient(135deg, #1a3c5e, #0d1f33);
+      background: linear-gradient(135deg, #1a1712, #0b0907);
+      border: 1px solid rgba(196,154,60,.18);
       border-radius: 12px;
       padding: 20px 24px;
       color: #fff;
@@ -315,7 +316,7 @@
       border-bottom: 1px solid #f1f3f5;
     }
     .script-scene:last-child { border-bottom: none; }
-    .script-scene strong { color: #c9a227; font-size: .82rem; text-transform: uppercase; }
+    .script-scene strong { color: #c49a3c; font-size: .82rem; text-transform: uppercase; }
     .script-scene p { font-size: .88rem; color: #4a5568; margin-top: 4px; }
 
     /* ── Actions bar at bottom of each tab ── */
@@ -351,7 +352,7 @@
       </div>
       <p class="header-tagline">Contenido generado con IA</p>
       <div style="margin-left:auto;">
-        <a href="/" class="btn-secondary" style="font-size:.82rem;padding:7px 16px;color:#c9a227;border-color:#c9a227;">+ Nueva propiedad</a>
+        <a href="/" class="btn-secondary" style="font-size:.82rem;padding:7px 16px;color:#c49a3c;border-color:#c49a3c;">+ Nueva propiedad</a>
       </div>
     </div>
   </header>
@@ -502,7 +503,7 @@
       <div class="tab-panel" id="tab-pdf">
         <div style="text-align:center;padding:40px 20px;">
           <div style="font-size:3rem;margin-bottom:12px;">&#x1F4C4;</div>
-          <h3 style="color:#1a3c5e;margin-bottom:8px;">Ficha T&eacute;cnica PDF</h3>
+          <h3 style="color:#c49a3c;margin-bottom:8px;">Ficha T&eacute;cnica PDF</h3>
           <p style="color:#7a8a9e;font-size:.88rem;margin-bottom:16px;">
             Genera un PDF profesional con foto de portada, descripci&oacute;n, amenidades, galer&iacute;a de fotos y especificaciones.
           </p>
@@ -517,7 +518,7 @@
             <input type="file" form="pdfForm" name="foto_hero_pdf_upload" id="pdfHeroUpload" accept="image/*"
               style="font-size:.82rem;color:#1a3c5e;" />
             <div id="pdfHeroPreview" style="display:none;margin-top:10px;">
-              <img id="pdfHeroPreviewImg" style="width:100%;max-height:140px;object-fit:cover;border-radius:8px;border:2px solid #c9a227;" />
+              <img id="pdfHeroPreviewImg" style="width:100%;max-height:140px;object-fit:cover;border-radius:8px;border:2px solid #c49a3c;" />
             </div>
           </div>
 

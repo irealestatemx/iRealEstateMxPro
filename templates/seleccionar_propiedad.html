@@ -14,7 +14,7 @@
       theme: {
         extend: {
           colors: {
-            navy: { 950:'#04080f', 900:'#07101d', 800:'#0d1626', 700:'#111d30', 600:'#182437' },
+            navy: { 950:'#070504', 900:'#0b0907', 800:'#12100c', 700:'#1a1712', 600:'#241f18' },
             gold: { DEFAULT:'#c49a3c', light:'#e2b95a', dim:'#9a7220' }
           }
         }
@@ -23,10 +23,10 @@
   </script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: 'Inter', sans-serif; background: #04080f; color: #e0e0e0; min-height: 100vh; }
+    body { font-family: 'Josefin Sans', sans-serif; background: #070504; color: #e0e0e0; min-height: 100vh; }
     /* topbar replaced by sidebar */
     .container { max-width: 900px; margin: 24px auto; padding: 0 20px; }
-    h1 { font-size: 22px; color: #c9a227; font-family: 'Playfair Display', serif; margin-bottom: 8px; }
+    h1 { font-size: 22px; color: #c49a3c; font-family: 'Cinzel', serif; margin-bottom: 8px; }
     .subtitle { font-size: 14px; color: rgba(255,255,255,.45); margin-bottom: 24px; }
 
     /* Steps */
@@ -38,23 +38,23 @@
       font-size: 13px; font-weight: 600; color: rgba(255,255,255,.3);
       border-bottom: 3px solid rgba(255,255,255,.08);
     }
-    .step.active { color: #c9a227; border-bottom-color: #c9a227; }
+    .step.active { color: #c49a3c; border-bottom-color: #c49a3c; }
     .step.done { color: #68d391; border-bottom-color: #68d391; }
     .step-num {
       display: inline-block; width: 24px; height: 24px; line-height: 24px;
       border-radius: 50%; font-size: 12px; margin-right: 6px;
       background: rgba(255,255,255,.08); color: rgba(255,255,255,.3);
     }
-    .step.active .step-num { background: rgba(201,162,39,.2); color: #c9a227; }
+    .step.active .step-num { background: rgba(201,162,39,.2); color: #c49a3c; }
     .step.done .step-num { background: rgba(104,211,145,.2); color: #68d391; }
 
     /* Selector agente */
     .agente-select {
       width: 100%; padding: 12px 16px; border: 1px solid rgba(201,162,39,.2);
-      border-radius: 10px; font-size: 14px; background: #1a1a1a; color: #e0e0e0;
-      font-family: 'Inter', sans-serif; cursor: pointer;
+      border-radius: 10px; font-size: 14px; background: #12100c; color: #e0e0e0;
+      font-family: 'Josefin Sans', sans-serif; cursor: pointer;
     }
-    .agente-select:focus { border-color: #c9a227; outline: none; }
+    .agente-select:focus { border-color: #c49a3c; outline: none; }
 
     /* Grid propiedades */
     .props-grid {
@@ -62,7 +62,7 @@
       margin-top: 20px;
     }
     .prop-card {
-      background: #1a1a1a; border: 2px solid rgba(255,255,255,.08); border-radius: 12px;
+      background: #12100c; border: 2px solid rgba(255,255,255,.08); border-radius: 12px;
       overflow: hidden; cursor: pointer; transition: all .2s;
     }
     .prop-card:hover { border-color: rgba(201,162,39,.4); transform: translateY(-2px); }
@@ -75,7 +75,7 @@
     }
     .prop-card-body { padding: 14px 16px; }
     .prop-card-body h3 { font-size: 15px; color: #fff; margin-bottom: 4px; }
-    .prop-card-body .price { font-size: 18px; font-weight: 700; color: #c9a227; margin-bottom: 6px; }
+    .prop-card-body .price { font-size: 18px; font-weight: 700; color: #c49a3c; margin-bottom: 6px; }
     .prop-card-body .loc { font-size: 12px; color: rgba(255,255,255,.4); margin-bottom: 8px; }
     .prop-card-body .specs {
       display: flex; gap: 8px; flex-wrap: wrap; font-size: 11px; color: rgba(255,255,255,.5);
@@ -85,15 +85,15 @@
     }
     .btn-select {
       display: block; width: 100%; padding: 10px; background: rgba(201,162,39,.1);
-      color: #c9a227; border: none; border-top: 1px solid rgba(201,162,39,.1);
-      font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'Inter', sans-serif;
+      color: #c49a3c; border: none; border-top: 1px solid rgba(201,162,39,.1);
+      font-size: 13px; font-weight: 600; cursor: pointer; font-family: 'Josefin Sans', sans-serif;
       transition: background .2s;
     }
     .btn-select:hover { background: rgba(201,162,39,.2); }
 
     .empty-msg {
       text-align: center; padding: 48px 20px; color: rgba(255,255,255,.35);
-      background: #1a1a1a; border-radius: 12px; border: 1px solid rgba(255,255,255,.06);
+      background: #12100c; border-radius: 12px; border: 1px solid rgba(255,255,255,.06);
     }
     .empty-msg p { font-size: 14px; margin-bottom: 4px; }
   </style>
