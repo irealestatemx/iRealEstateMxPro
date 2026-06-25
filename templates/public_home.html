@@ -266,6 +266,7 @@
     <a href="/propiedades">Propiedades</a>
     <a href="/propiedades?operacion=venta">Venta</a>
     <a href="/propiedades?operacion=renta">Renta</a>
+    <a href="/vendidas">Vendidas</a>
     <a href="/desarrollos">Desarrollos</a>
     <a href="/vender">Vender/Rentar</a>
     <a href="#contacto">Contacto</a>
@@ -285,10 +286,11 @@
   <h1 class="reveal">{{ c.hero_titulo|replace('{gold}', '<span>')|replace('{/gold}', '</span>')|safe }}</h1>
   <p class="reveal">{{ c.hero_subtitulo }}</p>
   <form class="search-bar reveal" action="/propiedades" method="GET">
-    <select name="operacion" aria-label="Tipo de operación">
+    <select name="operacion" aria-label="Tipo de operación" onchange="if(this.value==='vendidas'){window.location.href='/vendidas';}">
       <option value="">Tipo de operación</option>
       <option value="venta">En Venta</option>
       <option value="renta">En Renta</option>
+      <option value="vendidas">Vendidas</option>
     </select>
     <select name="tipo" aria-label="Tipo de propiedad">
       <option value="">Tipo de propiedad</option>

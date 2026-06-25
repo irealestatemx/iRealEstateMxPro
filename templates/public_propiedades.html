@@ -45,6 +45,7 @@
     <a href="/propiedades" class="{{ 'active' if not filtro_operacion else '' }}">Todas</a>
     <a href="/propiedades?operacion=venta" class="{{ 'active' if filtro_operacion == 'venta' else '' }}">Venta</a>
     <a href="/propiedades?operacion=renta" class="{{ 'active' if filtro_operacion == 'renta' else '' }}">Renta</a>
+    <a href="/vendidas">Vendidas</a>
     <a href="/desarrollos">Desarrollos</a>
     <a href="#contacto">Contacto</a>
     <a href="/login" class="topbar-login" title="Iniciar sesión"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></a>
@@ -66,10 +67,11 @@
   <p class="section-subtitle">{{ total }} propiedad{{ 'es' if total != 1 else '' }} encontrada{{ 's' if total != 1 else '' }}</p>
 
   <form class="filters-bar" method="GET" action="/propiedades" id="filterForm">
-    <select name="operacion" onchange="document.getElementById('filterForm').submit()">
+    <select name="operacion" onchange="if(this.value==='vendidas'){window.location.href='/vendidas';}else{document.getElementById('filterForm').submit();}">
       <option value="">Operación</option>
       <option value="venta" {{ 'selected' if filtro_operacion == 'venta' else '' }}>En Venta</option>
       <option value="renta" {{ 'selected' if filtro_operacion == 'renta' else '' }}>En Renta</option>
+      <option value="vendidas">Vendidas</option>
     </select>
     <select name="tipo" onchange="document.getElementById('filterForm').submit()">
       <option value="">Tipo</option>
