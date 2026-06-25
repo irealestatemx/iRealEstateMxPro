@@ -304,7 +304,8 @@
         </form>
       </div>
 
-      <!-- Agregar manual -->
+      <!-- Agregar manual (solo admin) -->
+      {% if user.rol == 'admin' %}
       <div class="card">
         <h2>Agregar prospecto</h2>
         <form method="post" action="/admin/prospectos/crear">
@@ -325,6 +326,7 @@
           </div>
         </form>
       </div>
+      {% endif %}
 
       {% if prospectos %}
       <!-- Bulk bar -->
@@ -362,6 +364,7 @@
                 <th>Teléfono</th>
                 <th>Fuente</th>
                 <th>Interés</th>
+                <th>Agente</th>
                 <th>Estado</th>
                 <th>Notas</th>
                 <th>Fecha</th>
@@ -391,6 +394,20 @@
                 </td>
                 <td>{{ p.desarrollo_interes or '—' }}</td>
                 <td>
+                  {% if user.rol in ('admin', 'pm') %}
+                  <form method="post" action="/admin/prospectos/{{ p.id }}/asignar" style="display:flex">
+                    <select name="agente_id" class="estado-select" onchange="this.form.submit()" title="Asignar agente">
+                      <option value="">Sin asignar</option>
+                      {% for a in agentes %}
+                      <option value="{{ a.id }}" {{ 'selected' if p.agente_id == a.id }}>{{ a.nombre }}</option>
+                      {% endfor %}
+                    </select>
+                  </form>
+                  {% else %}
+                  <span style="font-size:12px;color:#a0aec0">{{ agentes_dict.get(p.agente_id) or 'Sin asignar' }}</span>
+                  {% endif %}
+                </td>
+                <td>
                   <form method="post" action="/admin/prospectos/{{ p.id }}/estado" style="display:flex;gap:4px;align-items:center;">
                     <select name="estado" class="estado-select">
                       {% for est in ['nuevo','contactado','cita_agendada','cita_asistio','en_negociacion','venta_cerrada','perdido'] %}
@@ -412,9 +429,11 @@
                 <td>
                   <div style="display:flex;gap:4px">
                     <button class="btn-sm btn-save" onclick="verDetalle({{ p.id }})" title="Ver detalle">i</button>
+                    {% if user.rol == 'admin' %}
                     <form method="post" action="/admin/prospectos/{{ p.id }}/eliminar" style="display:inline" onsubmit="return confirm('¿Eliminar?')">
                       <button type="submit" class="btn-sm btn-delete">X</button>
                     </form>
+                    {% endif %}
                   </div>
                 </td>
               </tr>

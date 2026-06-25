@@ -40,7 +40,7 @@ from database import (
     get_properties_by_user,
     get_user_by_prefijo, get_all_referidos,
     create_prospecto, get_all_prospectos, get_prospecto_by_id,
-    update_prospecto, count_prospectos, delete_prospecto,
+    update_prospecto, count_prospectos, count_prospectos_recientes, delete_prospecto,
     get_prospecto_by_telefono, agregar_historial_prospecto,
     create_cita_chatbot, get_citas_chatbot, update_cita_chatbot, check_disponibilidad_citas,
     save_documento, get_documentos_by_propiedad, update_documento_estado,
@@ -3780,14 +3780,16 @@ async def dashboard_referido(request: Request, ok: Optional[str] = None, error: 
             elif not isinstance(v, (int, float, str, bool, list, dict, type(None))):
                 p[k] = str(v)
 
-    # Propiedades disponibles para el selector de "interés"
+    # Propiedades disponibles para el selector de "interés" y agentes para elegir
     propiedades = await get_all_properties(active_only=True, limit=200, offset=0)
+    agentes = await get_users_by_rol("agente")
 
     return templates.TemplateResponse(request=request, name="dashboard_referido.html", context={
         "user": user,
         "prospectos": prospectos,
         "counts": counts,
         "propiedades": propiedades,
+        "agentes": agentes,
         "ok": ok,
         "error": error,
     })
@@ -3799,19 +3801,28 @@ async def referido_create_prospecto(
     nombre_cliente: str = Form(""),
     telefono_cliente: str = Form(""),
     desarrollo_interes: str = Form(""),
+    agente_id: str = Form(""),
     notas: str = Form(""),
 ):
     """Un referido agrega manualmente un prospecto desde su plataforma.
     Se asocia automáticamente a su propio referido_id, fuente='manual'.
-    Esto lo hace visible en su panel, en /admin/prospectos y suma a sus KPIs en RestateFlow."""
+    El referido elige con qué agente trabajar; si no elige, queda sin asignar
+    para que el admin lo asigne. Visible en su panel, en /admin/prospectos y
+    suma a sus KPIs en RestateFlow."""
     user = await require_auth(request)
     if not user or user["rol"] != "referido":
         return RedirectResponse("/login", status_code=302)
     if not nombre_cliente.strip() or not telefono_cliente.strip():
         return RedirectResponse("/mis-prospectos?error=campos", status_code=302)
+    # Validar que el agente elegido sea realmente un agente activo
+    ag_id = None
+    if agente_id and agente_id.isdigit():
+        agentes = await get_users_by_rol("agente")
+        if int(agente_id) in {a["id"] for a in agentes}:
+            ag_id = int(agente_id)
     data = {
         "referido_id": user["id"],
-        "agente_id": None,
+        "agente_id": ag_id,
         "nombre_cliente": nombre_cliente.strip(),
         "telefono_cliente": telefono_cliente.strip(),
         "desarrollo_interes": desarrollo_interes.strip(),
@@ -3836,10 +3847,18 @@ async def admin_prospectos_page(
     buscar: Optional[str] = None,
 ):
     user = await require_auth(request)
-    if not user or user["rol"] not in ("admin", "agente"):
+    if not user or user["rol"] not in ("admin", "agente", "pm"):
         return RedirectResponse("/login", status_code=302)
     referido_id = int(referido) if referido and referido.isdigit() else None
     prospectos = await get_all_prospectos(referido_id=referido_id)
+
+    # Alcance por rol: el agente solo ve sus prospectos; el PM los de su equipo (+ sin asignar)
+    if user["rol"] == "agente":
+        prospectos = [p for p in prospectos if p.get("agente_id") == user["id"]]
+    elif user["rol"] == "pm":
+        equipo = await get_equipo_de_pm(user["id"])
+        team_ids = {a["id"] for a in equipo} | {user["id"]}
+        prospectos = [p for p in prospectos if p.get("agente_id") in team_ids or p.get("agente_id") is None]
 
     # Filtrar por estado
     if estado:
@@ -3863,6 +3882,8 @@ async def admin_prospectos_page(
     counts = await count_prospectos()
     referidos = await get_all_referidos()
     citas = await get_citas_chatbot(limit=100)
+    agentes = await get_users_by_rol("agente")
+    agentes_dict = {a["id"]: a["nombre"] for a in agentes}
 
     # Serializar para template
     for items in [prospectos, citas]:
@@ -3879,6 +3900,8 @@ async def admin_prospectos_page(
         "citas": citas,
         "counts": counts,
         "referidos": referidos,
+        "agentes": agentes,
+        "agentes_dict": agentes_dict,
         "selected_referido": referido_id,
         "selected_estado": estado or "",
         "selected_fuente": fuente or "",
@@ -3914,6 +3937,29 @@ async def admin_update_cita_estado(request: Request, cita_id: int, estado: str =
     return RedirectResponse("/admin/prospectos", status_code=302)
 
 
+async def _puede_gestionar_prospecto(user: dict, prospecto: dict) -> bool:
+    """Reglas de quién puede actualizar/cerrar un prospecto.
+    - admin: cualquiera
+    - pm: prospectos de su equipo (o sin asignar)
+    - agente: solo los prospectos asignados a él
+    - referido / otros: nunca (read-only)"""
+    if not user or not prospecto:
+        return False
+    rol = user["rol"]
+    if rol == "admin":
+        return True
+    ag_id = prospecto.get("agente_id")
+    if rol == "agente":
+        return ag_id == user["id"]
+    if rol == "pm":
+        if ag_id is None:
+            return True  # sin asignar: el PM puede tomarlo/gestionarlo
+        equipo = await get_equipo_de_pm(user["id"])
+        team_ids = {a["id"] for a in equipo} | {user["id"]}
+        return ag_id in team_ids
+    return False
+
+
 @app.post("/admin/prospectos/{prospecto_id}/estado")
 async def admin_update_prospecto_estado(
     request: Request,
@@ -3922,12 +3968,39 @@ async def admin_update_prospecto_estado(
     notas: str = Form(""),
 ):
     user = await require_auth(request)
-    if not user or user["rol"] != "admin":
+    if not user or user["rol"] not in ("admin", "agente", "pm"):
         return RedirectResponse("/login", status_code=302)
+    prospecto = await get_prospecto_by_id(prospecto_id)
+    if not prospecto or not await _puede_gestionar_prospecto(user, prospecto):
+        return RedirectResponse("/admin/prospectos", status_code=302)
     updates = {"estado": estado}
     if notas:
         updates["notas"] = notas
     await update_prospecto(prospecto_id, updates)
+    return RedirectResponse("/admin/prospectos", status_code=302)
+
+
+@app.post("/admin/prospectos/{prospecto_id}/asignar")
+async def admin_asignar_prospecto(
+    request: Request,
+    prospecto_id: int,
+    agente_id: str = Form(""),
+):
+    """Asigna (o reasigna) el agente que trabajará un prospecto. Solo admin y PM."""
+    user = await require_auth(request)
+    if not user or user["rol"] not in ("admin", "pm"):
+        return RedirectResponse("/login", status_code=302)
+    prospecto = await get_prospecto_by_id(prospecto_id)
+    if not prospecto:
+        return RedirectResponse("/admin/prospectos", status_code=302)
+    # PM solo asigna dentro de su equipo
+    nuevo_ag = int(agente_id) if agente_id and agente_id.isdigit() else None
+    if user["rol"] == "pm":
+        equipo = await get_equipo_de_pm(user["id"])
+        team_ids = {a["id"] for a in equipo}
+        if nuevo_ag is not None and nuevo_ag not in team_ids:
+            return RedirectResponse("/admin/prospectos", status_code=302)
+    await update_prospecto(prospecto_id, {"agente_id": nuevo_ag})
     return RedirectResponse("/admin/prospectos", status_code=302)
 
 
@@ -7287,7 +7360,7 @@ async def restateflow_page(request: Request, vista: str = "dashboard"):
                 "total_propiedades": sum(a["total_asignadas"] for a in agentes_kpis),
                 "total_ventas": sum(a["ventas_completadas"] for a in agentes_kpis),
                 "total_docs_pendientes": sum(a["docs_pendientes_72h"] for a in agentes_kpis),
-                "total_prospectos": agentes_kpis[0]["prospectos_30d"] if agentes_kpis else 0,
+                "total_prospectos": await count_prospectos_recientes(30),
             }
         elif is_pm:
             # KPIs de los agentes del equipo
@@ -7302,7 +7375,7 @@ async def restateflow_page(request: Request, vista: str = "dashboard"):
                 "total_propiedades": sum(a["total_asignadas"] for a in agentes_kpis),
                 "total_ventas": sum(a["ventas_completadas"] for a in agentes_kpis),
                 "total_docs_pendientes": sum(a["docs_pendientes_72h"] for a in agentes_kpis),
-                "total_prospectos": agentes_kpis[0]["prospectos_30d"] if agentes_kpis else 0,
+                "total_prospectos": sum(a["prospectos_30d"] for a in agentes_kpis),
             }
             context["mis_kpis"] = await get_kpis_agente(user["id"])
         else:

@@ -914,6 +914,14 @@ async def count_prospectos(referido_id: int = None) -> dict:
     return counts
 
 
+async def count_prospectos_recientes(days: int = 30) -> int:
+    """Cuenta el total global de prospectos creados en los últimos N días."""
+    row = await database.fetch_one(
+        f"SELECT COUNT(*) as total FROM prospectos WHERE created_at >= NOW() - INTERVAL '{int(days)} days'"
+    )
+    return row["total"] if row else 0
+
+
 async def delete_prospecto(prospecto_id: int):
     """Elimina un prospecto permanentemente."""
     query = "DELETE FROM prospectos WHERE id = :id"
@@ -1593,8 +1601,8 @@ async def get_kpis_agente(agente_id: int) -> dict:
 
     r7 = await database.fetch_one("""
         SELECT COUNT(*) as total FROM prospectos
-        WHERE created_at >= NOW() - INTERVAL '30 days'
-    """)
+        WHERE agente_id = :aid AND created_at >= NOW() - INTERVAL '30 days'
+    """, {"aid": agente_id})
 
     return {
         "propiedades_activas_30d": r1["total"] if r1 else 0,
