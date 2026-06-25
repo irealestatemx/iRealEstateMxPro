@@ -3759,7 +3759,7 @@ async def mis_documentos_vendedor(request: Request, propiedad_id: int):
 # ─── Dashboard de Referidos ───
 
 @app.get("/mis-prospectos", response_class=HTMLResponse)
-async def dashboard_referido(request: Request):
+async def dashboard_referido(request: Request, ok: Optional[str] = None, error: Optional[str] = None):
     user = await require_auth(request)
     if not user:
         return RedirectResponse("/login", status_code=302)
@@ -3780,11 +3780,49 @@ async def dashboard_referido(request: Request):
             elif not isinstance(v, (int, float, str, bool, list, dict, type(None))):
                 p[k] = str(v)
 
+    # Propiedades disponibles para el selector de "interés"
+    propiedades = await get_all_properties(active_only=True, limit=200, offset=0)
+
     return templates.TemplateResponse(request=request, name="dashboard_referido.html", context={
         "user": user,
         "prospectos": prospectos,
         "counts": counts,
+        "propiedades": propiedades,
+        "ok": ok,
+        "error": error,
     })
+
+
+@app.post("/mis-prospectos/crear")
+async def referido_create_prospecto(
+    request: Request,
+    nombre_cliente: str = Form(""),
+    telefono_cliente: str = Form(""),
+    desarrollo_interes: str = Form(""),
+    notas: str = Form(""),
+):
+    """Un referido agrega manualmente un prospecto desde su plataforma.
+    Se asocia automáticamente a su propio referido_id, fuente='manual'.
+    Esto lo hace visible en su panel, en /admin/prospectos y suma a sus KPIs en RestateFlow."""
+    user = await require_auth(request)
+    if not user or user["rol"] != "referido":
+        return RedirectResponse("/login", status_code=302)
+    if not nombre_cliente.strip() or not telefono_cliente.strip():
+        return RedirectResponse("/mis-prospectos?error=campos", status_code=302)
+    data = {
+        "referido_id": user["id"],
+        "agente_id": None,
+        "nombre_cliente": nombre_cliente.strip(),
+        "telefono_cliente": telefono_cliente.strip(),
+        "desarrollo_interes": desarrollo_interes.strip(),
+        "prefijo": user.get("prefijo_whatsapp"),
+        "estado": "nuevo",
+        "notas": notas.strip(),
+        "fuente": "manual",
+        "mensaje_original": f"Prospecto agregado manualmente por {user.get('nombre', 'referido')}.",
+    }
+    await create_prospecto(data)
+    return RedirectResponse("/mis-prospectos?ok=1", status_code=302)
 
 
 # ─── Admin: Gestion de Prospectos ───
@@ -3811,7 +3849,7 @@ async def admin_prospectos_page(
         if fuente == "referido":
             prospectos = [p for p in prospectos if p.get("referido_id")]
         elif fuente == "manual":
-            prospectos = [p for p in prospectos if not p.get("referido_id") and p.get("fuente") != "chatbot"]
+            prospectos = [p for p in prospectos if p.get("fuente") == "manual"]
         else:
             prospectos = [p for p in prospectos if p.get("fuente") == fuente]
     # Filtrar por búsqueda

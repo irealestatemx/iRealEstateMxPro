@@ -66,6 +66,42 @@
     .empty-state { text-align: center; padding: 60px 20px; color: rgba(255,255,255,.35); }
     .empty-state h2 { font-size: 20px; margin-bottom: 8px; color: rgba(255,255,255,.5); }
 
+    /* ── Agregar prospecto ── */
+    .add-card {
+      background: linear-gradient(145deg, #12100c 0%, #0b0907 100%);
+      border: 1px solid rgba(196,154,60,.18); border-radius: 14px;
+      padding: 22px; margin-bottom: 24px; position: relative; overflow: hidden;
+    }
+    .add-card::before { content:''; position:absolute; top:0; left:18%; right:18%; height:1px;
+      background:linear-gradient(90deg,transparent,rgba(196,154,60,.5),transparent); }
+    .add-card h2 { font-family:'Cinzel',serif; font-size:16px; color:#c49a3c; margin-bottom:4px; }
+    .add-card .sub { font-size:12px; color:rgba(255,255,255,.4); margin-bottom:16px; }
+    .add-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .add-grid .full { grid-column:1/-1; }
+    .add-grid label { display:block; font-size:11px; font-weight:600; color:rgba(255,255,255,.5);
+      text-transform:uppercase; letter-spacing:.04em; margin-bottom:5px; }
+    .add-grid input, .add-grid select, .add-grid textarea {
+      width:100%; padding:10px 12px; border:1px solid rgba(196,154,60,.2); border-radius:8px;
+      font-size:14px; font-family:'Josefin Sans',sans-serif; background:rgba(26,23,18,.6); color:#ece6db;
+      outline:none; transition:border-color .2s;
+    }
+    .add-grid input:focus, .add-grid select:focus, .add-grid textarea:focus { border-color:#c49a3c; box-shadow:0 0 0 3px rgba(196,154,60,.12); }
+    .add-grid select option { background:#12100c; color:#ece6db; }
+    .add-grid textarea { resize:vertical; min-height:60px; }
+    .add-referido-tag { display:inline-flex; align-items:center; gap:6px; font-size:12px; color:#c49a3c;
+      background:rgba(196,154,60,.1); border:1px solid rgba(196,154,60,.2); border-radius:8px; padding:8px 12px; }
+    .btn-add-prospecto {
+      grid-column:1/-1; padding:12px; margin-top:4px;
+      background:linear-gradient(135deg,#9a7220,#c49a3c 50%,#e2b95a); color:#070504; border:none;
+      border-radius:8px; font-size:14px; font-weight:700; font-family:'Josefin Sans',sans-serif; cursor:pointer;
+      box-shadow:0 2px 12px rgba(196,154,60,.3); transition:all .2s;
+    }
+    .btn-add-prospecto:hover { filter:brightness(1.08); transform:translateY(-1px); }
+    .flash { padding:11px 14px; border-radius:8px; font-size:13px; margin-bottom:16px; }
+    .flash-ok { background:rgba(16,185,129,.12); border:1px solid rgba(16,185,129,.3); color:#34d399; }
+    .flash-err { background:rgba(239,68,68,.12); border:1px solid rgba(239,68,68,.3); color:#fca5a5; }
+    @media (max-width:600px){ .add-grid { grid-template-columns:1fr; } }
+
     @media (max-width: 600px) {
       .container { padding: 0 12px; }
       .stats-row { gap: 6px; }
@@ -87,6 +123,51 @@
     <div class="page-header">
       <h1>Mis Prospectos</h1>
     </div>
+
+    {% if ok %}<div class="flash flash-ok">✓ Prospecto agregado correctamente. Ya aparece en tu lista y en el panel del administrador.</div>{% endif %}
+    {% if error %}<div class="flash flash-err">Faltan datos: el nombre y el teléfono son obligatorios.</div>{% endif %}
+
+    {% if user.rol == 'referido' %}
+    <div class="add-card">
+      <h2>Agregar prospecto</h2>
+      <p class="sub">Registra un cliente interesado. Se asignará automáticamente a tu nombre.</p>
+      <form method="post" action="/mis-prospectos/crear">
+        <div class="add-grid">
+          <div>
+            <label>Nombre del cliente *</label>
+            <input type="text" name="nombre_cliente" placeholder="Ej: Juan Pérez" required/>
+          </div>
+          <div>
+            <label>Teléfono *</label>
+            <input type="tel" name="telefono_cliente" placeholder="Ej: 477 123 4567" required/>
+          </div>
+          <div class="full">
+            <label>Interés (propiedad disponible)</label>
+            <select name="desarrollo_interes">
+              <option value="">Selecciona una propiedad…</option>
+              {% for p in propiedades %}
+              <option value="{{ (p.nombre_propiedad ~ ' — ') if p.nombre_propiedad else '' }}{{ p.tipo_propiedad or 'Propiedad' }}{{ (' en ' ~ p.ciudad) if p.ciudad else '' }}{{ (' · ' ~ p.precio_formateado) if p.precio_formateado else '' }}">
+                {% if p.nombre_propiedad %}{{ p.nombre_propiedad }} — {% endif %}{{ p.tipo_propiedad or 'Propiedad' }}{% if p.ciudad %} en {{ p.ciudad }}{% endif %}{% if p.precio_formateado %} · {{ p.precio_formateado }}{% endif %}
+              </option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="full">
+            <label>Referido</label>
+            <div class="add-referido-tag">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+              {{ user.nombre }} (tú)
+            </div>
+          </div>
+          <div class="full">
+            <label>Notas (opcional)</label>
+            <textarea name="notas" placeholder="Detalles del contacto, presupuesto, etc."></textarea>
+          </div>
+          <button type="submit" class="btn-add-prospecto">+ Agregar prospecto</button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
 
     <div class="stats-row">
       <div class="stat-card">
