@@ -4971,7 +4971,7 @@ async def load_public_config() -> dict:
         "hero_titulo": "Tu {gold}hogar ideal{/gold} en Guanajuato",
         "hero_subtitulo": "Compra, venta y renta de propiedades con asesoría legal completa y acompañamiento de inicio a fin.",
         "telefono": "4737365219",
-        "whatsapp": "524737365219",
+        "whatsapp": "5214737365219",
         "email": "irealestatemx@gmail.com",
         "wa_mensaje": "Hola, me interesa información sobre sus propiedades",
         "agente_nombre": "Esteban Castellanos",
@@ -5007,7 +5007,26 @@ async def load_public_config() -> dict:
     for k, v in defaults.items():
         if k not in config or not config[k]:
             config[k] = v
+    # Normaliza el número de WhatsApp a formato internacional MX (52 + 1 + 10 dígitos).
+    # WhatsApp/wa.me requiere el "1" de móvil para números mexicanos.
+    config["whatsapp"] = _normalize_wa_mx(config.get("whatsapp", ""))
     return config
+
+
+def _normalize_wa_mx(num: str) -> str:
+    """Devuelve el número en formato wa.me para México: 521 + 10 dígitos.
+    - 10 dígitos (local)           -> 521 + número
+    - 52 + 10 dígitos (sin el 1)   -> 521 + número
+    - 521 + 10 dígitos (correcto)  -> sin cambios
+    Otros formatos se dejan tal cual (solo dígitos)."""
+    digits = "".join(ch for ch in str(num or "") if ch.isdigit())
+    if not digits:
+        return digits
+    if len(digits) == 10:
+        return "521" + digits
+    if len(digits) == 12 and digits.startswith("52") and not digits.startswith("521"):
+        return "521" + digits[2:]
+    return digits
 
 
 @app.get("/web")
