@@ -320,13 +320,18 @@ Datos de la propiedad:
 
 Descripcion profesional:"""
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=400,
-        temperature=0.7,
-    )
-    return response.choices[0].message.content.strip()
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=400,
+            temperature=0.7,
+            timeout=30,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"[DESCRIPCION] OpenAI falló, se usa respaldo: {e}")
+        return ""  # el caller usa la descripción del agente como respaldo
 
 
 def generate_instagram_copy(summary: str, tipo: str, operacion: str, ciudad: str) -> str:
@@ -350,13 +355,18 @@ Datos de la propiedad:
 
 Instagram copy:"""
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}],
-        max_tokens=350,
-        temperature=0.8,
-    )
-    return response.choices[0].message.content.strip()
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=350,
+            temperature=0.8,
+            timeout=30,
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        print(f"[INSTAGRAM] OpenAI falló, se usa respaldo: {e}")
+        return ""
 
 
 # ─── Generación de guión para video ───
@@ -409,6 +419,7 @@ Responde SOLO con el JSON array, sin markdown:
             messages=[{"role": "user", "content": prompt}],
             max_tokens=600,
             temperature=0.7,
+            timeout=40,
         )
         raw = response.choices[0].message.content.strip()
         # Limpiar posible markdown
@@ -445,6 +456,7 @@ def generate_tts_audio(text: str, voice: str = "nova", output_path: str = "") ->
             voice=voice,
             input=text,
             speed=0.95,
+            timeout=60,
         )
         response.stream_to_file(output_path)
         print(f"[TTS] Audio generado: {output_path} ({len(text)} chars, voz={voice})")
@@ -5887,6 +5899,9 @@ async def generate(
         descripcion_profesional = generate_professional_description(summary)
     if gen_instagram_copy:
         instagram_copy = generate_instagram_copy(summary, tipo_propiedad, operacion, ciudad)
+    # Si la IA no está disponible, usa la descripción del agente como respaldo
+    if not descripcion_profesional and descripcion_agente:
+        descripcion_profesional = descripcion_agente.strip()
 
     precio_formateado = format_price(float(precio.replace(",", "").replace("$", "").strip()))
 
