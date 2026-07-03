@@ -578,18 +578,15 @@
           </div>
           <div class="wz-grid wz-grid-2" style="margin-top:16px;">
             <div class="wz-field">
-              <label>Ciudad <span class="required">*</span></label>
-              <select name="ciudad" class="wz-select" required>
-                <option value="León" selected>León</option>
-                <option value="Guanajuato">Guanajuato</option>
-                <option value="Irapuato">Irapuato</option>
-                <option value="Celaya">Celaya</option>
-                <option value="San Miguel de Allende">San Miguel de Allende</option>
-              </select>
+              <label>Estado <span class="required">*</span></label>
+              <select name="estado" id="wzEstado" class="wz-select" required></select>
             </div>
             <div class="wz-field">
-              <label>Estado <span class="required">*</span></label>
-              <input type="text" name="estado" class="wz-input" value="Guanajuato" required />
+              <label>Ciudad / Municipio <span class="required">*</span></label>
+              <input type="text" name="ciudad" id="wzCiudad" class="wz-input" list="wzCiudadesList"
+                     autocomplete="off" placeholder="Escribe o elige tu ciudad" required />
+              <datalist id="wzCiudadesList"></datalist>
+              <span id="wzCiudadHint" style="font-size:11px;color:rgba(255,255,255,.35);display:block;margin-top:4px;">Selecciona primero el estado</span>
             </div>
           </div>
           <div class="wz-grid wz-grid-2" style="margin-top:16px;">
@@ -1420,6 +1417,37 @@
 
     // Init progress bar
     goToStep(1);
+  </script>
+  <script src="/static/js/mx_estados_ciudades.js"></script>
+  <script>
+    (function(){
+      var data = window.MX_ESTADOS_CIUDADES || {};
+      var selEstado = document.getElementById('wzEstado');
+      var inpCiudad = document.getElementById('wzCiudad');
+      var dataList  = document.getElementById('wzCiudadesList');
+      var hint      = document.getElementById('wzCiudadHint');
+      if (!selEstado || !inpCiudad || !dataList) return;
+
+      var estados = Object.keys(data).sort(function(a,b){ return a.localeCompare(b, 'es'); });
+      selEstado.innerHTML = '<option value="" disabled>Selecciona estado...</option>' +
+        estados.map(function(e){ return '<option value="'+e+'">'+e+'</option>'; }).join('');
+
+      function poblarCiudades(estado, keepValue){
+        var ciudades = data[estado] || [];
+        dataList.innerHTML = ciudades.map(function(c){ return '<option value="'+c+'"></option>'; }).join('');
+        if (!keepValue) inpCiudad.value = '';
+        if (hint) hint.textContent = ciudades.length
+          ? 'Escribe para buscar entre ' + ciudades.length + ' municipios (o teclea otro)'
+          : 'Escribe el nombre de la ciudad';
+      }
+
+      selEstado.addEventListener('change', function(){ poblarCiudades(this.value, false); inpCiudad.focus(); });
+
+      var def = data['Guanajuato'] ? 'Guanajuato' : estados[0];
+      selEstado.value = def;
+      poblarCiudades(def, true);
+      if (def === 'Guanajuato' && !inpCiudad.value) inpCiudad.value = 'León';
+    })();
   </script>
 </div><!-- layout-main -->
 </div><!-- layout -->
