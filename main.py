@@ -1719,6 +1719,91 @@ async def enviar_email_notificacion(to_email: str, to_name: str, asunto: str, cu
         return False
 
 
+def _generar_ics_cita(cita_id, fecha: str, hora: str, hora_fin: str,
+                      desarrollo: str, nombre: str, phone: str, notas: str) -> str:
+    """Genera el texto iCalendar (.ics) de una visita, en zona horaria de México.
+    fecha=YYYY-MM-DD, hora/hora_fin=HH:MM."""
+    from datetime import datetime as _dt
+    f = fecha.replace("-", "")
+    hi = hora.replace(":", "") + "00"
+    hf = hora_fin.replace(":", "") + "00"
+    stamp = _dt.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    org = SMTP_USER or "irealestatemx@gmail.com"
+    desc = f"Cliente: {nombre}\\nTeléfono: {phone}\\n{notas}".replace("\n", "\\n")
+    return (
+        "BEGIN:VCALENDAR\r\n"
+        "VERSION:2.0\r\n"
+        "PRODID:-//iRealEstateMx//Bot//ES\r\n"
+        "CALSCALE:GREGORIAN\r\n"
+        "METHOD:REQUEST\r\n"
+        "BEGIN:VEVENT\r\n"
+        f"UID:cita-{cita_id}-{f}@irealestatemx.com\r\n"
+        f"DTSTAMP:{stamp}\r\n"
+        f"DTSTART;TZID=America/Mexico_City:{f}T{hi}\r\n"
+        f"DTEND;TZID=America/Mexico_City:{f}T{hf}\r\n"
+        f"SUMMARY:Visita {desarrollo} - {nombre}\r\n"
+        f"DESCRIPTION:{desc}\r\n"
+        f"LOCATION:{desarrollo}\r\n"
+        f"ORGANIZER;CN=iRealEstateMx:mailto:{org}\r\n"
+        f"ATTENDEE;CN={nombre};ROLE=REQ-PARTICIPANT;RSVP=TRUE:mailto:{org}\r\n"
+        "STATUS:CONFIRMED\r\n"
+        "SEQUENCE:0\r\n"
+        "BEGIN:VALARM\r\n"
+        "TRIGGER:-PT2H\r\n"
+        "ACTION:DISPLAY\r\n"
+        "DESCRIPTION:Recordatorio de visita\r\n"
+        "END:VALARM\r\n"
+        "END:VEVENT\r\n"
+        "END:VCALENDAR\r\n"
+    )
+
+
+async def enviar_email_cita(to_email: str, asunto: str, cuerpo_html: str, ics_text: str) -> bool:
+    """Envía un correo con invitación de calendario adjunta. Google Calendar añade
+    automáticamente los eventos recibidos por invitación en Gmail."""
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    from email.mime.base import MIMEBase
+    from email import encoders
+
+    if not SMTP_USER or not SMTP_PASSWORD:
+        print(f"[EMAIL-CITA] SMTP no configurado. Asunto: {asunto}")
+        return False
+
+    msg = MIMEMultipart("mixed")
+    msg["From"] = f"{SMTP_FROM_NAME} <{SMTP_USER}>"
+    msg["To"] = to_email
+    msg["Subject"] = asunto
+
+    alt = MIMEMultipart("alternative")
+    alt.attach(MIMEText(cuerpo_html, "html", "utf-8"))
+    # Parte de calendario (hace que Gmail muestre el evento y lo agende)
+    cal_part = MIMEText(ics_text, "calendar", "utf-8")
+    cal_part.replace_header("Content-Type", 'text/calendar; charset="utf-8"; method=REQUEST')
+    alt.attach(cal_part)
+    msg.attach(alt)
+
+    # Adjunto .ics de respaldo (botón "Agregar a calendario")
+    ics_att = MIMEBase("application", "ics")
+    ics_att.set_payload(ics_text.encode("utf-8"))
+    encoders.encode_base64(ics_att)
+    ics_att.add_header("Content-Disposition", 'attachment; filename="cita.ics"')
+    msg.attach(ics_att)
+
+    try:
+        server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
+        server.starttls()
+        server.login(SMTP_USER, SMTP_PASSWORD)
+        server.sendmail(SMTP_USER, to_email, msg.as_string())
+        server.quit()
+        print(f"[EMAIL-CITA] Invitación enviada a {to_email}: {asunto}")
+        return True
+    except Exception as e:
+        print(f"[EMAIL-CITA] Error: {e}")
+        return False
+
+
 def _formatear_telefono_mx(telefono: str) -> str:
     """Formatea teléfono mexicano para WAHA: 521XXXXXXXXXX@c.us"""
     tel = "".join(c for c in str(telefono) if c.isdigit())
@@ -4333,6 +4418,10 @@ async def procesar_respuesta_bot(phone: str, chat_id: str, mensaje: str, nombre:
 
     historial = _get_bot_history(phone)
     catalogo = _construir_catalogo_texto()
+
+    async def _agendar_cb(args):
+        return await agendar_cita_bot(args, phone, nombre)
+
     try:
         texto, nuevo_hist = await bot_claude.responder(
             mensaje=mensaje,
@@ -4340,6 +4429,7 @@ async def procesar_respuesta_bot(phone: str, chat_id: str, mensaje: str, nombre:
             persona=conf["persona"],
             catalogo_texto=catalogo,
             model=conf["model"],
+            agendar_cb=_agendar_cb,
         )
     except Exception as e:
         print(f"[BOT] Error generando respuesta: {e}")
@@ -4361,6 +4451,122 @@ async def procesar_respuesta_bot(phone: str, chat_id: str, mensaje: str, nombre:
                 _bot_sent_texts[phone] = _bot_sent_texts[phone][-10:]
         print(f"[BOT] ✓ Respuesta enviada a {phone} ({len(texto)} chars)")
     return texto if enviado else None
+
+
+async def agendar_cita_bot(args: dict, phone: str, nombre_default: str = "") -> str:
+    """Callback que ejecuta el bot cuando decide AGENDAR una cita.
+    Verifica disponibilidad, crea la cita en la BD, envía invitación de calendario
+    (.ics) al Gmail del negocio (Google Calendar la añade solo) y notifica al referido.
+    Devuelve un JSON que el bot usa para confirmarle al cliente."""
+    import json as _json
+    from datetime import time as _time, datetime as _dt, timedelta as _td
+
+    fecha = (args.get("fecha") or "").strip()
+    hora = (args.get("hora") or "").strip()
+    nombre = (args.get("nombre") or nombre_default or "Cliente").strip()
+    desarrollo = (args.get("desarrollo") or "").strip()
+    notas = (args.get("notas") or "").strip()
+
+    if not fecha or not hora:
+        return _json.dumps({"ok": False, "error": "Necesito la fecha (formato YYYY-MM-DD) y la hora (HH:MM 24h)."})
+    # Normalizar hora a HH:MM
+    if len(hora) == 4 and ":" not in hora:
+        hora = hora[:2] + ":" + hora[2:]
+    try:
+        _time.fromisoformat(hora if len(hora) == 5 else hora + ":00")
+        _dt.fromisoformat(fecha)
+    except Exception:
+        return _json.dumps({"ok": False, "error": "Fecha u hora con formato inválido. Usa fecha YYYY-MM-DD y hora HH:MM."})
+
+    # Disponibilidad
+    try:
+        disp = await check_disponibilidad_citas(fecha, hora)
+    except Exception as e:
+        return _json.dumps({"ok": False, "error": f"No pude verificar disponibilidad: {e}"})
+    if disp.get("hora_solicitada_ocupada"):
+        return _json.dumps({
+            "ok": False, "motivo": "horario_ocupado",
+            "horarios_disponibles": disp.get("horarios_disponibles", []),
+        })
+
+    # Hora fin (+1h)
+    hora_obj = _time.fromisoformat(hora if len(hora) == 5 else hora + ":00")
+    hora_fin = (_dt.combine(_dt.today(), hora_obj) + _td(hours=1)).time().strftime("%H:%M")
+
+    prospecto = await get_prospecto_by_telefono(phone) if phone else None
+    prospecto_id = prospecto["id"] if prospecto else None
+
+    try:
+        cita_id = await create_cita_chatbot({
+            "prospecto_id": prospecto_id,
+            "titulo": f"Visita {desarrollo} - {nombre}".strip(),
+            "desarrollo": desarrollo,
+            "fecha": fecha,
+            "hora_inicio": hora,
+            "hora_fin": hora_fin,
+            "estado": "pendiente",
+            "google_event_id": "",
+            "notas": notas,
+        })
+    except Exception as e:
+        return _json.dumps({"ok": False, "error": f"No pude registrar la cita: {e}"})
+
+    # Actualizar prospecto
+    if prospecto_id:
+        try:
+            await update_prospecto(prospecto_id, {"estado": "cita_agendada"})
+            await agregar_historial_prospecto(prospecto_id, {
+                "tipo": "cita_agendada",
+                "mensaje": f"Cita {fecha} {hora} - {desarrollo}",
+                "fecha": str(_dt.now()),
+                "datos": {"cita_id": cita_id, "fecha": fecha, "hora": hora},
+            })
+        except Exception as e:
+            print(f"[CITA] No se pudo actualizar prospecto: {e}")
+
+    # Invitación de calendario + correo de confirmación al negocio (Gmail)
+    try:
+        ics = _generar_ics_cita(cita_id, fecha, hora, hora_fin, desarrollo or "Visita", nombre, phone, notas)
+        fecha_txt = "/".join(reversed(fecha.split("-")))  # DD/MM/YYYY
+        cuerpo = f"""
+        <div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;">
+          <h2 style="color:#c49a3c;">Nueva cita agendada 🗓️</h2>
+          <p><b>Cliente:</b> {nombre}<br>
+             <b>Teléfono:</b> {phone}<br>
+             <b>Desarrollo:</b> {desarrollo or '—'}<br>
+             <b>Fecha:</b> {fecha_txt}<br>
+             <b>Hora:</b> {hora} a {hora_fin}</p>
+          {f'<p><b>Notas:</b> {notas}</p>' if notas else ''}
+          <p>Se adjunta la invitación para tu calendario.</p>
+        </div>"""
+        destino = SMTP_USER or "irealestatemx@gmail.com"
+        asyncio.create_task(enviar_email_cita(
+            destino, f"🗓️ Cita: {nombre} — {fecha_txt} {hora}", cuerpo, ics
+        ))
+    except Exception as e:
+        print(f"[CITA] No se pudo enviar invitación: {e}")
+
+    # Notificar al referido
+    if prospecto and prospecto.get("referido_id"):
+        try:
+            ref = await get_user_by_id(prospecto["referido_id"])
+            if ref and ref.get("email"):
+                cuerpo_ref = (
+                    f"Se registró una <b>nueva cita</b> de tu referido.<br><br>"
+                    f"<b>Cliente:</b> {nombre}<br><b>Desarrollo:</b> {desarrollo}<br>"
+                    f"<b>Fecha:</b> {'/'.join(reversed(fecha.split('-')))}<br><b>Hora:</b> {hora}"
+                )
+                asyncio.create_task(enviar_email_notificacion(
+                    ref["email"], ref["nombre"], f"🏠 Tu referido {nombre} agendó una cita", cuerpo_ref
+                ))
+        except Exception as e:
+            print(f"[CITA] No se pudo notificar al referido: {e}")
+
+    print(f"[CITA] Bot agendó cita #{cita_id} — {nombre} → {fecha} {hora} ({desarrollo})")
+    return _json.dumps({
+        "ok": True, "cita_id": cita_id, "fecha": fecha, "hora": hora,
+        "hora_fin": hora_fin, "desarrollo": desarrollo,
+    })
 
 
 async def _create_kommo_lead(phone: str, name: str):

@@ -70,7 +70,29 @@ TOOLS = [
                 "precio_max": {"type": "number", "description": "Precio máximo en MXN."},
             },
         },
-    }
+    },
+    {
+        "name": "agendar_cita",
+        "description": (
+            "Agenda una visita/cita cuando el cliente CONFIRMA un día y una hora concretos. "
+            "Antes de llamarla debes tener: nombre del cliente, fecha y hora. Convierte SIEMPRE "
+            "la fecha a formato YYYY-MM-DD y la hora a HH:MM en 24 horas (ej: las 5 de la tarde = 17:00). "
+            "Usa la fecha de HOY que se indica en el contexto para resolver 'mañana', 'el viernes', etc. "
+            "Si la herramienta devuelve que el horario está ocupado (horarios_disponibles), ofrécele "
+            "esos horarios al cliente y vuelve a intentar cuando elija otro."
+        ),
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "nombre": {"type": "string", "description": "Nombre del cliente."},
+                "fecha": {"type": "string", "description": "Fecha en formato YYYY-MM-DD."},
+                "hora": {"type": "string", "description": "Hora en formato HH:MM (24h), ej: 17:00."},
+                "desarrollo": {"type": "string", "description": "Desarrollo o propiedad a visitar."},
+                "notas": {"type": "string", "description": "Notas u observaciones opcionales."},
+            },
+            "required": ["fecha", "hora"],
+        },
+    },
 ]
 
 
@@ -154,8 +176,17 @@ CÓMO TRABAJAS:
 Nunca inventes propiedades, precios ni promesas. Solo comparte información que provenga de la herramienta de búsqueda."""
 
 
+def _fecha_hoy_mx() -> str:
+    """Fecha/hora actual en México (Central, sin DST) como texto legible para el modelo."""
+    from datetime import datetime, timedelta
+    ahora = datetime.utcnow() - timedelta(hours=6)  # America/Mexico_City
+    dias = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"]
+    return f"{dias[ahora.weekday()]} {ahora.strftime('%d/%m/%Y')} (ISO: {ahora.strftime('%Y-%m-%d')}), {ahora.strftime('%H:%M')} h"
+
+
 def construir_system(persona: str, catalogo_texto: str) -> list:
-    """Arma el system prompt como bloques, cacheando el bloque grande (persona + catálogo)."""
+    """Arma el system prompt como bloques. Cachea el bloque grande (persona + catálogo)
+    y deja la fecha de hoy en un bloque aparte NO cacheado (cambia cada día)."""
     texto = persona.strip()
     if catalogo_texto:
         texto += "\n\n=== DESARROLLOS DESTACADOS (contexto de referencia) ===\n" + catalogo_texto.strip()
@@ -164,7 +195,11 @@ def construir_system(persona: str, catalogo_texto: str) -> list:
             "type": "text",
             "text": texto,
             "cache_control": {"type": "ephemeral"},  # se cachea → lecturas siguientes ~10% del costo
-        }
+        },
+        {
+            "type": "text",
+            "text": f"Contexto: hoy es {_fecha_hoy_mx()} en Guanajuato, México. Úsalo para calcular fechas relativas al agendar citas.",
+        },
     ]
 
 
@@ -177,6 +212,7 @@ async def responder(
     persona: str,
     catalogo_texto: str,
     model: Optional[str] = None,
+    agendar_cb=None,
 ) -> Tuple[str, List[Dict]]:
     """
     Genera la respuesta del bot.
@@ -217,13 +253,25 @@ async def responder(
             messages.append({"role": "assistant", "content": resp.content})
             resultados = []
             for block in resp.content:
-                if block.type == "tool_use" and block.name == "buscar_propiedades":
+                if block.type != "tool_use":
+                    continue
+                if block.name == "buscar_propiedades":
                     salida = await _ejecutar_buscar(block.input or {})
-                    resultados.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": salida,
-                    })
+                elif block.name == "agendar_cita":
+                    if agendar_cb:
+                        try:
+                            salida = await agendar_cb(block.input or {})
+                        except Exception as e:
+                            salida = json.dumps({"ok": False, "error": f"No se pudo agendar: {e}"})
+                    else:
+                        salida = json.dumps({"ok": False, "error": "Agenda no disponible ahora."})
+                else:
+                    salida = json.dumps({"ok": False, "error": "Herramienta desconocida."})
+                resultados.append({
+                    "type": "tool_result",
+                    "tool_use_id": block.id,
+                    "content": salida,
+                })
             messages.append({"role": "user", "content": resultados})
             continue
 
