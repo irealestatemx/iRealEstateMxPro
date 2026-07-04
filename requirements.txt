@@ -3,6 +3,7 @@ uvicorn[standard]
 python-multipart
 jinja2
 openai
+anthropic
 python-dotenv
 aiofiles
 fpdf2

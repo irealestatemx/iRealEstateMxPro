@@ -133,6 +133,7 @@ RATE_LIMITS = {
     "/forgot-password": (3, 600), # 3 intentos cada 10 min
     "/reset-password": (5, 600),  # 5 intentos cada 10 min
     "/api/whatsapp/debounce": (60, 60),  # 60 req/min
+    "/api/whatsapp/webhook": (120, 60),  # 120 req/min (entrada directa de WAHA)
     "/api/whatsapp/bot-sent": (60, 60),  # 60 req/min
     "/api/prospectos/registrar": (30, 60),
 }
@@ -178,6 +179,7 @@ app.add_middleware(RateLimitMiddleware)
 CSRF_SECRET = os.getenv("CSRF_SECRET", SECRET_KEY)
 CSRF_EXEMPT_PATHS = {
     "/api/whatsapp/debounce",
+    "/api/whatsapp/webhook",
     "/api/prospectos/registrar",
     "/api/citas/disponibilidad",
     "/api/citas/registrar",
@@ -231,6 +233,11 @@ async def startup():
         await seed_admin_user()
     except Exception as e:
         print(f"[SEED] Error creando admin: {e}")
+    # Cargar keywords del bot desde configuración
+    try:
+        await refrescar_bot_keywords_desde_config()
+    except Exception as e:
+        print(f"[BOT] Error cargando keywords: {e}")
 
 
 @app.on_event("shutdown")
@@ -4084,10 +4091,23 @@ async def admin_bulk_prospectos(request: Request):
 # Acumula mensajes del mismo numero y espera a que termine de escribir
 # Tambien registra prospecto y crea lead en Kommo (una sola vez)
 
+# Cerebro del bot (Claude). Se importa perezosamente para no romper el arranque
+# si aún no está instalado el paquete anthropic.
+try:
+    import bot_claude
+    _BOT_CLAUDE_OK = True
+except Exception as _e:
+    bot_claude = None
+    _BOT_CLAUDE_OK = False
+    print(f"[BOT] bot_claude no disponible: {_e}")
+
 _message_buffer: Dict[str, dict] = {}
 _kommo_created: Dict[str, float] = {}  # telefono -> timestamp de ultimo lead creado
 _paused_chats: Dict[str, float] = {}  # telefono -> timestamp de cuando se pauso
 _active_chats: Dict[str, float] = {}  # telefono -> timestamp de cuando se activo la conversacion
+_bot_history: Dict[str, dict] = {}  # telefono -> {"messages": [...], "ts": epoch} memoria de conversación
+BOT_HISTORY_TTL = 60 * 30  # 30 min: igual que ACTIVE_DURATION
+BOT_HISTORY_MAX = 16       # máximo de mensajes retenidos por conversación
 _bot_last_sent: Dict[str, float] = {}  # telefono -> timestamp de cuando el bot envio su ultima respuesta
 _bot_sent_texts: Dict[str, list] = {}  # telefono -> [(timestamp, texto_normalizado)] de lo que el bot envió
 _last_processed: Dict[str, float] = {}  # telefono -> timestamp de ultimo process:true (cooldown anti-doble)
@@ -4160,6 +4180,26 @@ BOT_KEYWORDS = [
     "planos", "amenidades",
 ]
 
+_BOT_KEYWORDS_BASE = list(BOT_KEYWORDS)  # copia inmutable de las keywords por defecto
+
+
+def _set_bot_keywords_extra(extra_raw: str) -> None:
+    """Agrega keywords configurables (separadas por coma) a la lista base.
+    Ej: 'Cárcamos Residencial, Privada del Fresno, Nuevo Desarrollo'."""
+    global BOT_KEYWORDS
+    extras = [k.strip().lower() for k in (extra_raw or "").split(",") if k.strip()]
+    BOT_KEYWORDS = _BOT_KEYWORDS_BASE + [k for k in extras if k not in _BOT_KEYWORDS_BASE]
+
+
+async def refrescar_bot_keywords_desde_config() -> None:
+    """Carga las keywords extra guardadas en site_config y las aplica."""
+    try:
+        cfg = await get_all_site_config()
+        _set_bot_keywords_extra(cfg.get("bot_keywords_extra", ""))
+    except Exception as e:
+        print(f"[BOT] No se pudieron cargar keywords de config: {e}")
+
+
 KOMMO_SUBDOMAIN = os.getenv("KOMMO_SUBDOMAIN", "irealestatemxclaude")
 KOMMO_ACCESS_TOKEN = os.getenv("KOMMO_ACCESS_TOKEN", "")
 KOMMO_PIPELINE_ID = 13489919
@@ -4213,6 +4253,114 @@ def _is_chat_active(phone: str) -> bool:
         _active_chats.pop(phone, None)
         return False
     return True
+
+
+# ─── Cerebro del bot (Claude) — envío, catálogo, config y orquestación ───
+
+async def enviar_texto_waha(chat_id: str, texto: str) -> bool:
+    """Envía un texto libre por WAHA (sendText). Devuelve True si se envió."""
+    if not WAHA_API_URL or not WAHA_API_KEY or not texto:
+        return False
+    payload = {"chatId": chat_id, "text": texto, "session": WAHA_SESSION}
+    headers = {"X-Api-Key": WAHA_API_KEY, "Content-Type": "application/json"}
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            resp = await client.post(f"{WAHA_API_URL}/api/sendText", json=payload, headers=headers)
+            if resp.status_code < 400:
+                return True
+            print(f"[WAHA] Error {resp.status_code}: {resp.text[:200]}")
+            return False
+    except Exception as e:
+        print(f"[WAHA] Error conexión: {e}")
+        return False
+
+
+def _construir_catalogo_texto() -> str:
+    """Renderiza los desarrollos estáticos como texto de contexto para el system prompt."""
+    partes = []
+    for d in DESARROLLOS_DATA.values():
+        difs = ", ".join(d.get("diferenciales", []) or [])
+        partes.append(
+            f"• {d.get('nombre','')}\n"
+            f"  Ubicación: {d.get('ubicacion','')}\n"
+            f"  Tipo: {d.get('tipo','')}  |  Desde: {d.get('precio_desde','')}\n"
+            f"  {d.get('descripcion_corta','')}\n"
+            + (f"  Diferenciales: {difs}\n" if difs else "")
+            + (f"  Ficha PDF: {d.get('pdf_url')}\n" if d.get('pdf_url') else "")
+        )
+    return "\n".join(partes)
+
+
+async def _cargar_config_bot() -> dict:
+    """Lee la configuración editable del bot desde site_config (con defaults)."""
+    try:
+        cfg = await get_all_site_config()
+    except Exception:
+        cfg = {}
+    persona = (cfg.get("bot_system_prompt") or "").strip()
+    if not persona and bot_claude:
+        persona = bot_claude.PERSONA_DEFAULT
+    model = (cfg.get("bot_model") or os.getenv("CLAUDE_MODEL") or "claude-sonnet-5").strip()
+    habilitado = str(cfg.get("bot_enabled", "1")).strip().lower() not in ("0", "false", "no", "off")
+    return {"persona": persona, "model": model, "habilitado": habilitado}
+
+
+def _get_bot_history(phone: str) -> list:
+    """Historial de conversación vigente (o vacío si expiró)."""
+    now = time.time()
+    entry = _bot_history.get(phone)
+    if not entry or (now - entry.get("ts", 0)) > BOT_HISTORY_TTL:
+        _bot_history.pop(phone, None)
+        return []
+    return list(entry.get("messages", []))
+
+
+def _save_bot_history(phone: str, messages: list) -> None:
+    _bot_history[phone] = {"messages": messages[-BOT_HISTORY_MAX:], "ts": time.time()}
+
+
+async def procesar_respuesta_bot(phone: str, chat_id: str, mensaje: str, nombre: str = "") -> Optional[str]:
+    """Genera la respuesta con Claude y la envía por WhatsApp. Registra el eco.
+    Devuelve el texto enviado, o None si el bot no está disponible/habilitado."""
+    if not _BOT_CLAUDE_OK or not bot_claude or not bot_claude.bot_configurado():
+        print("[BOT] Claude no configurado (falta ANTHROPIC_API_KEY o paquete anthropic)")
+        return None
+
+    conf = await _cargar_config_bot()
+    if not conf["habilitado"]:
+        print("[BOT] Bot deshabilitado en configuración")
+        return None
+
+    historial = _get_bot_history(phone)
+    catalogo = _construir_catalogo_texto()
+    try:
+        texto, nuevo_hist = await bot_claude.responder(
+            mensaje=mensaje,
+            historial=historial,
+            persona=conf["persona"],
+            catalogo_texto=catalogo,
+            model=conf["model"],
+        )
+    except Exception as e:
+        print(f"[BOT] Error generando respuesta: {e}")
+        return None
+
+    if not texto:
+        return None
+
+    enviado = await enviar_texto_waha(chat_id, texto)
+    if enviado:
+        _save_bot_history(phone, nuevo_hist)
+        # Registrar el eco (para no confundir el fromMe con un humano)
+        now = time.time()
+        _bot_last_sent[phone] = now
+        sent_norm = _normalize_bot_text(texto)
+        if sent_norm:
+            _bot_sent_texts.setdefault(phone, []).append((now, sent_norm))
+            if len(_bot_sent_texts[phone]) > 10:
+                _bot_sent_texts[phone] = _bot_sent_texts[phone][-10:]
+        print(f"[BOT] ✓ Respuesta enviada a {phone} ({len(texto)} chars)")
+    return texto if enviado else None
 
 
 async def _create_kommo_lead(phone: str, name: str):
@@ -4502,16 +4650,20 @@ async def whatsapp_deactivate(request: Request):
 
 @app.post("/api/whatsapp/debounce")
 async def whatsapp_debounce(request: Request):
+    """Entrada legacy (n8n): recibe {phone, message, name, chatId, prefijo, desarrollo, fromMe}."""
+    body = await request.json()
+    return await _procesar_whatsapp(body)
+
+
+async def _procesar_whatsapp(body: dict):
     """
-    Recibe cada mensaje de WhatsApp (tanto del cliente como de Esteban).
-    Lógica:
+    Procesa un mensaje de WhatsApp (cliente o Esteban). Lógica:
     1. Si fromMe=true → Esteban escribió → pausar bot y desactivar chat
     2. Si el bot está pausado → no procesar
     3. Si NO hay conversación activa → solo activar si hay palabras clave
     4. Si hay conversación activa → acumular mensajes con debounce de 12s
-    5. Al final: registrar prospecto + crear lead Kommo (una sola vez)
+    5. Al final: registrar prospecto + responder con Claude + enviar por WhatsApp
     """
-    body = await request.json()
     phone = body.get("phone", "")
     message = body.get("message", "")
     name = body.get("name", "")
@@ -4698,6 +4850,30 @@ async def whatsapp_debounce(request: Request):
         _bot_last_sent[phone] = time.time()
         _last_processed[phone] = time.time()  # Cooldown anti-doble respuesta
 
+        # ─── Responder NATIVAMENTE con Claude y enviar por WhatsApp ───
+        reply = await procesar_respuesta_bot(
+            phone=phone,
+            chat_id=final["chatId"] or _formatear_telefono_mx(phone),
+            mensaje=combined,
+            nombre=final["name"],
+        )
+        if reply is not None:
+            # Guardar la respuesta en el historial del prospecto (visible en el admin)
+            try:
+                from datetime import datetime as _dt
+                p = await get_prospecto_by_telefono(phone)
+                if p:
+                    await agregar_historial_prospecto(p["id"], {
+                        "tipo": "respuesta_bot",
+                        "mensaje": reply,
+                        "fecha": str(_dt.now()),
+                        "datos": {},
+                    })
+            except Exception as e:
+                print(f"[BOT] No se pudo guardar respuesta en historial: {e}")
+            return JSONResponse({"process": True, "handled_by": "claude", "reply": reply})
+
+        # Bot no disponible/deshabilitado → devolver payload (compat con consumidores externos)
         return JSONResponse({
             "process": True,
             "phone": phone,
@@ -4709,6 +4885,48 @@ async def whatsapp_debounce(request: Request):
         })
 
     return JSONResponse({"process": False})
+
+
+@app.post("/api/whatsapp/webhook")
+async def whatsapp_webhook(request: Request):
+    """Webhook DIRECTO de WAHA (reemplaza a n8n). Configura en WAHA:
+    URL = https://TU-DOMINIO/api/whatsapp/webhook, evento 'message'.
+    Parsea el payload de WAHA y procesa el mensaje en segundo plano (el debounce
+    espera 12s), devolviendo 200 de inmediato para que WAHA no reintente."""
+    try:
+        data = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "invalid_json"}, status_code=200)
+
+    evento = data.get("event")
+    if evento not in (None, "message", "message.any"):
+        return JSONResponse({"ok": True, "ignored": evento})
+
+    payload = data.get("payload") or {}
+    frm = payload.get("from") or ""
+    if not frm or frm.endswith("@g.us") or frm == "status@broadcast":
+        return JSONResponse({"ok": True, "ignored": "no_privado"})
+
+    phone = frm.split("@")[0]
+    message = payload.get("body") or ""
+    from_me = bool(payload.get("fromMe"))
+    _pd = payload.get("_data") or {}
+    name = _pd.get("notifyName") or payload.get("notifyName") or ""
+    chat_id = frm
+
+    # Detectar prefijo de referido (ej: "N-", "R-") al inicio del mensaje
+    prefijo = ""
+    m = re.match(r'^\s*([A-Za-z]{1,5})\s*[-–—]\s', message)
+    if m:
+        prefijo = m.group(1).upper()
+
+    cuerpo = {
+        "phone": phone, "message": message, "name": name, "chatId": chat_id,
+        "prefijo": prefijo, "desarrollo": "", "fromMe": from_me,
+    }
+    # Procesar en segundo plano (respuesta inmediata a WAHA)
+    asyncio.create_task(_procesar_whatsapp(cuerpo))
+    return JSONResponse({"ok": True})
 
 
 # ─── API: Disponibilidad de citas (para el chatbot) ───
@@ -5071,6 +5289,8 @@ async def admin_config_save(request: Request):
         "vender_stat1_num", "vender_stat1_label",
         "vender_stat2_num", "vender_stat2_label",
         "vender_stat3_num", "vender_stat3_label",
+        # Chatbot (Claude)
+        "bot_enabled", "bot_model", "bot_keywords_extra", "bot_system_prompt",
     ]
     # Agregar campos dinámicos de beneficios
     for i in range(1, 7):
@@ -5083,6 +5303,8 @@ async def admin_config_save(request: Request):
         valor = form.get(campo, "").strip()
         if valor:
             await set_site_config(campo, valor)
+    # Refrescar keywords del bot en caliente
+    await refrescar_bot_keywords_desde_config()
     return RedirectResponse("/admin/config?msg=Configuración guardada correctamente", status_code=302)
 
 

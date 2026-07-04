@@ -97,6 +97,43 @@
     </div>
 
     <!-- ─── Agente Principal ─── -->
+    <!-- ─── Chatbot IA (WhatsApp con Claude) ─── -->
+    <div class="card">
+      <h2>🤖 Chatbot de WhatsApp (Claude)</h2>
+      <div class="row">
+        <div class="field">
+          <label>Estado del bot</label>
+          <select name="bot_enabled">
+            <option value="1" {{ 'selected' if (c.bot_enabled or '1') not in ['0','false','no','off'] else '' }}>Activado</option>
+            <option value="0" {{ 'selected' if (c.bot_enabled or '1') in ['0','false','no','off'] else '' }}>Desactivado</option>
+          </select>
+          <div class="hint">Si lo desactivas, el bot deja de responder automáticamente por WhatsApp.</div>
+        </div>
+        <div class="field">
+          <label>Modelo</label>
+          <select name="bot_model">
+            <option value="claude-sonnet-5" {{ 'selected' if (c.bot_model or 'claude-sonnet-5') == 'claude-sonnet-5' else '' }}>Claude Sonnet 5 (recomendado / costo)</option>
+            <option value="claude-opus-4-8" {{ 'selected' if c.bot_model == 'claude-opus-4-8' else '' }}>Claude Opus 4.8 (máxima calidad)</option>
+            <option value="claude-haiku-4-5" {{ 'selected' if c.bot_model == 'claude-haiku-4-5' else '' }}>Claude Haiku 4.5 (más rápido/barato)</option>
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label>Palabras clave que activan el bot (además de las de base)</label>
+        <input type="text" name="bot_keywords_extra" value="{{ c.bot_keywords_extra or 'Cárcamos Residencial, Privada del Fresno' }}"/>
+        <div class="hint">Separadas por coma. Agrega aquí los nombres de nuevos desarrollos o campañas. El bot solo se activa si el mensaje contiene una palabra clave o un prefijo de referido (ej: N-, R-).</div>
+      </div>
+      <div class="field">
+        <label>Personalidad / instrucciones del bot (system prompt)</label>
+        <textarea name="bot_system_prompt" rows="8" placeholder="Deja vacío para usar la personalidad por defecto (asesor experto de iRealEstateMx).">{{ c.bot_system_prompt or '' }}</textarea>
+        <div class="hint">Define el tono, reglas y estilo. Déjalo vacío para usar el experto por defecto. El catálogo de desarrollos se agrega automáticamente.</div>
+      </div>
+      <div class="preview-box">
+        Webhook de WAHA (configúralo en WAHA): <strong>https://irealestatemx.com/api/whatsapp/webhook</strong> · evento <strong>message</strong>.
+        Requiere la variable de entorno <strong>ANTHROPIC_API_KEY</strong> en el servidor.
+      </div>
+    </div>
+
     <div class="card">
       <h2>Agente Principal (Sobre Nosotros)</h2>
       <div class="row">
