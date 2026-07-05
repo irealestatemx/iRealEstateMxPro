@@ -746,6 +746,18 @@ async def get_users_by_rol(rol: str):
     return [dict(r._mapping) for r in rows]
 
 
+async def get_agentes_asignables():
+    """Usuarios que pueden trabajar/cerrar leads: agente, admin y PM.
+    Se usa para poblar los selectores de 'asignar agente' (referido y admin)."""
+    query = """
+        SELECT id, nombre, email, rol FROM usuarios
+        WHERE rol IN ('agente', 'admin', 'pm') AND activo = TRUE
+        ORDER BY (rol = 'agente') DESC, nombre
+    """
+    rows = await database.fetch_all(query=query)
+    return [dict(r._mapping) for r in rows]
+
+
 async def update_user(user_id: int, updates: dict):
     """Actualiza un usuario."""
     allowed = {"nombre", "email", "rol", "activo", "prefijo_whatsapp", "telefono", "pm_id"}

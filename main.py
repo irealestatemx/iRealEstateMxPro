@@ -38,7 +38,7 @@ from database import (
     authenticate_user, get_user_by_email, get_user_by_id, get_all_users, create_user,
     update_user, delete_user, delete_user_permanent, seed_admin_user, get_users_by_rol,
     get_properties_by_user,
-    get_user_by_prefijo, get_all_referidos,
+    get_user_by_prefijo, get_all_referidos, get_agentes_asignables,
     create_prospecto, get_all_prospectos, get_prospecto_by_id,
     update_prospecto, count_prospectos, count_prospectos_recientes, delete_prospecto,
     get_prospecto_by_telefono, agregar_historial_prospecto,
@@ -3904,7 +3904,7 @@ async def dashboard_referido(request: Request, ok: Optional[str] = None, error: 
 
     # Propiedades disponibles para el selector de "interés" y agentes para elegir
     propiedades = await get_all_properties(active_only=True, limit=200, offset=0)
-    agentes = await get_users_by_rol("agente")
+    agentes = await get_agentes_asignables()
 
     return templates.TemplateResponse(request=request, name="dashboard_referido.html", context={
         "user": user,
@@ -3939,7 +3939,7 @@ async def referido_create_prospecto(
     # Validar que el agente elegido sea realmente un agente activo
     ag_id = None
     if agente_id and agente_id.isdigit():
-        agentes = await get_users_by_rol("agente")
+        agentes = await get_agentes_asignables()
         if int(agente_id) in {a["id"] for a in agentes}:
             ag_id = int(agente_id)
     data = {
@@ -4004,7 +4004,7 @@ async def admin_prospectos_page(
     counts = await count_prospectos()
     referidos = await get_all_referidos()
     citas = await get_citas_chatbot(limit=100)
-    agentes = await get_users_by_rol("agente")
+    agentes = await get_agentes_asignables()
     agentes_dict = {a["id"]: a["nombre"] for a in agentes}
 
     # Serializar para template
@@ -4394,7 +4394,7 @@ def _construir_catalogo_texto() -> str:
             f"  Tipo: {d.get('tipo','')}  |  Desde: {d.get('precio_desde','')}\n"
             f"  {d.get('descripcion_corta','')}\n"
             + (f"  Diferenciales: {difs}\n" if difs else "")
-            + (f"  Mapa (envíalo si piden ubicación): {d.get('mapa_url')}\n" if d.get('mapa_url') else "")
+            + (f"  Mapa (NO lo compartas salvo que el cliente lo pida explícitamente): {d.get('mapa_url')}\n" if d.get('mapa_url') else "")
             + (f"  Ficha PDF: {d.get('pdf_url')}\n" if d.get('pdf_url') else "")
         )
     return "\n".join(partes)
@@ -5073,9 +5073,9 @@ async def _procesar_whatsapp(body: dict):
                     updates["nombre_cliente"] = final["name"]
                 if final["desarrollo"]:
                     updates["desarrollo_interes"] = final["desarrollo"]
-                # Asignación FORZOSA: si el mensaje trae un prefijo válido, se asigna
-                # a ese referido aunque el prospecto ya tuviera otro (o ninguno).
-                if referido and existente.get("referido_id") != referido["id"]:
+                # El PRIMER referido que contactó se queda con el cliente.
+                # Si el prospecto YA tiene referido, NO se reasigna a otro distinto.
+                if referido and not existente.get("referido_id"):
                     updates["referido_id"] = referido["id"]
                 if updates:
                     await update_prospecto(prospecto_id, updates)
@@ -5148,6 +5148,36 @@ async def _procesar_whatsapp(body: dict):
     return JSONResponse({"process": False})
 
 
+def _telefono_desde_payload(payload: dict, exclude: str = "") -> str:
+    """Busca recursivamente el teléfono real del remitente en TODO el payload de WAHA.
+    Reconoce identificadores @c.us y @s.whatsapp.net (el número real), ignora @lid
+    (id privado), @g.us (grupos) y el número del negocio ('to'/exclude). Prefiere un
+    número que parezca mexicano (52 + 10/11 dígitos)."""
+    to_val = str(payload.get("to") or "")
+    exclude_d = "".join(c for c in str(exclude or "").split("@")[0] if c.isdigit())
+    encontrados = []
+
+    def walk(v):
+        if isinstance(v, str):
+            if v.endswith("@c.us") or v.endswith("@s.whatsapp.net"):
+                d = "".join(c for c in v.split("@")[0] if c.isdigit())
+                if d and d != exclude_d and v != to_val:
+                    encontrados.append(d)
+        elif isinstance(v, dict):
+            for x in v.values():
+                walk(x)
+        elif isinstance(v, list):
+            for x in v:
+                walk(x)
+
+    walk(payload)
+    # Preferir números mexicanos (52 + 10 = 12, o 521 + 10 = 13)
+    for d in encontrados:
+        if d.startswith("52") and 12 <= len(d) <= 13:
+            return d
+    return encontrados[0] if encontrados else ""
+
+
 @app.post("/api/whatsapp/webhook")
 async def whatsapp_webhook(request: Request):
     """Webhook DIRECTO de WAHA (reemplaza a n8n). Configura en WAHA:
@@ -5174,17 +5204,18 @@ async def whatsapp_webhook(request: Request):
     name = _pd.get("notifyName") or payload.get("notifyName") or ""
     chat_id = frm  # para responder funciona con @c.us o @lid
 
-    # Teléfono real: WAHA a veces manda un @lid (id privado) en 'from'. Buscar un
-    # número @c.us en los campos alternativos; si no hay, usar lo que venga.
-    phone = ""
-    for cand in (frm, _pd.get("from"), _pd.get("author"), payload.get("author"),
-                 payload.get("participant"), (_pd.get("id") or {}).get("participant") if isinstance(_pd.get("id"), dict) else None):
-        c = str(cand or "")
-        if c.endswith("@c.us"):
-            phone = c.split("@")[0]
-            break
+    # Teléfono real: WAHA a veces manda un @lid (id privado) en 'from'. El número real
+    # suele estar en _data como @s.whatsapp.net. Se busca en TODO el payload.
+    phone = _telefono_desde_payload(payload, exclude=frm)
     if not phone:
-        phone = frm.split("@")[0]
+        phone = frm.split("@")[0]  # último recurso (puede ser un LID)
+        # Diagnóstico: para ver dónde viene el número real en tu versión de WAHA
+        try:
+            print(f"[WA-DEBUG] Sin número real. from={frm} to={payload.get('to')} "
+                  f"keys={list(payload.keys())} data_keys={list(_pd.keys())[:20]}")
+            print(f"[WA-DEBUG] payload={json.dumps(payload, ensure_ascii=False)[:1500]}")
+        except Exception:
+            pass
 
     # Detectar prefijo de referido al inicio (ej: "N- Hola", "R-🏡 ...").
     # Permite emoji/texto pegado al guion (sin espacio).
