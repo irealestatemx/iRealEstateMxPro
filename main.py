@@ -5077,6 +5077,9 @@ async def _procesar_whatsapp(body: dict):
         final = _message_buffer.pop(phone)
         combined = "\n".join(final["messages"])
 
+        # INTERÉS para el CRM: revisar lo que escribió el cliente y deducir el interés
+        interes = final["desarrollo"] or _detectar_interes(combined)
+
         # ─── Registrar prospecto en nuestra BD (buscar existente primero) ───
         try:
             referido = None
@@ -5091,8 +5094,10 @@ async def _procesar_whatsapp(body: dict):
                 updates = {}
                 if final["name"] and not existente.get("nombre_cliente"):
                     updates["nombre_cliente"] = final["name"]
-                if final["desarrollo"]:
-                    updates["desarrollo_interes"] = final["desarrollo"]
+                # Actualizar interés: siempre que detectemos un desarrollo específico,
+                # o si aún no había interés registrado.
+                if interes and (final["desarrollo"] or not existente.get("desarrollo_interes")):
+                    updates["desarrollo_interes"] = interes
                 # El PRIMER referido que contactó se queda con el cliente.
                 # Si el prospecto YA tiene referido, NO se reasigna a otro distinto.
                 if referido and not existente.get("referido_id"):
@@ -5116,7 +5121,7 @@ async def _procesar_whatsapp(body: dict):
                     "telefono_cliente": phone,
                     "mensaje_original": combined,
                     "prefijo": final["prefijo"],
-                    "desarrollo_interes": final["desarrollo"],
+                    "desarrollo_interes": interes,
                     "estado": "nuevo",
                     "fuente": "chatbot",
                 })
@@ -5490,6 +5495,48 @@ DESARROLLOS_DATA = {
         "mapa_url": "https://maps.app.goo.gl/bANj9rgwFXgR16Q19",
     },
 }
+
+
+def _detectar_interes(texto: str) -> str:
+    """Revisa la conversación y deduce el INTERÉS del prospecto para el CRM.
+    Prioriza el nombre de un desarrollo mencionado; si no, deduce el tipo de
+    interés (casa, terreno, departamento, renta, inversión, crédito). Devuelve
+    '' si no encuentra nada claro."""
+    t = " " + (texto or "").lower() + " "
+    # 1) Desarrollo específico mencionado (nombre o palabras clave del catálogo)
+    alias = {
+        "carcamos-residencial": ["carcamos", "cárcamos", "carcamos residencial", "cárcamos residencial"],
+        "privada-del-fresno": ["privada del fresno", "del fresno", "fresno"],
+    }
+    for slug, palabras in alias.items():
+        if any(p in t for p in palabras):
+            dev = DESARROLLOS_DATA.get(slug)
+            if dev:
+                return dev["nombre"]
+    # 2) Tipo de interés general
+    tipos = [
+        (["departamento", "depa ", "depas"], "Departamento"),
+        (["terreno", "lote", "lotes"], "Terreno"),
+        (["local", "oficina", "comercial"], "Local comercial"),
+        (["casa", "residencia", "hogar", "vivienda"], "Casa"),
+    ]
+    tipo = ""
+    for palabras, etiqueta in tipos:
+        if any(p in t for p in palabras):
+            tipo = etiqueta
+            break
+    # 3) Operación / financiamiento (matiza el interés)
+    extra = []
+    if any(p in t for p in [" renta", "rentar", "alquil"]):
+        extra.append("renta")
+    if any(p in t for p in ["inversi", "plusval", "invertir"]):
+        extra.append("inversión")
+    if any(p in t for p in ["infonavit", "fovissste", "crédit", "credito", "hipotec"]):
+        extra.append("crédito")
+    if any(p in t for p in ["preventa", "pre-venta", "preventá"]):
+        extra.append("preventa")
+    partes = [x for x in ([tipo] + extra) if x]
+    return " · ".join(partes) if partes else ""
 
 
 @app.get("/admin/desarrollos", response_class=HTMLResponse)
