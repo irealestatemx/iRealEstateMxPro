@@ -1918,10 +1918,26 @@ def _send_reset_email(to_email: str, to_name: str, reset_link: str):
         print(f"[EMAIL] SMTP no configurado. Link de reset: {reset_link}")
         return False
 
+    from email.utils import formatdate, make_msgid
+
     msg = MIMEMultipart("alternative")
     msg["From"] = f"{SMTP_FROM_NAME} <{SMTP_USER}>"
     msg["To"] = to_email
-    msg["Subject"] = "Recupera tu contraseña — iRealEstateMxPro"
+    msg["Subject"] = "Restablece el acceso a tu cuenta de iRealEstateMx"
+    # Headers que mejoran la entregabilidad (evitan spam)
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain="irealestatemx.com")
+    msg["Reply-To"] = SMTP_USER
+    msg["List-Unsubscribe"] = f"<mailto:{SMTP_USER}?subject=unsubscribe>"
+
+    texto_plano = (
+        f"Hola {to_name},\n\n"
+        f"Recibimos una solicitud para restablecer tu contraseña en iRealEstateMx.\n"
+        f"Abre este enlace para crear una nueva (expira en 1 hora):\n\n"
+        f"{reset_link}\n\n"
+        f"Si no solicitaste este cambio, ignora este correo.\n\n"
+        f"iRealEstateMx"
+    )
 
     html = f"""
     <div style="font-family:'Inter',Arial,sans-serif;max-width:500px;margin:0 auto;padding:40px 20px;">
@@ -1956,7 +1972,9 @@ def _send_reset_email(to_email: str, to_name: str, reset_link: str):
     </div>
     """
 
-    msg.attach(MIMEText(html, "html"))
+    # Orden importa: texto plano primero, HTML después (baja el score de spam)
+    msg.attach(MIMEText(texto_plano, "plain", "utf-8"))
+    msg.attach(MIMEText(html, "html", "utf-8"))
 
     try:
         server = smtplib.SMTP(SMTP_HOST, SMTP_PORT)
@@ -4198,7 +4216,8 @@ _bot_sent_texts: Dict[str, list] = {}  # telefono -> [(timestamp, texto_normaliz
 _last_processed: Dict[str, float] = {}  # telefono -> timestamp de ultimo process:true (cooldown anti-doble)
 _seen_messages: Dict[str, float] = {}  # "phone:hash" -> timestamp (dedup exacto)
 _phone_locks: Dict[str, asyncio.Lock] = {}  # lock por teléfono para evitar procesamiento concurrente
-PROCESS_COOLDOWN = 30  # segundos de cooldown después de responder (anti-doble respuesta)
+PROCESS_COOLDOWN = 3  # segundos de cooldown tras responder. Bajo, para no bloquear la conversación
+                      # (el debounce de 12s + lock + dedup ya evitan respuestas dobles)
 PAUSE_DURATION = 3600 * 24  # 24 horas de pausa cuando Esteban escribe manualmente
 ACTIVE_DURATION = 60 * 30  # 30 minutos de actividad máxima del bot
 BOT_ECHO_WINDOW = 3  # segundos: ventana corta de fallback (la detección real es por contenido)
@@ -4245,25 +4264,18 @@ _blocked_phones_raw = os.getenv("BOT_BLOCKED_PHONES", "")
 if _blocked_phones_raw:
     BOT_BLOCKED_PHONES = {p.strip()[-10:] for p in _blocked_phones_raw.split(",") if p.strip()}
 
-# Palabras clave que activan el bot (sin importar mayúsculas)
+# Palabras clave que activan el bot (sin importar mayúsculas).
+# Solo términos específicos de desarrollos/campaña. NO palabras genéricas
+# (casa, precio, etc.) para que no se active en cualquier conversación.
 BOT_KEYWORDS = [
-    # Desarrollos
-    "cárcamos", "carcamos", "fresno", "privada del fresno",
-    # Inmobiliarias
-    "casa", "departamento", "terreno", "propiedad", "lote",
-    "venta", "renta", "comprar", "rentar",
-    "inmueble", "residencial", "fraccionamiento",
-    "recámara", "recamara", "habitación", "habitacion",
-    "precio", "costo", "cuánto", "cuanto", "crédito", "credito",
-    "infonavit", "fovissste", "hipoteca",
-    "metros", "m2", "m²",
-    "ubicación", "ubicacion", "dirección", "direccion", "dónde", "donde",
-    "disponible", "disponibilidad",
-    "agendar", "cita", "visitar", "visita", "ver la casa",
-    "información", "informacion", "info",
-    "interesa", "interesado", "interesada",
-    "planos", "amenidades",
+    "carcamos", "cárcamos",
+    "carcamos residencial", "cárcamos residencial",
+    "fresno", "privada del fresno",
+    "información", "informacion",
 ]
+
+# Palabra que DETIENE al bot de inmediato (cualquiera que la escriba lo pausa).
+BOT_STOP_WORD = os.getenv("BOT_STOP_WORD", "extraordinario").strip().lower()
 
 _BOT_KEYWORDS_BASE = list(BOT_KEYWORDS)  # copia inmutable de las keywords por defecto
 
@@ -4277,10 +4289,14 @@ def _set_bot_keywords_extra(extra_raw: str) -> None:
 
 
 async def refrescar_bot_keywords_desde_config() -> None:
-    """Carga las keywords extra guardadas en site_config y las aplica."""
+    """Carga las keywords extra y la palabra de paro guardadas en site_config."""
+    global BOT_STOP_WORD
     try:
         cfg = await get_all_site_config()
         _set_bot_keywords_extra(cfg.get("bot_keywords_extra", ""))
+        sw = (cfg.get("bot_stop_word") or "").strip().lower()
+        if sw:
+            BOT_STOP_WORD = sw
     except Exception as e:
         print(f"[BOT] No se pudieron cargar keywords de config: {e}")
 
@@ -4323,8 +4339,9 @@ def _has_bot_keyword(text: str) -> bool:
     for kw in BOT_KEYWORDS:
         if kw in text_lower:
             return True
-    # También detectar prefijos de referidos (ej: N-, A-, etc.)
-    if re.search(r'[A-Z]\s*-\s', text_sin_urls, re.IGNORECASE):
+    # Prefijo de referido AL INICIO (ej: "N- Hola", "R-🏡 ..."). Permite emoji/texto
+    # pegado al guion (sin espacio). Anclado al inicio para no activar por guiones sueltos.
+    if re.match(r'^\s*[A-Za-z]{1,4}\s*[-–—]', text_sin_urls):
         return True
     return False
 
@@ -4899,6 +4916,17 @@ async def _procesar_whatsapp(body: dict):
     for k in _seen_messages_expired:
         _seen_messages.pop(k, None)
 
+    # ─── 0c. Palabra de PARO: detiene al bot de inmediato (24h) ───
+    # No es eco del propio bot (el bot nunca envía la stop word).
+    if BOT_STOP_WORD and BOT_STOP_WORD in (message or "").lower():
+        if not _is_bot_echo_by_content(phone, message):
+            _paused_chats[phone] = now
+            _active_chats.pop(phone, None)
+            _message_buffer.pop(phone, None)
+            _bot_history.pop(phone, None)
+            print(f"[BOT] Palabra de paro '{BOT_STOP_WORD}' en {phone} → bot detenido")
+            return JSONResponse({"process": False, "reason": "stop_word"})
+
     # ─── 1. Si fromMe → ¿es eco del bot o Esteban escribiendo? ───
     # IMPORTANTE: este check va ANTES del cooldown para que siempre pausemos si Esteban escribe
     if from_me:
@@ -5020,7 +5048,9 @@ async def _procesar_whatsapp(body: dict):
                     updates["nombre_cliente"] = final["name"]
                 if final["desarrollo"]:
                     updates["desarrollo_interes"] = final["desarrollo"]
-                if referido and not existente.get("referido_id"):
+                # Asignación FORZOSA: si el mensaje trae un prefijo válido, se asigna
+                # a ese referido aunque el prospecto ya tuviera otro (o ninguno).
+                if referido and existente.get("referido_id") != referido["id"]:
                     updates["referido_id"] = referido["id"]
                 if updates:
                     await update_prospecto(prospecto_id, updates)
@@ -5120,9 +5150,10 @@ async def whatsapp_webhook(request: Request):
     name = _pd.get("notifyName") or payload.get("notifyName") or ""
     chat_id = frm
 
-    # Detectar prefijo de referido (ej: "N-", "R-") al inicio del mensaje
+    # Detectar prefijo de referido al inicio (ej: "N- Hola", "R-🏡 ...").
+    # Permite emoji/texto pegado al guion (sin espacio).
     prefijo = ""
-    m = re.match(r'^\s*([A-Za-z]{1,5})\s*[-–—]\s', message)
+    m = re.match(r'^\s*([A-Za-z]{1,4})\s*[-–—]', message)
     if m:
         prefijo = m.group(1).upper()
 
@@ -5496,7 +5527,7 @@ async def admin_config_save(request: Request):
         "vender_stat2_num", "vender_stat2_label",
         "vender_stat3_num", "vender_stat3_label",
         # Chatbot (Claude)
-        "bot_enabled", "bot_model", "bot_keywords_extra", "bot_system_prompt",
+        "bot_enabled", "bot_model", "bot_keywords_extra", "bot_system_prompt", "bot_stop_word",
     ]
     # Agregar campos dinámicos de beneficios
     for i in range(1, 7):

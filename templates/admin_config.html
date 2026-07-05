@@ -118,10 +118,17 @@
           </select>
         </div>
       </div>
-      <div class="field">
-        <label>Palabras clave que activan el bot (además de las de base)</label>
-        <input type="text" name="bot_keywords_extra" value="{{ c.bot_keywords_extra or 'Cárcamos Residencial, Privada del Fresno' }}"/>
-        <div class="hint">Separadas por coma. Agrega aquí los nombres de nuevos desarrollos o campañas. El bot solo se activa si el mensaje contiene una palabra clave o un prefijo de referido (ej: N-, R-).</div>
+      <div class="row">
+        <div class="field">
+          <label>Palabras clave que activan el bot (además de las de base)</label>
+          <input type="text" name="bot_keywords_extra" value="{{ c.bot_keywords_extra or '' }}"/>
+          <div class="hint">Separadas por coma. Base actual: carcamos, cárcamos residencial, fresno, privada del fresno, información. Agrega aquí nuevos desarrollos/campañas. El bot solo se activa con una de estas palabras o un prefijo de referido (ej: N-, R-).</div>
+        </div>
+        <div class="field" style="max-width:220px">
+          <label>Palabra que detiene el bot</label>
+          <input type="text" name="bot_stop_word" value="{{ c.bot_stop_word or 'Extraordinario' }}"/>
+          <div class="hint">Si alguien la escribe, el bot se detiene 24h en ese chat.</div>
+        </div>
       </div>
       <div class="field">
         <label>Personalidad / instrucciones del bot (system prompt)</label>
