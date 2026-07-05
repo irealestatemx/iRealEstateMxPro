@@ -1040,21 +1040,27 @@ async def get_citas_chatbot(prospecto_id: int = None, fecha: str = None, limit: 
     return [dict(r._mapping) for r in rows]
 
 
-async def check_disponibilidad_citas(fecha: str, hora: str = None):
-    """Revisa las citas de un día. Si se pasa hora, verifica si esa hora está ocupada."""
+async def check_disponibilidad_citas(fecha: str, hora: str = None, excluir_prospecto_id: int = None):
+    """Revisa las citas de un día. Si se pasa hora, verifica si esa hora está ocupada.
+    excluir_prospecto_id: ignora las citas de ese prospecto (para no marcar como
+    'ocupada' la cita propia del mismo cliente)."""
     from datetime import date as date_cls, time as time_cls, timedelta
     fecha_val = date_cls.fromisoformat(fecha) if isinstance(fecha, str) else fecha
 
     # Traer todas las citas del día que no estén canceladas
     query = """
-    SELECT c.id, c.hora_inicio, c.hora_fin, c.desarrollo, c.estado,
+    SELECT c.id, c.prospecto_id, c.hora_inicio, c.hora_fin, c.desarrollo, c.estado,
            p.nombre_cliente
     FROM citas_chatbot c
     LEFT JOIN prospectos p ON c.prospecto_id = p.id
     WHERE c.fecha = :fecha AND c.estado != 'cancelada'
-    ORDER BY c.hora_inicio ASC
     """
-    rows = await database.fetch_all(query=query, values={"fecha": fecha_val})
+    values = {"fecha": fecha_val}
+    if excluir_prospecto_id:
+        query += " AND (c.prospecto_id IS NULL OR c.prospecto_id != :excluir_prospecto_id)"
+        values["excluir_prospecto_id"] = excluir_prospecto_id
+    query += " ORDER BY c.hora_inicio ASC"
+    rows = await database.fetch_all(query=query, values=values)
     citas_dia = []
     for r in rows:
         d = dict(r._mapping)

@@ -4502,9 +4502,32 @@ async def agendar_cita_bot(args: dict, phone: str, nombre_default: str = "") -> 
     except Exception:
         return _json.dumps({"ok": False, "error": "Fecha u hora con formato inválido. Usa fecha YYYY-MM-DD y hora HH:MM."})
 
-    # Disponibilidad
+    prospecto = await get_prospecto_by_telefono(phone) if phone else None
+    prospecto_id = prospecto["id"] if prospecto else None
+
+    # ¿El cliente YA tiene una cita? Si es la misma fecha/hora, es SU cita: no re-agendar
+    # ni tratarla como conflicto (bug: pedía ubicación y el bot decía "ocupado").
+    hora_norm = hora if len(hora) == 5 else hora + ":00"
+    if prospecto_id:
+        try:
+            citas_previas = await get_citas_chatbot(prospecto_id=prospecto_id)
+        except Exception:
+            citas_previas = []
+        for cp in citas_previas:
+            if str(cp.get("estado")) == "cancelada":
+                continue
+            cp_fecha = str(cp.get("fecha") or "")
+            cp_hora = str(cp.get("hora_inicio") or "")[:5]
+            if cp_fecha == fecha and cp_hora == hora[:5]:
+                return _json.dumps({
+                    "ok": True, "ya_agendada": True, "cita_id": cp.get("id"),
+                    "fecha": fecha, "hora": hora, "nombre": nombre, "desarrollo": desarrollo,
+                    "mensaje": "El cliente ya tiene ESTA cita agendada. No la re-agendes; solo respóndele lo que pregunte (ej. la ubicación).",
+                })
+
+    # Disponibilidad (excluyendo las citas propias del mismo cliente)
     try:
-        disp = await check_disponibilidad_citas(fecha, hora)
+        disp = await check_disponibilidad_citas(fecha, hora, excluir_prospecto_id=prospecto_id)
     except Exception as e:
         return _json.dumps({"ok": False, "error": f"No pude verificar disponibilidad: {e}"})
     if disp.get("hora_solicitada_ocupada"):
@@ -4514,11 +4537,8 @@ async def agendar_cita_bot(args: dict, phone: str, nombre_default: str = "") -> 
         })
 
     # Hora fin (+1h)
-    hora_obj = _time.fromisoformat(hora if len(hora) == 5 else hora + ":00")
+    hora_obj = _time.fromisoformat(hora_norm)
     hora_fin = (_dt.combine(_dt.today(), hora_obj) + _td(hours=1)).time().strftime("%H:%M")
-
-    prospecto = await get_prospecto_by_telefono(phone) if phone else None
-    prospecto_id = prospecto["id"] if prospecto else None
 
     try:
         cita_id = await create_cita_chatbot({
@@ -5178,6 +5198,17 @@ def _telefono_desde_payload(payload: dict, exclude: str = "") -> str:
     return encontrados[0] if encontrados else ""
 
 
+def _normalizar_tel_mx(telefono: str) -> str:
+    """Deja el número de México en 10 dígitos: quita el prefijo de país 52 y el 1
+    de celular (52 + 10 = 12, o 521 + 10 = 13). Otros países se dejan igual."""
+    d = "".join(c for c in str(telefono or "") if c.isdigit())
+    if d.startswith("521") and len(d) == 13:
+        return d[3:]
+    if d.startswith("52") and len(d) == 12:
+        return d[2:]
+    return d
+
+
 @app.post("/api/whatsapp/webhook")
 async def whatsapp_webhook(request: Request):
     """Webhook DIRECTO de WAHA (reemplaza a n8n). Configura en WAHA:
@@ -5216,6 +5247,10 @@ async def whatsapp_webhook(request: Request):
             print(f"[WA-DEBUG] payload={json.dumps(payload, ensure_ascii=False)[:1500]}")
         except Exception:
             pass
+
+    # México: guardar/mostrar solo los 10 dígitos (quitar 52/521). El envío por WhatsApp
+    # usa chat_id (frm), así que recortar 'phone' no afecta la entrega de mensajes.
+    phone = _normalizar_tel_mx(phone)
 
     # Detectar prefijo de referido al inicio (ej: "N- Hola", "R-🏡 ...").
     # Permite emoji/texto pegado al guion (sin espacio).
