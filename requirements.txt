@@ -4,6 +4,8 @@ python-multipart
 jinja2
 openai
 anthropic
+google-api-python-client
+google-auth
 python-dotenv
 aiofiles
 fpdf2

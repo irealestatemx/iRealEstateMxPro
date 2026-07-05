@@ -4204,6 +4204,12 @@ except Exception as _e:
     _BOT_CLAUDE_OK = False
     print(f"[BOT] bot_claude no disponible: {_e}")
 
+try:
+    import gcal
+except Exception as _e:
+    gcal = None
+    print(f"[GCAL] módulo no disponible: {_e}")
+
 _message_buffer: Dict[str, dict] = {}
 _kommo_created: Dict[str, float] = {}  # telefono -> timestamp de ultimo lead creado
 _paused_chats: Dict[str, float] = {}  # telefono -> timestamp de cuando se pauso
@@ -4388,6 +4394,7 @@ def _construir_catalogo_texto() -> str:
             f"  Tipo: {d.get('tipo','')}  |  Desde: {d.get('precio_desde','')}\n"
             f"  {d.get('descripcion_corta','')}\n"
             + (f"  Diferenciales: {difs}\n" if difs else "")
+            + (f"  Mapa (envíalo si piden ubicación): {d.get('mapa_url')}\n" if d.get('mapa_url') else "")
             + (f"  Ficha PDF: {d.get('pdf_url')}\n" if d.get('pdf_url') else "")
         )
     return "\n".join(partes)
@@ -4528,13 +4535,31 @@ async def agendar_cita_bot(args: dict, phone: str, nombre_default: str = "") -> 
     except Exception as e:
         return _json.dumps({"ok": False, "error": f"No pude registrar la cita: {e}"})
 
-    # Actualizar prospecto
+    # ─── Crear el evento REAL en Google Calendar (como en n8n) ───
+    try:
+        if gcal and gcal.calendar_configurado():
+            desc_cal = f"Cliente: {nombre}\nTeléfono: {phone}\nDesarrollo: {desarrollo}\n{notas}".strip()
+            gid = await asyncio.to_thread(
+                gcal.crear_evento,
+                f"Visita {desarrollo} - {nombre}".strip(),
+                desc_cal, desarrollo or "iRealEstateMx",
+                fecha, hora, hora_fin,
+            )
+            if gid:
+                await update_cita_chatbot(cita_id, {"google_event_id": gid})
+    except Exception as e:
+        print(f"[CITA] Google Calendar falló: {e}")
+
+    # Actualizar prospecto (estado + guardar el nombre que dio el cliente al agendar)
     if prospecto_id:
         try:
-            await update_prospecto(prospecto_id, {"estado": "cita_agendada"})
+            ups = {"estado": "cita_agendada"}
+            if nombre and nombre != "Cliente" and (not prospecto.get("nombre_cliente") or prospecto.get("nombre_cliente") in ("", "Cliente")):
+                ups["nombre_cliente"] = nombre
+            await update_prospecto(prospecto_id, ups)
             await agregar_historial_prospecto(prospecto_id, {
                 "tipo": "cita_agendada",
-                "mensaje": f"Cita {fecha} {hora} - {desarrollo}",
+                "mensaje": f"Cita {fecha} {hora} - {desarrollo} (a nombre de {nombre})",
                 "fecha": str(_dt.now()),
                 "datos": {"cita_id": cita_id, "fecha": fecha, "hora": hora},
             })
@@ -5143,12 +5168,23 @@ async def whatsapp_webhook(request: Request):
     if not frm or frm.endswith("@g.us") or frm == "status@broadcast":
         return JSONResponse({"ok": True, "ignored": "no_privado"})
 
-    phone = frm.split("@")[0]
     message = payload.get("body") or ""
     from_me = bool(payload.get("fromMe"))
     _pd = payload.get("_data") or {}
     name = _pd.get("notifyName") or payload.get("notifyName") or ""
-    chat_id = frm
+    chat_id = frm  # para responder funciona con @c.us o @lid
+
+    # Teléfono real: WAHA a veces manda un @lid (id privado) en 'from'. Buscar un
+    # número @c.us en los campos alternativos; si no hay, usar lo que venga.
+    phone = ""
+    for cand in (frm, _pd.get("from"), _pd.get("author"), payload.get("author"),
+                 payload.get("participant"), (_pd.get("id") or {}).get("participant") if isinstance(_pd.get("id"), dict) else None):
+        c = str(cand or "")
+        if c.endswith("@c.us"):
+            phone = c.split("@")[0]
+            break
+    if not phone:
+        phone = frm.split("@")[0]
 
     # Detectar prefijo de referido al inicio (ej: "N- Hola", "R-🏡 ...").
     # Permite emoji/texto pegado al guion (sin espacio).
@@ -5363,6 +5399,7 @@ DESARROLLOS_DATA = {
         ],
         "tags": ["Alta plusvalía", "Casas nuevas", "Personalizable"],
         "pdf_url": "https://api.irealestatemx.cloud/static/docs/carcamos-residencial.pdf",
+        "mapa_url": "https://maps.app.goo.gl/VEjXnGPVXvGzNNim9",
     },
     "privada-del-fresno": {
         "slug": "privada-del-fresno",
@@ -5384,6 +5421,7 @@ DESARROLLOS_DATA = {
         ],
         "tags": ["Exclusivo", "Preventa", "Amenidades"],
         "pdf_url": "https://api.irealestatemx.cloud/static/docs/privada-del-fresno.pdf",
+        "mapa_url": "https://maps.app.goo.gl/bANj9rgwFXgR16Q19",
     },
 }
 

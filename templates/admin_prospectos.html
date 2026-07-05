@@ -387,7 +387,7 @@
                   {% endif %}
                 </td>
                 <td>
-                  {% if p.fuente == 'chatbot' %}<span class="badge badge-chatbot">Chatbot</span>
+                  {% if p.fuente == 'chatbot' %}<span class="badge badge-chatbot">Chatbot</span>{% if p.referido_nombre %} <span class="badge badge-referido">{{ p.referido_nombre }}</span>{% endif %}
                   {% elif p.fuente == 'manual' and p.referido_nombre %}<span class="badge badge-manual">Manual</span> <span class="badge badge-referido">{{ p.referido_nombre }}</span>
                   {% elif p.referido_nombre %}<span class="badge badge-referido">{{ p.referido_nombre }}</span>
                   {% else %}<span class="badge badge-manual">Manual</span>{% endif %}
